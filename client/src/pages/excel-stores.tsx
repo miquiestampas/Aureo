@@ -38,8 +38,11 @@ import {
   Download,
   Eye,
   Table,
+  Search,
+  UploadCloud,
   Info
 } from "lucide-react";
+import FileUploadModal from "@/components/FileUploadModal";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 
@@ -76,6 +79,7 @@ export default function ExcelStoresPage() {
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [showFileUploadModal, setShowFileUploadModal] = useState(false);
   const [detailsData, setDetailsData] = useState<ExcelData | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   
@@ -236,74 +240,32 @@ export default function ExcelStoresPage() {
           <h1 className="text-2xl font-semibold text-gray-900">Tiendas Excel</h1>
           
           <div className="flex space-x-2">
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Subir Archivo Excel
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Subir Archivo Excel</DialogTitle>
-                  <DialogDescription>
-                    Sube un archivo Excel que contenga datos de compras de la tienda.
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="store">Seleccionar Tienda</Label>
-                    <Select 
-                      onValueChange={(value) => setSelectedStore(value)}
-                      value={selectedStore || undefined}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione una tienda" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stores?.filter(store => store.type === "Excel").map(store => (
-                          <SelectItem key={store.id} value={store.code}>
-                            {store.name} ({store.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="file">Archivo Excel</Label>
-                    <Input 
-                      id="file" 
-                      type="file" 
-                      accept=".xlsx,.xls" 
-                      onChange={handleFileChange}
-                    />
-                    <p className="text-sm text-gray-500">
-                      Solo se aceptan archivos Excel (.xlsx, .xls).
-                    </p>
-                  </div>
-                </div>
-                
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button 
-                    onClick={handleUpload} 
-                    disabled={!selectedStore || !uploadFile || uploadMutation.isPending}
-                  >
-                    {uploadMutation.isPending ? "Subiendo..." : "Subir"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <Button 
+              className="bg-primary hover:bg-primary/90"
+              onClick={() => setShowFileUploadModal(true)}
+            >
+              <UploadCloud className="mr-2 h-4 w-4" />
+              Cargar Archivos Excel
+            </Button>
+            
+            <Button variant="outline">
+              <Search className="mr-2 h-4 w-4" />
+              Buscar Registros
+            </Button>
             
             <Button variant="outline">
               <Download className="mr-2 h-4 w-4" />
               Exportar Datos
             </Button>
           </div>
+          
+          {/* Nuevo Modal de Carga de Archivos */}
+          <FileUploadModal 
+            isOpen={showFileUploadModal}
+            onClose={() => setShowFileUploadModal(false)}
+            storesByType={stores?.filter(store => store.type === "Excel") || []}
+            fileType="Excel"
+          />
         </div>
         
         <Card className="mb-6">
