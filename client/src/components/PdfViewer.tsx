@@ -30,19 +30,31 @@ export default function PdfViewer({ isOpen, onClose, documentId, storeCode, docu
       setIsLoading(true);
       setError(null);
       
-      // Obtener la URL del PDF del servidor
-      fetch(`/api/pdf-documents/${documentId}/view`)
+      // Primero obtener los detalles del documento
+      fetch(`/api/pdf-documents/${documentId}`)
         .then(response => {
           if (!response.ok) {
-            throw new Error(`Error al cargar el documento: ${response.status}`);
+            throw new Error(`Error al obtener detalles del documento: ${response.status}`);
           }
-          return response.blob();
+          return response.json();
         })
-        .then(blob => {
-          // Crear una URL del objeto para mostrar el PDF
-          const url = URL.createObjectURL(blob);
-          setPdfUrl(url);
-          setIsLoading(false);
+        .then(docInfo => {
+          // Luego obtener el contenido del PDF
+          return fetch(`/api/pdf-documents/${documentId}/view`)
+            .then(response => {
+              if (!response.ok) {
+                throw new Error(`Error al cargar el documento: ${response.status}`);
+              }
+              return response.blob();
+            })
+            .then(blob => {
+              // Crear una URL del objeto para mostrar el PDF
+              const url = URL.createObjectURL(blob);
+              setPdfUrl(url);
+              setIsLoading(false);
+              
+              console.log("PDF cargado correctamente:", docInfo);
+            });
         })
         .catch(err => {
           console.error("Error al cargar el PDF:", err);

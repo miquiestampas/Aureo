@@ -134,58 +134,85 @@ async function handleNewExcelFile(filePath: string) {
   try {
     const filename = path.basename(filePath);
     
-    // Estrategias mejoradas para extraer el código de tienda del nombre del archivo
-    let storeCode = '';
+    // Buscar todas las tiendas y usar la primera que coincida con el nombre del archivo
+    const allStores = await storage.getStores();
+    let foundStore = null;
     
-    // 1. Intentar el formato STORECODE_*.xlsx
-    const formatMatch = filename.match(/^([^_\.]+)_/);
-    if (formatMatch && formatMatch[1]) {
-      storeCode = formatMatch[1];
-    } 
-    // 2. Intentar el formato STORECODE.*.xlsx
-    else {
-      const dotMatch = filename.match(/^([^\.]+)\./);
-      if (dotMatch && dotMatch[1]) {
-        storeCode = dotMatch[1];
-      }
-      // 3. Si no se encontró ningún patrón, usar el nombre completo sin extensión como código
-      else {
-        const nameWithoutExtension = path.parse(filename).name;
-        storeCode = nameWithoutExtension;
+    // Primero intentar coincidencia exacta de código
+    for (const store of allStores) {
+      if (filename.includes(store.code)) {
+        foundStore = store;
+        console.log(`Excel matched with store by code: ${store.code}`);
+        break;
       }
     }
     
-    console.log(`New Excel file detected: ${filename} (Store: ${storeCode})`);
-    
-    // Verificar si la tienda existe
-    const storeExists = await storage.getStoreByCode(storeCode);
-    if (!storeExists) {
-      console.warn(`Store with code ${storeCode} does not exist. Marking file activity as failed.`);
+    // Si no se encontró coincidencia, intentar con expresiones regulares
+    if (!foundStore) {
+      // Estrategias para extraer el código de tienda del nombre del archivo
+      let storeCode = '';
       
-      // Crear actividad de archivo con error
+      // 1. Intentar el formato STORECODE_*.xlsx
+      const formatMatch = filename.match(/^([^_\.]+)_/);
+      if (formatMatch && formatMatch[1]) {
+        storeCode = formatMatch[1];
+      } 
+      // 2. Intentar el formato STORECODE.*.xlsx
+      else {
+        const dotMatch = filename.match(/^([^\.]+)\./);
+        if (dotMatch && dotMatch[1]) {
+          storeCode = dotMatch[1];
+        }
+        // 3. Si no se encontró ningún patrón, usar el nombre completo sin extensión como código
+        else {
+          const nameWithoutExtension = path.parse(filename).name;
+          storeCode = nameWithoutExtension;
+        }
+      }
+      
+      // Intentar buscar la tienda con el código extraído
+      foundStore = await storage.getStoreByCode(storeCode);
+      
+      // Si aún no hay coincidencia, usar la primera tienda Excel disponible
+      if (!foundStore) {
+        const excelStores = await storage.getStoresByType('Excel');
+        if (excelStores.length > 0) {
+          foundStore = excelStores[0];
+          console.log(`No store match found for ${filename}, using default Excel store: ${foundStore.code}`);
+        }
+      }
+    }
+    
+    if (!foundStore) {
+      console.warn(`Warning: No suitable store found for ${filename}`);
+      
+      // Crear actividad de archivo con estado Failed
       const activity = await storage.createFileActivity({
         filename,
-        storeCode,
+        storeCode: "UNKNOWN",
         fileType: 'Excel',
         status: 'Failed',
         processingDate: new Date(),
         processedBy: 'System',
-        errorMessage: `La tienda con código ${storeCode} no existe en el sistema.`,
+        errorMessage: `No se encontró una tienda adecuada para este archivo.`,
         metadata: null
       });
       
-      // Emitir eventos de detección y fallo
+      // Emit file detection and failure
       emitFileDetected({
         id: activity.id,
         filename,
-        storeCode,
+        storeCode: "UNKNOWN",
         fileType: 'Excel',
         status: 'Failed'
       });
       
-      emitFileProcessingStatus(activity.id, 'Failed', `La tienda con código ${storeCode} no existe en el sistema.`);
+      emitFileProcessingStatus(activity.id, 'Failed', `No se encontró una tienda adecuada para este archivo.`);
       return;
     }
+    
+    const storeCode = foundStore.code;
+    console.log(`Excel file ${filename} will be processed for store: ${storeCode}`);
     
     // Crear actividad de archivo
     const activity = await storage.createFileActivity({
@@ -221,81 +248,105 @@ async function handleNewPdfFile(filePath: string) {
   try {
     const filename = path.basename(filePath);
     
-    // Estrategias mejoradas para extraer el código de tienda del nombre del archivo
-    let storeCode = '';
+    // Buscar todas las tiendas y usar la primera que coincida con el nombre del archivo
+    const allStores = await storage.getStores();
+    let foundStore = null;
     
-    // Expresiones regulares para detectar códigos de tienda en diferentes formatos
-    // El patrón común de código de tienda suele ser letras/números seguidos por más letras/números
-    
-    // 1. Buscar por patrón J12345ABCDE (formato común que comienza con J seguido de números y letras)
-    const j_pattern = /\b(J\d{5}[A-Z0-9]{4,5})\b/i;
-    const j_match = filename.match(j_pattern);
-    
-    if (j_match && j_match[1]) {
-      storeCode = j_match[1];
-    }
-    // 2. Intentar formato general de códigos: LETRA+NÚMEROS o NÚMEROS+LETRA
-    else {
-      const general_pattern = /\b([A-Z]\d{1,6}|J\d{2,6}[a-z]{1,3})\b/i;
-      const general_match = filename.match(general_pattern);
-      
-      if (general_match && general_match[1]) {
-        storeCode = general_match[1];
+    // Primero intentar coincidencia exacta de código
+    for (const store of allStores) {
+      if (filename.includes(store.code)) {
+        foundStore = store;
+        console.log(`PDF matched with store by code: ${store.code}`);
+        break;
       }
-      // 3. Intentar el formato STORECODE_*.pdf
+    }
+    
+    // Si no se encontró coincidencia, intentar con expresiones regulares
+    if (!foundStore) {
+      // Estrategias para extraer el código de tienda del nombre del archivo
+      let storeCode = '';
+      
+      // 1. Buscar por patrón J12345ABCDE (formato común que comienza con J seguido de números y letras)
+      const j_pattern = /\b(J\d{5}[A-Z0-9]{4,5})\b/i;
+      const j_match = filename.match(j_pattern);
+      
+      if (j_match && j_match[1]) {
+        storeCode = j_match[1];
+      }
+      // 2. Intentar formato general de códigos: LETRA+NÚMEROS o NÚMEROS+LETRA
       else {
-        const formatMatch = filename.match(/^([^_\.]+)_/);
-        if (formatMatch && formatMatch[1]) {
-          storeCode = formatMatch[1];
-        } 
-        // 4. Intentar el formato STORECODE.*.pdf
+        const general_pattern = /\b([A-Z]\d{1,6}|J\d{2,6}[a-z]{1,3})\b/i;
+        const general_match = filename.match(general_pattern);
+        
+        if (general_match && general_match[1]) {
+          storeCode = general_match[1];
+        }
+        // 3. Intentar el formato STORECODE_*.pdf
         else {
-          const dotMatch = filename.match(/^([^\.]+)\./);
-          if (dotMatch && dotMatch[1]) {
-            storeCode = dotMatch[1];
-          }
-          // 5. Si no se encontró ningún patrón, usar el nombre completo sin extensión como código
+          const formatMatch = filename.match(/^([^_\.]+)_/);
+          if (formatMatch && formatMatch[1]) {
+            storeCode = formatMatch[1];
+          } 
+          // 4. Intentar el formato STORECODE.*.pdf
           else {
-            const nameWithoutExtension = path.parse(filename).name;
-            storeCode = nameWithoutExtension;
+            const dotMatch = filename.match(/^([^\.]+)\./);
+            if (dotMatch && dotMatch[1]) {
+              storeCode = dotMatch[1];
+            }
+            // 5. Si no se encontró ningún patrón, usar el nombre completo sin extensión como código
+            else {
+              const nameWithoutExtension = path.parse(filename).name;
+              storeCode = nameWithoutExtension;
+            }
           }
+        }
+      }
+      
+      // Intentar buscar la tienda con el código extraído
+      foundStore = await storage.getStoreByCode(storeCode);
+      
+      // Si aún no hay coincidencia, usar la primera tienda PDF disponible
+      if (!foundStore) {
+        const pdfStores = await storage.getStoresByType('PDF');
+        if (pdfStores.length > 0) {
+          foundStore = pdfStores[0];
+          console.log(`No store match found for ${filename}, using default PDF store: ${foundStore.code}`);
         }
       }
     }
     
-    console.log(`New PDF file detected: ${filename} (Store: ${storeCode})`);
-    
-    // Check if the store exists
-    const storeExists = await storage.getStoreByCode(storeCode);
-    if (!storeExists) {
-      console.warn(`Store with code ${storeCode} does not exist. Marking file activity as failed.`);
+    if (!foundStore) {
+      console.warn(`Warning: No suitable store found for ${filename}`);
       
-      // Create file activity entry with error
+      // Crear actividad de archivo con estado Failed
       const activity = await storage.createFileActivity({
         filename,
-        storeCode,
+        storeCode: "UNKNOWN",
         fileType: 'PDF',
         status: 'Failed',
         processingDate: new Date(),
         processedBy: 'System',
-        errorMessage: `La tienda con código ${storeCode} no existe en el sistema.`,
+        errorMessage: `No se encontró una tienda adecuada para este archivo.`,
         metadata: null
       });
       
-      // Emit file detection and failure events
+      // Emit file detection and failure
       emitFileDetected({
         id: activity.id,
         filename,
-        storeCode,
+        storeCode: "UNKNOWN",
         fileType: 'PDF',
         status: 'Failed'
       });
       
-      emitFileProcessingStatus(activity.id, 'Failed', `La tienda con código ${storeCode} no existe en el sistema.`);
+      emitFileProcessingStatus(activity.id, 'Failed', `No se encontró una tienda adecuada para este archivo.`);
       return;
     }
     
-    // Create file activity entry
+    const storeCode = foundStore.code;
+    console.log(`PDF file ${filename} will be processed for store: ${storeCode}`);
+    
+    // Crear actividad de archivo
     const activity = await storage.createFileActivity({
       filename,
       storeCode,
