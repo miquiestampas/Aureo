@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -149,3 +149,112 @@ export const insertPdfDocumentSchema = createInsertSchema(pdfDocuments).pick({
 
 export type InsertPdfDocument = z.infer<typeof insertPdfDocumentSchema>;
 export type PdfDocument = typeof pdfDocuments.$inferSelect;
+
+// Persona de interés (Watchlist)
+export const watchlistPersons = pgTable("watchlist_persons", {
+  id: serial("id").primaryKey(),
+  fullName: text("full_name").notNull(),
+  identificationNumber: text("identification_number"), // Número de identificación como DUI, pasaporte, etc.
+  phone: text("phone"),
+  notes: text("notes"),
+  riskLevel: text("risk_level", { enum: ["Alto", "Medio", "Bajo"] }).notNull().default("Medio"),
+  status: text("status", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").notNull(), // ID del usuario que agregó el registro
+  lastUpdated: timestamp("last_updated"),
+});
+
+export const insertWatchlistPersonSchema = createInsertSchema(watchlistPersons).pick({
+  fullName: true,
+  identificationNumber: true,
+  phone: true,
+  notes: true,
+  riskLevel: true,
+  status: true,
+  createdBy: true,
+});
+
+export type InsertWatchlistPerson = z.infer<typeof insertWatchlistPersonSchema>;
+export type WatchlistPerson = typeof watchlistPersons.$inferSelect;
+
+// Objeto de interés (Watchlist de artículos)
+export const watchlistItems = pgTable("watchlist_items", {
+  id: serial("id").primaryKey(),
+  itemType: text("item_type").notNull(), // Tipo de joya, electrónico, etc.
+  description: text("description").notNull(),
+  serialNumber: text("serial_number"),
+  identificationMarks: text("identification_marks"), // Marcas distintivas, grabados, etc.
+  model: text("model"),
+  brand: text("brand"),
+  notes: text("notes"),
+  riskLevel: text("risk_level", { enum: ["Alto", "Medio", "Bajo"] }).notNull().default("Medio"),
+  status: text("status", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").notNull(), // ID del usuario que agregó el registro
+  lastUpdated: timestamp("last_updated"),
+});
+
+export const insertWatchlistItemSchema = createInsertSchema(watchlistItems).pick({
+  itemType: true,
+  description: true,
+  serialNumber: true,
+  identificationMarks: true,
+  model: true,
+  brand: true,
+  notes: true,
+  riskLevel: true,
+  status: true,
+  createdBy: true,
+});
+
+export type InsertWatchlistItem = z.infer<typeof insertWatchlistItemSchema>;
+export type WatchlistItem = typeof watchlistItems.$inferSelect;
+
+// Alertas generadas
+export const alerts = pgTable("alerts", {
+  id: serial("id").primaryKey(),
+  alertType: text("alert_type", { enum: ["Persona", "Objeto"] }).notNull(),
+  excelDataId: integer("excel_data_id").notNull(), // ID del registro de excelData que generó la alerta
+  watchlistPersonId: integer("watchlist_person_id"), // ID de la persona en watchlist (si es alerta de persona)
+  watchlistItemId: integer("watchlist_item_id"), // ID del objeto en watchlist (si es alerta de objeto)
+  matchConfidence: integer("match_confidence").notNull(), // Porcentaje de confianza en la coincidencia (0-100)
+  status: text("status", { enum: ["Nueva", "Revisada", "Falsa"] }).notNull().default("Nueva"),
+  reviewedBy: integer("reviewed_by"), // ID del usuario que revisó la alerta
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export const insertAlertSchema = createInsertSchema(alerts).pick({
+  alertType: true,
+  excelDataId: true,
+  watchlistPersonId: true,
+  watchlistItemId: true,
+  matchConfidence: true,
+  status: true,
+  reviewedBy: true,
+  reviewNotes: true,
+});
+
+export type InsertAlert = z.infer<typeof insertAlertSchema>;
+export type Alert = typeof alerts.$inferSelect;
+
+// Historial de búsquedas
+export const searchHistory = pgTable("search_history", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  searchType: text("search_type", { enum: ["Cliente", "Artículo", "Orden", "General"] }).notNull(),
+  searchTerms: text("search_terms").notNull(),
+  searchDate: timestamp("search_date").notNull().defaultNow(),
+  resultCount: integer("result_count").notNull(),
+});
+
+export const insertSearchHistorySchema = createInsertSchema(searchHistory).pick({
+  userId: true,
+  searchType: true,
+  searchTerms: true,
+  resultCount: true,
+});
+
+export type InsertSearchHistory = z.infer<typeof insertSearchHistorySchema>;
+export type SearchHistory = typeof searchHistory.$inferSelect;

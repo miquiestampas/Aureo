@@ -53,10 +53,39 @@ export interface IStorage {
   // ExcelData methods
   createExcelData(data: InsertExcelData): Promise<ExcelData>;
   getExcelDataByStore(storeCode: string): Promise<ExcelData[]>;
+  searchExcelData(query: string, filters?: any): Promise<ExcelData[]>;
+  getExcelDataById(id: number): Promise<ExcelData | undefined>;
   
   // PdfDocument methods
   createPdfDocument(doc: InsertPdfDocument): Promise<PdfDocument>;
   getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]>;
+  
+  // Watchlist Person methods
+  createWatchlistPerson(person: InsertWatchlistPerson): Promise<WatchlistPerson>;
+  getWatchlistPersons(includeInactive?: boolean): Promise<WatchlistPerson[]>;
+  getWatchlistPerson(id: number): Promise<WatchlistPerson | undefined>;
+  updateWatchlistPerson(id: number, person: Partial<WatchlistPerson>): Promise<WatchlistPerson | undefined>;
+  deleteWatchlistPerson(id: number): Promise<boolean>;
+  searchWatchlistPersons(query: string): Promise<WatchlistPerson[]>;
+  
+  // Watchlist Item methods
+  createWatchlistItem(item: InsertWatchlistItem): Promise<WatchlistItem>;
+  getWatchlistItems(includeInactive?: boolean): Promise<WatchlistItem[]>;
+  getWatchlistItem(id: number): Promise<WatchlistItem | undefined>;
+  updateWatchlistItem(id: number, item: Partial<WatchlistItem>): Promise<WatchlistItem | undefined>;
+  deleteWatchlistItem(id: number): Promise<boolean>;
+  searchWatchlistItems(query: string): Promise<WatchlistItem[]>;
+  
+  // Alert methods
+  createAlert(alert: InsertAlert): Promise<Alert>;
+  getAlerts(status?: string, limit?: number): Promise<Alert[]>;
+  getAlert(id: number): Promise<Alert | undefined>;
+  updateAlertStatus(id: number, status: string, reviewedBy: number, notes?: string): Promise<Alert | undefined>;
+  getAlertsByExcelDataId(excelDataId: number): Promise<Alert[]>;
+  
+  // Search History methods
+  addSearchHistory(searchHistory: InsertSearchHistory): Promise<SearchHistory>;
+  getRecentSearches(userId: number, limit?: number): Promise<SearchHistory[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -498,6 +527,280 @@ export class DatabaseStorage implements IStorage {
       .from(pdfDocuments)
       .where(eq(pdfDocuments.storeCode, storeCode))
       .orderBy(desc(pdfDocuments.uploadDate));
+  }
+  
+  // Nuevos métodos de ExcelData para búsqueda
+  async searchExcelData(query: string, filters?: any): Promise<ExcelData[]> {
+    const searchQuery = `%${query}%`;
+    let baseQuery = db
+      .select()
+      .from(excelData);
+      
+    // Aplicar búsqueda por texto en múltiples campos
+    baseQuery = baseQuery.where(
+      or(
+        like(excelData.customerName, searchQuery),
+        like(excelData.customerContact, searchQuery),
+        like(excelData.orderNumber, searchQuery),
+        like(excelData.itemDetails, searchQuery),
+        like(excelData.metals, searchQuery),
+        like(excelData.engravings, searchQuery),
+        like(excelData.pawnTicket, searchQuery)
+      )
+    );
+    
+    // Aplicar filtros adicionales si están presentes
+    if (filters) {
+      if (filters.storeCode) {
+        baseQuery = baseQuery.where(eq(excelData.storeCode, filters.storeCode));
+      }
+      
+      if (filters.dateFrom && filters.dateTo) {
+        baseQuery = baseQuery.where(
+          and(
+            gte(excelData.orderDate, filters.dateFrom),
+            lte(excelData.orderDate, filters.dateTo)
+          )
+        );
+      }
+    }
+    
+    return await baseQuery.orderBy(desc(excelData.orderDate));
+  }
+  
+  async getExcelDataById(id: number): Promise<ExcelData | undefined> {
+    const [data] = await db
+      .select()
+      .from(excelData)
+      .where(eq(excelData.id, id));
+    return data;
+  }
+  
+  // Watchlist Person methods
+  async createWatchlistPerson(person: InsertWatchlistPerson): Promise<WatchlistPerson> {
+    const [watchlistPerson] = await db
+      .insert(watchlistPersons)
+      .values(person)
+      .returning();
+    return watchlistPerson;
+  }
+  
+  async getWatchlistPersons(includeInactive: boolean = false): Promise<WatchlistPerson[]> {
+    let query = db.select().from(watchlistPersons);
+    
+    if (!includeInactive) {
+      query = query.where(eq(watchlistPersons.status, "Activo"));
+    }
+    
+    return await query.orderBy(desc(watchlistPersons.createdAt));
+  }
+  
+  async getWatchlistPerson(id: number): Promise<WatchlistPerson | undefined> {
+    const [person] = await db
+      .select()
+      .from(watchlistPersons)
+      .where(eq(watchlistPersons.id, id));
+    return person;
+  }
+  
+  async updateWatchlistPerson(id: number, personUpdate: Partial<WatchlistPerson>): Promise<WatchlistPerson | undefined> {
+    // Actualizar la fecha de última modificación
+    const updateData = {
+      ...personUpdate,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const [updatedPerson] = await db
+      .update(watchlistPersons)
+      .set(updateData)
+      .where(eq(watchlistPersons.id, id))
+      .returning();
+    return updatedPerson;
+  }
+  
+  async deleteWatchlistPerson(id: number): Promise<boolean> {
+    // En lugar de eliminar, marcamos como inactivo
+    const [updated] = await db
+      .update(watchlistPersons)
+      .set({ 
+        status: "Inactivo",
+        lastUpdated: new Date().toISOString() 
+      })
+      .where(eq(watchlistPersons.id, id))
+      .returning();
+    return !!updated;
+  }
+  
+  async searchWatchlistPersons(query: string): Promise<WatchlistPerson[]> {
+    const searchQuery = `%${query}%`;
+    return await db
+      .select()
+      .from(watchlistPersons)
+      .where(
+        and(
+          eq(watchlistPersons.status, "Activo"),
+          or(
+            like(watchlistPersons.fullName, searchQuery),
+            like(watchlistPersons.identificationNumber, searchQuery),
+            like(watchlistPersons.phone, searchQuery)
+          )
+        )
+      )
+      .orderBy(desc(watchlistPersons.createdAt));
+  }
+  
+  // Watchlist Item methods
+  async createWatchlistItem(item: InsertWatchlistItem): Promise<WatchlistItem> {
+    const [watchlistItem] = await db
+      .insert(watchlistItems)
+      .values(item)
+      .returning();
+    return watchlistItem;
+  }
+  
+  async getWatchlistItems(includeInactive: boolean = false): Promise<WatchlistItem[]> {
+    let query = db.select().from(watchlistItems);
+    
+    if (!includeInactive) {
+      query = query.where(eq(watchlistItems.status, "Activo"));
+    }
+    
+    return await query.orderBy(desc(watchlistItems.createdAt));
+  }
+  
+  async getWatchlistItem(id: number): Promise<WatchlistItem | undefined> {
+    const [item] = await db
+      .select()
+      .from(watchlistItems)
+      .where(eq(watchlistItems.id, id));
+    return item;
+  }
+  
+  async updateWatchlistItem(id: number, itemUpdate: Partial<WatchlistItem>): Promise<WatchlistItem | undefined> {
+    // Actualizar la fecha de última modificación
+    const updateData = {
+      ...itemUpdate,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const [updatedItem] = await db
+      .update(watchlistItems)
+      .set(updateData)
+      .where(eq(watchlistItems.id, id))
+      .returning();
+    return updatedItem;
+  }
+  
+  async deleteWatchlistItem(id: number): Promise<boolean> {
+    // En lugar de eliminar, marcamos como inactivo
+    const [updated] = await db
+      .update(watchlistItems)
+      .set({ 
+        status: "Inactivo",
+        lastUpdated: new Date().toISOString() 
+      })
+      .where(eq(watchlistItems.id, id))
+      .returning();
+    return !!updated;
+  }
+  
+  async searchWatchlistItems(query: string): Promise<WatchlistItem[]> {
+    const searchQuery = `%${query}%`;
+    return await db
+      .select()
+      .from(watchlistItems)
+      .where(
+        and(
+          eq(watchlistItems.status, "Activo"),
+          or(
+            like(watchlistItems.description, searchQuery),
+            like(watchlistItems.serialNumber, searchQuery),
+            like(watchlistItems.model, searchQuery),
+            like(watchlistItems.brand, searchQuery),
+            like(watchlistItems.identificationMarks, searchQuery)
+          )
+        )
+      )
+      .orderBy(desc(watchlistItems.createdAt));
+  }
+  
+  // Alert methods
+  async createAlert(alert: InsertAlert): Promise<Alert> {
+    const [newAlert] = await db
+      .insert(alerts)
+      .values(alert)
+      .returning();
+    return newAlert;
+  }
+  
+  async getAlerts(status?: string, limit: number = 50): Promise<Alert[]> {
+    let query = db.select().from(alerts);
+    
+    if (status) {
+      query = query.where(eq(alerts.status, status));
+    }
+    
+    return await query
+      .orderBy(desc(alerts.createdAt))
+      .limit(limit);
+  }
+  
+  async getAlert(id: number): Promise<Alert | undefined> {
+    const [alert] = await db
+      .select()
+      .from(alerts)
+      .where(eq(alerts.id, id));
+    return alert;
+  }
+  
+  async updateAlertStatus(
+    id: number, 
+    status: string, 
+    reviewedBy: number,
+    notes?: string
+  ): Promise<Alert | undefined> {
+    const updateData: Partial<Alert> = { 
+      status: status as "Nueva" | "Revisada" | "Falsa",
+      reviewedBy,
+      resolvedAt: new Date().toISOString()
+    };
+    
+    if (notes) {
+      updateData.reviewNotes = notes;
+    }
+    
+    const [updatedAlert] = await db
+      .update(alerts)
+      .set(updateData)
+      .where(eq(alerts.id, id))
+      .returning();
+    return updatedAlert;
+  }
+  
+  async getAlertsByExcelDataId(excelDataId: number): Promise<Alert[]> {
+    return await db
+      .select()
+      .from(alerts)
+      .where(eq(alerts.excelDataId, excelDataId))
+      .orderBy(desc(alerts.createdAt));
+  }
+  
+  // Search History methods
+  async addSearchHistory(searchHistory: InsertSearchHistory): Promise<SearchHistory> {
+    const [history] = await db
+      .insert(searchHistory)
+      .values(searchHistory)
+      .returning();
+    return history;
+  }
+  
+  async getRecentSearches(userId: number, limit: number = 10): Promise<SearchHistory[]> {
+    return await db
+      .select()
+      .from(searchHistory)
+      .where(eq(searchHistory.userId, userId))
+      .orderBy(desc(searchHistory.searchDate))
+      .limit(limit);
   }
 }
 
