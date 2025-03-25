@@ -39,26 +39,27 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
-      {/* Sidebar - Always visible on desktop, conditionally on mobile */}
-      <div 
-        className={`md:flex md:flex-shrink-0 ${
-          sidebarOpen ? 'fixed inset-0 z-40 flex lg:hidden' : 'hidden'
-        }`}
-      >
-        {/* Mobile overlay */}
-        {sidebarOpen && (
+      {/* Sidebar for mobile (fixed position when open) */}
+      {sidebarOpen && (
+        <>
+          {/* Mobile overlay */}
           <div 
-            className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+            className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 md:hidden"
             onClick={toggleSidebar}
           />
-        )}
-        
-        <Sidebar />
-      </div>
+          
+          {/* Mobile sidebar */}
+          <div className="fixed inset-y-0 left-0 z-50 w-64 md:hidden">
+            <Sidebar />
+          </div>
+        </>
+      )}
       
-      {/* Always visible on desktop */}
+      {/* Desktop sidebar (always visible) */}
       <div className="hidden md:flex md:flex-shrink-0">
-        <Sidebar />
+        <div className="w-64">
+          <Sidebar />
+        </div>
       </div>
       
       {/* Main Content Area */}
