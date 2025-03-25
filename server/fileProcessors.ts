@@ -143,11 +143,49 @@ async function checkWatchlistMatches(excelData: ExcelData) {
 }
 
 // Función para procesar los valores de una fila y crear una entrada InsertExcelData
+// Función para validar una fecha y devolver una fecha válida o la fecha actual
+function validateDate(dateValue: any): Date {
+  if (!dateValue) return new Date();
+  
+  try {
+    // Intentar crear una fecha válida
+    const date = new Date(dateValue);
+    
+    // Verificar si la fecha es válida (no es NaN y está dentro de un rango razonable)
+    if (isNaN(date.getTime()) || date.getFullYear() < 1900 || date.getFullYear() > 2100) {
+      console.warn(`Fecha inválida detectada: ${dateValue}, usando fecha actual`);
+      return new Date();
+    }
+    
+    return date;
+  } catch (error) {
+    console.warn(`Error al procesar fecha: ${dateValue}, usando fecha actual`, error);
+    return new Date();
+  }
+}
+
+// Función para procesar los valores de una fila y crear una entrada InsertExcelData
 function createExcelDataFromValues(values: any[], storeCode: string, activityId: number): InsertExcelData {
+  // Procesar fecha de orden con validación
+  const orderDate = validateDate(values[2]);
+  
+  // Procesar fecha de venta con validación
+  let saleDate: Date | null = null;
+  if (values[12]) {
+    try {
+      const date = new Date(values[12]);
+      if (!isNaN(date.getTime())) {
+        saleDate = date;
+      }
+    } catch (error) {
+      console.warn(`Error al procesar fecha de venta: ${values[12]}, usando null`, error);
+    }
+  }
+  
   return {
     storeCode: storeCode, // Usamos el código de tienda proporcionado, no el del Excel
     orderNumber: values[1]?.toString() || '', // Columna B
-    orderDate: values[2] ? new Date(values[2]) : new Date(), // Columna C
+    orderDate: orderDate, // Columna C (validada)
     customerName: values[3]?.toString() || '', // Columna D
     customerContact: values[4]?.toString() || '', // Columna E
     itemDetails: values[5]?.toString() || '', // Columna F
@@ -157,7 +195,7 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
     carats: values[9]?.toString() || '', // Columna J
     price: values[10]?.toString() || '', // Columna K
     pawnTicket: values[11]?.toString() || '', // Columna L
-    saleDate: values[12] ? new Date(values[12]) : null, // Columna M
+    saleDate: saleDate, // Columna M (validada)
     fileActivityId: activityId
   };
 }

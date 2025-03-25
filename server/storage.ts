@@ -64,6 +64,7 @@ export interface IStorage {
   // PdfDocument methods
   createPdfDocument(doc: InsertPdfDocument): Promise<PdfDocument>;
   getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]>;
+  getPdfDocument(id: number): Promise<PdfDocument | undefined>;
   
   // Watchlist Person methods
   createWatchlistPerson(person: InsertWatchlistPerson): Promise<WatchlistPerson>;
@@ -358,6 +359,10 @@ export class MemStorage implements IStorage {
         const dateB = new Date(b.uploadDate).getTime();
         return dateB - dateA; // Sort in descending order (newest first)
       });
+  }
+  
+  async getPdfDocument(id: number): Promise<PdfDocument | undefined> {
+    return this.pdfDocuments.get(id);
   }
   
   // Implementación de nuevos métodos para cumplir con la interfaz
@@ -907,6 +912,14 @@ export class DatabaseStorage implements IStorage {
       .from(pdfDocuments)
       .where(eq(pdfDocuments.storeCode, storeCode))
       .orderBy(desc(pdfDocuments.uploadDate));
+  }
+  
+  async getPdfDocument(id: number): Promise<PdfDocument | undefined> {
+    const [document] = await db
+      .select()
+      .from(pdfDocuments)
+      .where(eq(pdfDocuments.id, id));
+    return document;
   }
   
   // Nuevos métodos de ExcelData para búsqueda
