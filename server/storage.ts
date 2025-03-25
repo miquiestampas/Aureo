@@ -14,7 +14,7 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 import connectPg from "connect-pg-simple";
 import { db } from "./db";
-import { eq, desc, like, or, and, gte, lte, inArray } from "drizzle-orm";
+import { eq, desc, like, or, and, gte, lte, inArray, sql } from "drizzle-orm";
 import { pool } from "./db";
 
 const MemoryStore = createMemoryStore(session);
@@ -852,8 +852,8 @@ export class DatabaseStorage implements IStorage {
       // También eliminar alertas asociadas con estos registros de Excel eliminados
       if (result.length > 0) {
         const excelIds = result.map(item => item.id);
-        await db.delete(alerts)
-          .where(inArray(alerts.excelDataId, excelIds));
+        // Usar SQL directo para evitar problemas de nomenclatura de columnas
+        await db.execute(sql`DELETE FROM "alerts" WHERE "exceldataid" IN (${sql.join(excelIds, sql`, `)})`);
       }
       
       return { count: result.length };
