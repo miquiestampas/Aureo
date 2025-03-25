@@ -27,7 +27,13 @@ const getPdfParser = async () => {
 async function checkWatchlistMatches(excelData: ExcelData) {
   try {
     // 1. Verificar coincidencias de personas
-    const watchlistPersons = await storage.getWatchlistPersons();
+    const watchlistPersons = await storage.getWatchlistPersons() || [];
+    
+    // Verificar que watchlistPersons sea iterable
+    if (!Array.isArray(watchlistPersons)) {
+      console.warn("La lista de vigilancia de personas no es un array iterable. Saltando verificación de personas.");
+      return;
+    }
     
     // Verificar coincidencias por nombre
     for (const person of watchlistPersons) {
@@ -49,10 +55,8 @@ async function checkWatchlistMatches(excelData: ExcelData) {
             alertType: "Persona",
             status: "Nueva",
             matchConfidence: confidence,
-            createdAt: new Date(),
             reviewedBy: null,
-            reviewNotes: null,
-            resolvedAt: null
+            reviewNotes: null
           };
           
           await storage.createAlert(alert);
@@ -72,10 +76,8 @@ async function checkWatchlistMatches(excelData: ExcelData) {
           alertType: "Persona",
           status: "Nueva",
           matchConfidence: 95, // Alta confianza para coincidencias de ID
-          createdAt: new Date(),
           reviewedBy: null,
-          reviewNotes: null,
-          resolvedAt: null
+          reviewNotes: null
         };
         
         await storage.createAlert(alert);
@@ -84,7 +86,13 @@ async function checkWatchlistMatches(excelData: ExcelData) {
     }
     
     // 2. Verificar coincidencias de artículos
-    const watchlistItems = await storage.getWatchlistItems();
+    const watchlistItems = await storage.getWatchlistItems() || [];
+    
+    // Verificar que watchlistItems sea iterable
+    if (!Array.isArray(watchlistItems)) {
+      console.warn("La lista de vigilancia de artículos no es un array iterable. Saltando verificación de artículos.");
+      return;
+    }
     
     for (const item of watchlistItems) {
       // Verificar si la descripción del artículo está en los detalles del pedido
@@ -103,10 +111,8 @@ async function checkWatchlistMatches(excelData: ExcelData) {
             alertType: "Objeto",
             status: "Nueva",
             matchConfidence: confidence,
-            createdAt: new Date(),
             reviewedBy: null,
-            reviewNotes: null,
-            resolvedAt: null
+            reviewNotes: null
           };
           
           await storage.createAlert(alert);
