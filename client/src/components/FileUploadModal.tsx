@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, FileSpreadsheet, FilePdf, Upload } from "lucide-react";
+import { AlertCircle, FileSpreadsheet, FileText, Upload } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
@@ -167,7 +167,7 @@ export default function FileUploadModal({ isOpen, onClose, storesByType, fileTyp
     return fileType === "Excel" ? (
       <FileSpreadsheet className="h-5 w-5 text-green-600" />
     ) : (
-      <FilePdf className="h-5 w-5 text-red-600" />
+      <FileText className="h-5 w-5 text-red-600" />
     );
   };
   
@@ -225,7 +225,7 @@ export default function FileUploadModal({ isOpen, onClose, storesByType, fileTyp
           </TabsContent>
           
           <TabsContent value="batch" className="space-y-4 pt-4">
-            <Alert variant="warning">
+            <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Modo de carga por lotes</AlertTitle>
               <AlertDescription>
