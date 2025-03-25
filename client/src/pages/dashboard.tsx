@@ -75,19 +75,19 @@ export default function DashboardPage() {
   const columns: ColumnDef<FileActivity>[] = [
     {
       accessorKey: "storeCode",
-      header: "Store",
+      header: "Tienda",
       cell: ({ row }) => {
         const storeCode = row.original.storeCode;
         return (
           <div>
-            <div className="text-sm font-medium text-gray-900">Store #{storeCode}</div>
+            <div className="text-sm font-medium text-gray-900">Tienda #{storeCode}</div>
           </div>
         );
       }
     },
     {
       accessorKey: "fileType",
-      header: "File Type",
+      header: "Tipo de Archivo",
       cell: ({ row }) => {
         const fileType = row.original.fileType;
         return (
@@ -104,7 +104,7 @@ export default function DashboardPage() {
     },
     {
       accessorKey: "processingDate",
-      header: "Date",
+      header: "Fecha",
       cell: ({ row }) => {
         const date = new Date(row.original.processingDate);
         return (
@@ -116,7 +116,7 @@ export default function DashboardPage() {
     },
     {
       accessorKey: "status",
-      header: "Status",
+      header: "Estado",
       cell: ({ row }) => {
         const status = row.original.status;
         
@@ -124,25 +124,25 @@ export default function DashboardPage() {
           case "Processed":
             return (
               <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">
-                <CheckCircle className="h-3 w-3 mr-1" /> Processed
+                <CheckCircle className="h-3 w-3 mr-1" /> Procesado
               </Badge>
             );
           case "Processing":
             return (
               <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-                <Clock className="h-3 w-3 mr-1" /> Processing
+                <Clock className="h-3 w-3 mr-1" /> Procesando
               </Badge>
             );
           case "Failed":
             return (
               <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100">
-                <XCircle className="h-3 w-3 mr-1" /> Failed
+                <XCircle className="h-3 w-3 mr-1" /> Fallido
               </Badge>
             );
           default:
             return (
               <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                <Clock className="h-3 w-3 mr-1" /> Pending
+                <Clock className="h-3 w-3 mr-1" /> Pendiente
               </Badge>
             );
         }
@@ -150,7 +150,7 @@ export default function DashboardPage() {
     },
     {
       accessorKey: "processedBy",
-      header: "Processed By",
+      header: "Procesado Por",
       cell: ({ row }) => {
         return <div className="text-sm text-gray-500">{row.original.processedBy}</div>;
       }
@@ -162,7 +162,7 @@ export default function DashboardPage() {
         return (
           <div className="text-right">
             <Button variant="link" size="sm" className="text-primary hover:text-primary/90">
-              View
+              Ver
             </Button>
           </div>
         );

@@ -34,17 +34,17 @@ import { Loader2, FileSpreadsheet, FileText } from "lucide-react";
 
 // Login form schema
 const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
+  username: z.string().min(1, "Código de usuario requerido"),
+  password: z.string().min(1, "Contraseña requerida"),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 // Registration form schema
 const registerSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  name: z.string().min(2, "Name is required"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  username: z.string().min(3, "El código debe tener al menos 3 caracteres"),
+  name: z.string().min(2, "Nombre requerido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
   role: z.enum(["SuperAdmin", "Admin", "User"]).default("User"),
 });
 
@@ -96,8 +96,8 @@ export default function AuthPage() {
       <div className="w-full md:w-1/2 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-primary">RetailManager</h1>
-            <p className="mt-2 text-gray-600">Sign in to access your account</p>
+            <h1 className="text-3xl font-bold text-primary">Áureo</h1>
+            <p className="mt-2 text-gray-600">Inicie sesión para acceder al sistema</p>
           </div>
           
           <Card>
@@ -165,9 +165,9 @@ export default function AuthPage() {
       {/* Right side - Hero section */}
       <div className="w-full md:w-1/2 bg-primary p-10 flex flex-col justify-center hidden md:flex">
         <div className="max-w-md mx-auto text-white">
-          <h2 className="text-3xl font-bold mb-6">Retail Management System</h2>
+          <h2 className="text-3xl font-bold mb-6">Sistema de Gestión Áureo</h2>
           <p className="text-lg mb-8">
-            A comprehensive solution for tracking and managing store purchases with automated file processing and monitoring.
+            Una solución completa para rastrear y administrar compras de tiendas con procesamiento automatizado de archivos.
           </p>
           
           <div className="space-y-4">
@@ -176,9 +176,9 @@ export default function AuthPage() {
                 <FileSpreadsheet className="h-6 w-6 text-secondary" />
               </div>
               <div>
-                <h3 className="font-medium text-lg">Excel Store Processing</h3>
+                <h3 className="font-medium text-lg">Procesamiento de Archivos Excel</h3>
                 <p className="text-white/80">
-                  Automatically import and process Excel files containing store purchase data
+                  Importación y procesamiento automático de archivos Excel con datos de compras de tiendas
                 </p>
               </div>
             </div>
@@ -188,9 +188,9 @@ export default function AuthPage() {
                 <FileText className="h-6 w-6 text-secondary" />
               </div>
               <div>
-                <h3 className="font-medium text-lg">PDF Document Management</h3>
+                <h3 className="font-medium text-lg">Gestión de Documentos PDF</h3>
                 <p className="text-white/80">
-                  Organize and track PDF documents by store code with our intelligent classification system
+                  Organice y clasifique documentos PDF por código de tienda con nuestro sistema inteligente
                 </p>
               </div>
             </div>
@@ -202,9 +202,9 @@ export default function AuthPage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-medium text-lg">Real-time Monitoring</h3>
+                <h3 className="font-medium text-lg">Monitoreo en Tiempo Real</h3>
                 <p className="text-white/80">
-                  Automatic detection and processing of new files with real-time status updates
+                  Detección y procesamiento automático de nuevos archivos con actualizaciones de estado en tiempo real
                 </p>
               </div>
             </div>

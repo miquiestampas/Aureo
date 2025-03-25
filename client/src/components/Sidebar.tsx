@@ -66,7 +66,7 @@ export default function Sidebar() {
     <div className="flex flex-col w-64 bg-primary text-white h-full">
       {/* Logo Section */}
       <div className="flex items-center justify-center h-16 px-4 bg-primary-dark">
-        <h1 className="text-xl font-bold">RetailManager</h1>
+        <h1 className="text-xl font-bold">Áureo</h1>
       </div>
       
       {/* User Profile Section */}
@@ -86,28 +86,28 @@ export default function Sidebar() {
           <NavItem
             href="/"
             icon={<LayoutDashboard size={20} />}
-            label="Dashboard"
+            label="Panel Principal"
             active={location === '/'}
           />
           
           <NavItem
             href="/excel-stores"
             icon={<FileSpreadsheet size={20} />}
-            label="Excel Stores"
+            label="Tiendas Excel"
             active={location === '/excel-stores'}
           />
           
           <NavItem
             href="/pdf-stores"
             icon={<FileText size={20} />}
-            label="PDF Stores"
+            label="Tiendas PDF"
             active={location === '/pdf-stores'}
           />
           
           <NavItem
             href="/store-management"
             icon={<Store size={20} />}
-            label="Store Management"
+            label="Gestión de Tiendas"
             active={location === '/store-management'}
             requiredRoles={["SuperAdmin", "Admin"]}
             userRole={user?.role}
@@ -116,7 +116,7 @@ export default function Sidebar() {
           <NavItem
             href="/user-management"
             icon={<Users size={20} />}
-            label="User Management"
+            label="Gestión de Usuarios"
             active={location === '/user-management'}
             requiredRoles={["SuperAdmin"]}
             userRole={user?.role}
@@ -125,7 +125,7 @@ export default function Sidebar() {
           <NavItem
             href="/system-config"
             icon={<Settings size={20} />}
-            label="System Configuration"
+            label="Configuración del Sistema"
             active={location === '/system-config'}
             requiredRoles={["SuperAdmin"]}
             userRole={user?.role}
@@ -141,7 +141,7 @@ export default function Sidebar() {
           disabled={logoutMutation.isPending}
         >
           <LogOut className="h-5 w-5 mr-2" />
-          Logout
+          Cerrar Sesión
         </Button>
       </div>
     </div>
