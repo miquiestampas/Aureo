@@ -178,11 +178,11 @@ export default function ExcelStoresPage() {
   const columns: ColumnDef<ExcelData>[] = [
     {
       accessorKey: "orderNumber",
-      header: "Order #",
+      header: "Orden #",
     },
     {
       accessorKey: "orderDate",
-      header: "Order Date",
+      header: "Fecha de Orden",
       cell: ({ row }) => {
         const date = new Date(row.original.orderDate);
         return format(date, "MMM d, yyyy");
@@ -190,27 +190,27 @@ export default function ExcelStoresPage() {
     },
     {
       accessorKey: "customerName",
-      header: "Customer Name",
+      header: "Nombre del Cliente",
     },
     {
       accessorKey: "itemDetails",
-      header: "Item Details",
+      header: "Detalles del Artículo",
     },
     {
       accessorKey: "price",
-      header: "Price",
+      header: "Precio",
     },
     {
       accessorKey: "saleDate",
-      header: "Sale Date",
+      header: "Fecha de Venta",
       cell: ({ row }) => {
         const date = row.original.saleDate ? new Date(row.original.saleDate) : null;
-        return date ? format(date, "MMM d, yyyy") : "Not sold";
+        return date ? format(date, "MMM d, yyyy") : "No vendido";
       }
     },
     {
       id: "actions",
-      header: "Actions",
+      header: "Acciones",
       cell: ({ row }) => {
         return (
           <div className="flex space-x-2">
@@ -221,7 +221,7 @@ export default function ExcelStoresPage() {
               onClick={() => handleViewDetails(row.original)}
             >
               <Eye className="h-4 w-4" />
-              <span className="sr-only">View details</span>
+              <span className="sr-only">Ver detalles</span>
             </Button>
           </div>
         );
@@ -233,14 +233,14 @@ export default function ExcelStoresPage() {
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">Excel Stores</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Tiendas Excel</h1>
           
           <div className="flex space-x-2">
             <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-primary hover:bg-primary/90">
                   <Upload className="mr-2 h-4 w-4" />
-                  Upload Excel File
+                  Subir Archivo Excel
                 </Button>
               </DialogTrigger>
               <DialogContent>
