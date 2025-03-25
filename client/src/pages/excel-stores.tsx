@@ -81,6 +81,7 @@ export default function ExcelStoresPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [showFileUploadModal, setShowFileUploadModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
   const [detailsData, setDetailsData] = useState<ExcelData | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   
@@ -249,7 +250,10 @@ export default function ExcelStoresPage() {
               Cargar Archivos Excel
             </Button>
             
-            <Button variant="outline">
+            <Button 
+              variant="outline"
+              onClick={() => setShowSearchModal(true)}
+            >
               <Search className="mr-2 h-4 w-4" />
               Buscar Registros
             </Button>
@@ -260,12 +264,20 @@ export default function ExcelStoresPage() {
             </Button>
           </div>
           
-          {/* Nuevo Modal de Carga de Archivos */}
+          {/* Modal de Carga de Archivos */}
           <FileUploadModal 
             isOpen={showFileUploadModal}
             onClose={() => setShowFileUploadModal(false)}
             storesByType={stores?.filter(store => store.type === "Excel") || []}
             fileType="Excel"
+          />
+          
+          {/* Modal de Búsqueda de Datos Excel */}
+          <ExcelDataSearch
+            isOpen={showSearchModal}
+            onClose={() => setShowSearchModal(false)}
+            onViewDetails={handleViewDetails}
+            stores={stores?.filter(store => store.type === "Excel") || []}
           />
         </div>
         
