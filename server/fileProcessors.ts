@@ -177,21 +177,22 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       
       const values = row.values as any[];
       
-      // Extract values from specific columns (adjust indices as needed)
+      // Extract values from columns in a fixed order regardless of header names
+      // Columna A = storeCode, B = orderNumber, etc. (Excel usa índices basados en 1, pero values[0] es undefined)
       const excelData: InsertExcelData = {
-        storeCode: storeCode,
-        orderNumber: values[1]?.toString() || '',
-        orderDate: new Date(values[2] || new Date()),
-        customerName: values[3]?.toString() || '',
-        customerContact: values[4]?.toString() || '',
-        itemDetails: values[5]?.toString() || '',
-        metals: values[6]?.toString() || '',
-        engravings: values[7]?.toString() || '',
-        stones: values[8]?.toString() || '',
-        carats: values[9]?.toString() || '',
-        price: values[10]?.toString() || '',
-        pawnTicket: values[11]?.toString() || '',
-        saleDate: values[12] ? new Date(values[12]) : null,
+        storeCode: storeCode, // Usamos el código de tienda proporcionado, no el del Excel
+        orderNumber: values[2]?.toString() || '', // Columna B
+        orderDate: new Date(values[3] || new Date()), // Columna C
+        customerName: values[4]?.toString() || '', // Columna D
+        customerContact: values[5]?.toString() || '', // Columna E
+        itemDetails: values[6]?.toString() || '', // Columna F
+        metals: values[7]?.toString() || '', // Columna G
+        engravings: values[8]?.toString() || '', // Columna H
+        stones: values[9]?.toString() || '', // Columna I
+        carats: values[10]?.toString() || '', // Columna J
+        price: values[11]?.toString() || '', // Columna K
+        pawnTicket: values[12]?.toString() || '', // Columna L
+        saleDate: values[13] ? new Date(values[13]) : null, // Columna M
         fileActivityId: activityId
       };
       

@@ -134,16 +134,60 @@ async function handleNewExcelFile(filePath: string) {
   try {
     const filename = path.basename(filePath);
     
-    // Extract store code from filename (assumes format: STORECODE_*.xlsx)
-    let storeCode = 'UNKNOWN';
-    const filenameMatch = filename.match(/^([^_]+)_/);
-    if (filenameMatch && filenameMatch[1]) {
-      storeCode = filenameMatch[1];
+    // Estrategias mejoradas para extraer el código de tienda del nombre del archivo
+    let storeCode = '';
+    
+    // 1. Intentar el formato STORECODE_*.xlsx
+    const formatMatch = filename.match(/^([^_\.]+)_/);
+    if (formatMatch && formatMatch[1]) {
+      storeCode = formatMatch[1];
+    } 
+    // 2. Intentar el formato STORECODE.*.xlsx
+    else {
+      const dotMatch = filename.match(/^([^\.]+)\./);
+      if (dotMatch && dotMatch[1]) {
+        storeCode = dotMatch[1];
+      }
+      // 3. Si no se encontró ningún patrón, usar el nombre completo sin extensión como código
+      else {
+        const nameWithoutExtension = path.parse(filename).name;
+        storeCode = nameWithoutExtension;
+      }
     }
     
     console.log(`New Excel file detected: ${filename} (Store: ${storeCode})`);
     
-    // Create file activity entry
+    // Verificar si la tienda existe
+    const storeExists = await storage.getStoreByCode(storeCode);
+    if (!storeExists) {
+      console.warn(`Store with code ${storeCode} does not exist. Marking file activity as failed.`);
+      
+      // Crear actividad de archivo con error
+      const activity = await storage.createFileActivity({
+        filename,
+        storeCode,
+        fileType: 'Excel',
+        status: 'Failed',
+        processingDate: new Date(),
+        processedBy: 'System',
+        errorMessage: `La tienda con código ${storeCode} no existe en el sistema.`,
+        metadata: null
+      });
+      
+      // Emitir eventos de detección y fallo
+      emitFileDetected({
+        id: activity.id,
+        filename,
+        storeCode,
+        fileType: 'Excel',
+        status: 'Failed'
+      });
+      
+      emitFileProcessingStatus(activity.id, 'Failed', `La tienda con código ${storeCode} no existe en el sistema.`);
+      return;
+    }
+    
+    // Crear actividad de archivo
     const activity = await storage.createFileActivity({
       filename,
       storeCode,
@@ -177,17 +221,25 @@ async function handleNewPdfFile(filePath: string) {
   try {
     const filename = path.basename(filePath);
     
-    // Extract store code from filename with improved detection
-    // First try STORECODE_*.pdf format
+    // Estrategias mejoradas para extraer el código de tienda del nombre del archivo
     let storeCode = '';
-    const formatMatch = filename.match(/^([^_]+)_/);
+    
+    // 1. Intentar el formato STORECODE_*.pdf
+    const formatMatch = filename.match(/^([^_\.]+)_/);
     if (formatMatch && formatMatch[1]) {
       storeCode = formatMatch[1];
     } 
-    // If not found, try to use the whole filename without extension as store code
+    // 2. Intentar el formato STORECODE.*.pdf
     else {
-      const nameWithoutExtension = path.parse(filename).name;
-      storeCode = nameWithoutExtension;
+      const dotMatch = filename.match(/^([^\.]+)\./);
+      if (dotMatch && dotMatch[1]) {
+        storeCode = dotMatch[1];
+      }
+      // 3. Si no se encontró ningún patrón, usar el nombre completo sin extensión como código
+      else {
+        const nameWithoutExtension = path.parse(filename).name;
+        storeCode = nameWithoutExtension;
+      }
     }
     
     console.log(`New PDF file detected: ${filename} (Store: ${storeCode})`);
