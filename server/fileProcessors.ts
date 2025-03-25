@@ -267,7 +267,8 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         
         // Extraer valores de las columnas en orden
         const values = Object.values(row);
-        processedRows.push(createExcelDataFromValues([null, ...values], storeCode, activityId));
+        console.log("CSV row values:", values);
+        processedRows.push(createExcelDataFromValues(values, storeCode, activityId));
       });
     } 
     else if (fileExt === '.xls') {
@@ -294,7 +295,8 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       for (let i = 1; i < jsonData.length; i++) {
         const row = jsonData[i] as any[];
         if (row.length > 0) {
-          processedRows.push(createExcelDataFromValues([null, ...row], storeCode, activityId));
+          console.log("XLS row values:", row);
+          processedRows.push(createExcelDataFromValues(row, storeCode, activityId));
         }
       }
     } 
