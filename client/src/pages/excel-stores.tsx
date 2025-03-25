@@ -253,13 +253,13 @@ export default function ExcelStoresPage() {
                 
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="store">Select Store</Label>
+                    <Label htmlFor="store">Seleccionar Tienda</Label>
                     <Select 
                       onValueChange={(value) => setSelectedStore(value)}
                       value={selectedStore || undefined}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a store" />
+                        <SelectValue placeholder="Seleccione una tienda" />
                       </SelectTrigger>
                       <SelectContent>
                         {stores?.filter(store => store.type === "Excel").map(store => (
@@ -272,7 +272,7 @@ export default function ExcelStoresPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="file">Excel File</Label>
+                    <Label htmlFor="file">Archivo Excel</Label>
                     <Input 
                       id="file" 
                       type="file" 
@@ -280,20 +280,20 @@ export default function ExcelStoresPage() {
                       onChange={handleFileChange}
                     />
                     <p className="text-sm text-gray-500">
-                      Only Excel files (.xlsx, .xls) are accepted.
+                      Solo se aceptan archivos Excel (.xlsx, .xls).
                     </p>
                   </div>
                 </div>
                 
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
-                    Cancel
+                    Cancelar
                   </Button>
                   <Button 
                     onClick={handleUpload} 
                     disabled={!selectedStore || !uploadFile || uploadMutation.isPending}
                   >
-                    {uploadMutation.isPending ? "Uploading..." : "Upload"}
+                    {uploadMutation.isPending ? "Subiendo..." : "Subir"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -336,12 +336,12 @@ export default function ExcelStoresPage() {
                 <CardTitle>
                   <div className="flex items-center">
                     <FileSpreadsheet className="h-5 w-5 mr-2 text-green-600" />
-                    Store Data: {stores?.find(s => s.code === selectedStore)?.name || selectedStore}
+                    Datos de Tienda: {stores?.find(s => s.code === selectedStore)?.name || selectedStore}
                   </div>
                 </CardTitle>
                 <div className="flex items-center text-sm text-muted-foreground">
                   <Table className="h-4 w-4 mr-1" />
-                  {excelData?.length || 0} records
+                  {excelData?.length || 0} registros
                 </div>
               </div>
             </CardHeader>
