@@ -14,7 +14,7 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 import connectPg from "connect-pg-simple";
 import { db } from "./db";
-import { eq, desc, like, or, and, gte, lte } from "drizzle-orm";
+import { eq, desc, like, or, and, gte, lte, inArray } from "drizzle-orm";
 import { pool } from "./db";
 
 const MemoryStore = createMemoryStore(session);
