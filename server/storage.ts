@@ -7,8 +7,13 @@ import {
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import connectPg from "connect-pg-simple";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
+import { pool } from "./db";
 
 const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
 
 // Extend the interface with CRUD methods
 export interface IStorage {
@@ -306,4 +311,254 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  sessionStore: any;
+
+  constructor() {
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true
+    });
+  }
+
+  // User methods
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+  
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+  
+  async updateUser(id: number, userUpdate: Partial<User>): Promise<User | undefined> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(userUpdate)
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser;
+  }
+  
+  async deleteUser(id: number): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id));
+    return result.rowCount > 0;
+  }
+  
+  // Store methods
+  async getStore(id: number): Promise<Store | undefined> {
+    const [store] = await db.select().from(stores).where(eq(stores.id, id));
+    return store;
+  }
+  
+  async getStoreByCode(code: string): Promise<Store | undefined> {
+    const [store] = await db.select().from(stores).where(eq(stores.code, code));
+    return store;
+  }
+  
+  async getStores(): Promise<Store[]> {
+    return await db.select().from(stores);
+  }
+  
+  async getStoresByType(type: 'Excel' | 'PDF'): Promise<Store[]> {
+    return await db.select().from(stores).where(eq(stores.type, type));
+  }
+  
+  async createStore(insertStore: InsertStore): Promise<Store> {
+    const [store] = await db.insert(stores).values(insertStore).returning();
+    return store;
+  }
+  
+  async updateStore(id: number, storeUpdate: Partial<Store>): Promise<Store | undefined> {
+    const [updatedStore] = await db
+      .update(stores)
+      .set(storeUpdate)
+      .where(eq(stores.id, id))
+      .returning();
+    return updatedStore;
+  }
+  
+  async deleteStore(id: number): Promise<boolean> {
+    const result = await db.delete(stores).where(eq(stores.id, id));
+    return result.rowCount > 0;
+  }
+  
+  // SystemConfig methods
+  async getConfig(key: string): Promise<SystemConfig | undefined> {
+    const [config] = await db.select().from(systemConfigs).where(eq(systemConfigs.key, key));
+    return config;
+  }
+  
+  async getAllConfigs(): Promise<SystemConfig[]> {
+    return await db.select().from(systemConfigs);
+  }
+  
+  async setConfig(insertConfig: InsertSystemConfig): Promise<SystemConfig> {
+    // Check if config exists
+    const existingConfig = await this.getConfig(insertConfig.key);
+    
+    if (existingConfig) {
+      return await this.updateConfig(insertConfig.key, insertConfig.value) as SystemConfig;
+    }
+    
+    const [config] = await db.insert(systemConfigs).values(insertConfig).returning();
+    return config;
+  }
+  
+  async updateConfig(key: string, value: string): Promise<SystemConfig | undefined> {
+    const [updatedConfig] = await db
+      .update(systemConfigs)
+      .set({ value })
+      .where(eq(systemConfigs.key, key))
+      .returning();
+    return updatedConfig;
+  }
+  
+  // FileActivity methods
+  async createFileActivity(insertActivity: InsertFileActivity): Promise<FileActivity> {
+    const [activity] = await db.insert(fileActivities).values(insertActivity).returning();
+    return activity;
+  }
+  
+  async getFileActivity(id: number): Promise<FileActivity | undefined> {
+    const [activity] = await db.select().from(fileActivities).where(eq(fileActivities.id, id));
+    return activity;
+  }
+  
+  async updateFileActivityStatus(
+    id: number, 
+    status: string, 
+    errorMessage?: string
+  ): Promise<FileActivity | undefined> {
+    const updateValues: Partial<FileActivity> = { 
+      status: status as "Pending" | "Processing" | "Processed" | "Failed"
+    };
+    
+    if (errorMessage) {
+      updateValues.errorMessage = errorMessage;
+    }
+    
+    const [updatedActivity] = await db
+      .update(fileActivities)
+      .set(updateValues)
+      .where(eq(fileActivities.id, id))
+      .returning();
+    return updatedActivity;
+  }
+  
+  async getRecentFileActivities(limit: number): Promise<FileActivity[]> {
+    return await db
+      .select()
+      .from(fileActivities)
+      .orderBy(desc(fileActivities.processingDate))
+      .limit(limit);
+  }
+  
+  async getFileActivitiesByStore(storeCode: string): Promise<FileActivity[]> {
+    return await db
+      .select()
+      .from(fileActivities)
+      .where(eq(fileActivities.storeCode, storeCode))
+      .orderBy(desc(fileActivities.processingDate));
+  }
+  
+  // ExcelData methods
+  async createExcelData(insertData: InsertExcelData): Promise<ExcelData> {
+    const [data] = await db.insert(excelData).values(insertData).returning();
+    return data;
+  }
+  
+  async getExcelDataByStore(storeCode: string): Promise<ExcelData[]> {
+    return await db
+      .select()
+      .from(excelData)
+      .where(eq(excelData.storeCode, storeCode))
+      .orderBy(desc(excelData.orderDate));
+  }
+  
+  // PdfDocument methods
+  async createPdfDocument(insertDoc: InsertPdfDocument): Promise<PdfDocument> {
+    const [doc] = await db.insert(pdfDocuments).values(insertDoc).returning();
+    return doc;
+  }
+  
+  async getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]> {
+    return await db
+      .select()
+      .from(pdfDocuments)
+      .where(eq(pdfDocuments.storeCode, storeCode))
+      .orderBy(desc(pdfDocuments.uploadDate));
+  }
+}
+
+// Create initial data
+async function initializeDatabase() {
+  try {
+    const storage = new DatabaseStorage();
+    
+    // Check if we already have a SuperAdmin user
+    const existingAdmin = await storage.getUserByUsername("117020");
+    
+    if (!existingAdmin) {
+      // Hash the password for our new user
+      const hashedPassword = "09c0e483c2b36cea17e403cbf055362ff4f65b4f1ceabbff4fbf3459f9442ac5968feb27463e79b2486d2b723f068c115e8f8b2c8fc5abeb088b64e8ba8e7f22.c36e7a5ec3c69340f554985b50bd226f";
+      
+      // Create the super admin user
+      await storage.createUser({
+        username: "117020",
+        password: hashedPassword,
+        name: "Administrador del Sistema",
+        role: "SuperAdmin"
+      });
+      
+      console.log("Created default SuperAdmin user");
+    }
+    
+    // Create default system configurations if they don't exist
+    const excelWatchDir = await storage.getConfig("EXCEL_WATCH_DIR");
+    if (!excelWatchDir) {
+      await storage.setConfig({
+        key: "EXCEL_WATCH_DIR",
+        value: "./data/excel",
+        description: "Directory to watch for Excel files"
+      });
+    }
+    
+    const pdfWatchDir = await storage.getConfig("PDF_WATCH_DIR");
+    if (!pdfWatchDir) {
+      await storage.setConfig({
+        key: "PDF_WATCH_DIR",
+        value: "./data/pdf",
+        description: "Directory to watch for PDF files"
+      });
+    }
+    
+    const fileProcessingEnabled = await storage.getConfig("FILE_PROCESSING_ENABLED");
+    if (!fileProcessingEnabled) {
+      await storage.setConfig({
+        key: "FILE_PROCESSING_ENABLED",
+        value: "true",
+        description: "Enable or disable file processing"
+      });
+    }
+    
+    console.log("Database initialization complete");
+  } catch (error) {
+    console.error("Error initializing database:", error);
+  }
+}
+
+// Initialize the database and create a new instance of DatabaseStorage
+initializeDatabase().catch(console.error);
+
+export const storage = new DatabaseStorage();
