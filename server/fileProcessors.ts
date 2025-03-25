@@ -4,7 +4,7 @@ import { storage } from './storage';
 import { emitFileProcessingStatus } from './fileWatcher';
 import { InsertExcelData, InsertPdfDocument, InsertAlert } from '@shared/schema';
 import { promisify } from 'util';
-import * as ExcelJS from 'exceljs';
+import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
 import csvParser from 'csv-parser';
 
