@@ -154,10 +154,10 @@ export type PdfDocument = typeof pdfDocuments.$inferSelect;
 export const watchlistPersons = pgTable("watchlist_persons", {
   id: serial("id").primaryKey(),
   fullName: text("fullname").notNull(),
-  identificationNumber: text("identification_number"), // Número de identificación como DUI, pasaporte, etc.
+  identificationNumber: text("identificationnumber"), // Número de identificación como DUI, pasaporte, etc.
   phone: text("phone"),
   notes: text("notes"),
-  riskLevel: text("risk_level", { enum: ["Alto", "Medio", "Bajo"] }).notNull().default("Medio"),
+  riskLevel: text("risklevel", { enum: ["Alto", "Medio", "Bajo"] }).notNull().default("Medio"),
   status: text("status", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
   createdAt: timestamp("createdat").notNull().defaultNow(),
   createdBy: integer("createdby").notNull(), // ID del usuario que agregó el registro

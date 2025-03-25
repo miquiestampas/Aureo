@@ -979,13 +979,12 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getWatchlistPersons(includeInactive: boolean = false): Promise<WatchlistPerson[]> {
-    let query = db.select().from(watchlistPersons);
+    // Usar SQL directo ya que hay problemas con la correspondencia de columnas
+    const sql = includeInactive
+      ? `SELECT * FROM watchlist_persons ORDER BY createdat DESC`
+      : `SELECT * FROM watchlist_persons WHERE status = 'Activo' ORDER BY createdat DESC`;
     
-    if (!includeInactive) {
-      query = query.where(eq(watchlistPersons.status, "Activo"));
-    }
-    
-    return await query.orderBy(desc(watchlistPersons.createdAt));
+    return await db.execute(sql);
   }
   
   async getWatchlistPerson(id: number): Promise<WatchlistPerson | undefined> {
@@ -1026,20 +1025,18 @@ export class DatabaseStorage implements IStorage {
   
   async searchWatchlistPersons(query: string): Promise<WatchlistPerson[]> {
     const searchQuery = `%${query}%`;
-    return await db
-      .select()
-      .from(watchlistPersons)
-      .where(
-        and(
-          eq(watchlistPersons.status, "Activo"),
-          or(
-            like(watchlistPersons.fullName, searchQuery),
-            like(watchlistPersons.identificationNumber, searchQuery),
-            like(watchlistPersons.phone, searchQuery)
-          )
-        )
+    // Usar SQL directo para evitar problemas con nombres de columnas
+    const sql = `
+      SELECT * FROM watchlist_persons
+      WHERE status = 'Activo' AND (
+        fullname ILIKE $1 OR
+        identificationnumber ILIKE $1 OR
+        phone ILIKE $1
       )
-      .orderBy(desc(watchlistPersons.createdAt));
+      ORDER BY createdat DESC
+    `;
+    
+    return await db.execute(sql, [searchQuery]);
   }
   
   // Watchlist Item methods
