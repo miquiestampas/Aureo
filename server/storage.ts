@@ -1413,11 +1413,11 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getAlertsByExcelDataId(excelDataId: number): Promise<Alert[]> {
-    return await db
-      .select()
-      .from(alerts)
-      .where(eq(alerts.excelDataId, excelDataId))
-      .orderBy(desc(alerts.createdAt));
+    // Usar SQL directo para evitar problemas de nomenclatura
+    const result = await db.execute(
+      sql`SELECT * FROM "alerts" WHERE "exceldataid" = ${excelDataId} ORDER BY "created_at" DESC`
+    );
+    return result.rows as Alert[];
   }
   
   // Search History methods
