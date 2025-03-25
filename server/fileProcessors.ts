@@ -182,8 +182,12 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
     }
   }
   
+  // Usar el código de tienda de la celda A1 (values[0]) si está disponible
+  const excelStoreCode = values[0]?.toString() || '';
+  const finalStoreCode = excelStoreCode || storeCode;
+  
   return {
-    storeCode: storeCode, // Usamos el código de tienda proporcionado, no el del Excel
+    storeCode: finalStoreCode, // Usar el código de tienda de A1 o el proporcionado si A1 está vacío
     orderNumber: values[1]?.toString() || '', // Columna B
     orderDate: orderDate, // Columna C (validada)
     customerName: values[3]?.toString() || '', // Columna D
@@ -207,10 +211,10 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     await storage.updateFileActivityStatus(activityId, 'Processing');
     emitFileProcessingStatus(activityId, 'Processing');
     
-    // Check if store exists
-    const store = await storage.getStoreByCode(storeCode);
-    if (!store) {
-      throw new Error(`Store with code ${storeCode} does not exist`);
+    // Check if the default store exists
+    const defaultStore = await storage.getStoreByCode(storeCode);
+    if (!defaultStore) {
+      throw new Error(`Default store with code ${storeCode} does not exist`);
     }
     
     // Verify file exists and is readable
@@ -222,12 +226,13 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     const fileExt = path.extname(filePath).toLowerCase();
     let processedRows: InsertExcelData[] = [];
     
-    // Procesar según el tipo de archivo
+    // Extracting store code from the file
+    let excelStoreCode = '';
+    
+    // First extract the store code from cell A2 based on the file type
     if (fileExt === '.csv') {
-      // Procesar archivo CSV
+      // Procesar archivo CSV para obtener código de tienda
       const rows: any[] = [];
-      
-      // Leer el archivo CSV usando csvParser
       await new Promise<void>((resolve, reject) => {
         fs.createReadStream(filePath)
           .pipe(csvParser())
@@ -242,6 +247,16 @@ export async function processExcelFile(filePath: string, activityId: number, sto
           });
       });
       
+      if (rows.length > 1) {
+        // Extraer código de tienda de la segunda fila (índice 1)
+        const secondRow = rows[1];
+        const values = Object.values(secondRow);
+        if (values.length > 0) {
+          excelStoreCode = values[0]?.toString() || '';
+        }
+      }
+      
+      // Continuar con el procesamiento normal
       // Saltar la primera fila (encabezado) e indexar los valores por posición
       rows.forEach((row, index) => {
         if (index === 0) return; // Saltar encabezado
@@ -263,6 +278,14 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       
+      // Extraer código de tienda si hay al menos una fila después del encabezado
+      if (jsonData.length > 1) {
+        const secondRow = jsonData[1] as any[];
+        if (secondRow && secondRow.length > 0) {
+          excelStoreCode = secondRow[0]?.toString() || '';
+        }
+      }
+      
       // Saltar la primera fila (encabezado)
       for (let i = 1; i < jsonData.length; i++) {
         const row = jsonData[i] as any[];
@@ -282,6 +305,12 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         throw new Error('El archivo Excel no contiene hojas');
       }
       
+      // Intentar obtener el código de tienda de la celda A2
+      const cellA2 = worksheet.getCell('A2');
+      if (cellA2 && cellA2.value) {
+        excelStoreCode = cellA2.value.toString();
+      }
+      
       // Procesar filas (saltar fila de encabezado)
       worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
         // Saltar fila de encabezado
@@ -290,6 +319,33 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         const values = row.values as any[];
         processedRows.push(createExcelDataFromValues(values, storeCode, activityId));
       });
+    }
+    
+    // Verificar si el código de tienda extraído existe
+    if (excelStoreCode && excelStoreCode.trim() !== '') {
+      console.log(`Excel file has store code ${excelStoreCode} in cell A2`);
+      const excelStore = await storage.getStoreByCode(excelStoreCode);
+      
+      if (excelStore) {
+        console.log(`Found matching store in database: ${excelStore.code}`);
+        
+        // Actualizar la actividad del archivo con el código correcto
+        await storage.updateFileActivityStatus(
+          activityId, 
+          'Processing', 
+          null, 
+          { storeCode: excelStore.code }
+        );
+        
+        // Actualizar todos los registros para usar el código de tienda correcto
+        for (const row of processedRows) {
+          row.storeCode = excelStore.code;
+        }
+      } else {
+        console.warn(`Store code ${excelStoreCode} from Excel file does not exist in database, using default: ${storeCode}`);
+      }
+    } else {
+      console.log(`No store code found in Excel file, using default: ${storeCode}`);
     }
     
     // Guardar todos los datos extraídos y verificar coincidencias con la lista de vigilancia
