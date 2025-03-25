@@ -184,7 +184,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Stores</dt>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total de Tiendas</dt>
                     <dd className="text-lg font-medium text-gray-900">
                       {systemStatus?.totalStores ?? '...'}
                     </dd>
@@ -195,7 +195,7 @@ export default function DashboardPage() {
             <CardFooter className="bg-gray-50 px-6 py-3">
               <Link href="/store-management">
                 <a className="text-sm font-medium text-primary hover:text-primary/90">
-                  View all stores
+                  Ver todas las tiendas
                 </a>
               </Link>
             </CardFooter>
@@ -210,7 +210,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Processed Today</dt>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Procesados Hoy</dt>
                     <dd className="text-lg font-medium text-gray-900">
                       {systemStatus?.processedToday ?? '...'}
                     </dd>
@@ -221,7 +221,7 @@ export default function DashboardPage() {
             <CardFooter className="bg-gray-50 px-6 py-3">
               <Link href="/excel-stores">
                 <a className="text-sm font-medium text-primary hover:text-primary/90">
-                  View recent files
+                  Ver archivos recientes
                 </a>
               </Link>
             </CardFooter>
@@ -236,7 +236,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Excel Stores</dt>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Tiendas Excel</dt>
                     <dd className="text-lg font-medium text-gray-900">
                       {systemStatus?.excelStores ?? '...'}
                     </dd>
@@ -247,7 +247,7 @@ export default function DashboardPage() {
             <CardFooter className="bg-gray-50 px-6 py-3">
               <Link href="/excel-stores">
                 <a className="text-sm font-medium text-primary hover:text-primary/90">
-                  View Excel stores
+                  Ver tiendas Excel
                 </a>
               </Link>
             </CardFooter>
@@ -262,7 +262,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">PDF Stores</dt>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Tiendas PDF</dt>
                     <dd className="text-lg font-medium text-gray-900">
                       {systemStatus?.pdfStores ?? '...'}
                     </dd>
@@ -273,7 +273,7 @@ export default function DashboardPage() {
             <CardFooter className="bg-gray-50 px-6 py-3">
               <Link href="/pdf-stores">
                 <a className="text-sm font-medium text-primary hover:text-primary/90">
-                  View PDF stores
+                  Ver tiendas PDF
                 </a>
               </Link>
             </CardFooter>
@@ -282,23 +282,23 @@ export default function DashboardPage() {
         
         {/* System Status Section */}
         <div className="mt-8">
-          <h2 className="text-lg leading-6 font-medium text-gray-900">System Status</h2>
+          <h2 className="text-lg leading-6 font-medium text-gray-900">Estado del Sistema</h2>
           <div className="mt-5 bg-white shadow overflow-hidden rounded-lg">
             <div className="px-4 py-5 sm:p-6">
               <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
                 {/* File Monitoring Status */}
                 <div className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">File Monitoring</dt>
+                  <dt className="text-sm font-medium text-gray-500">Monitoreo de Archivos</dt>
                   <dd className="mt-1 flex items-center">
                     {systemStatus?.fileWatchingActive || watcherActive ? (
                       <>
                         <span className="flex-shrink-0 h-4 w-4 rounded-full bg-green-500"></span>
-                        <span className="ml-2 text-sm text-gray-900">Active</span>
+                        <span className="ml-2 text-sm text-gray-900">Activo</span>
                       </>
                     ) : (
                       <>
                         <span className="flex-shrink-0 h-4 w-4 rounded-full bg-red-500"></span>
-                        <span className="ml-2 text-sm text-gray-900">Inactive</span>
+                        <span className="ml-2 text-sm text-gray-900">Inactivo</span>
                       </>
                     )}
                   </dd>
