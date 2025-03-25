@@ -100,169 +100,65 @@ export default function AuthPage() {
             <p className="mt-2 text-gray-600">Sign in to access your account</p>
           </div>
           
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Register</TabsTrigger>
-            </TabsList>
-            
-            {/* Login Form */}
-            <TabsContent value="login">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Login</CardTitle>
-                  <CardDescription>
-                    Enter your credentials to access your account
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Form {...loginForm}>
-                    <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
-                      <FormField
-                        control={loginForm.control}
-                        name="username"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Username</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Enter your username" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={loginForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Password</FormLabel>
-                            <FormControl>
-                              <Input type="password" placeholder="Enter your password" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <Button 
-                        type="submit" 
-                        className="w-full bg-primary hover:bg-primary/90"
-                        disabled={loginMutation.isPending}
-                      >
-                        {loginMutation.isPending ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
-                            Logging in...
-                          </>
-                        ) : (
-                          "Login"
-                        )}
-                      </Button>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            {/* Register Form */}
-            <TabsContent value="register">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Create Account</CardTitle>
-                  <CardDescription>
-                    Register a new account to get started
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Form {...registerForm}>
-                    <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
-                      <FormField
-                        control={registerForm.control}
-                        name="username"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Username</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Choose a username" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={registerForm.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Full Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Enter your full name" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={registerForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Password</FormLabel>
-                            <FormControl>
-                              <Input type="password" placeholder="Choose a password" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={registerForm.control}
-                        name="role"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Role</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select a role" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="User">User</SelectItem>
-                                <SelectItem value="Admin">Admin</SelectItem>
-                                <SelectItem value="SuperAdmin">Super Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <Button 
-                        type="submit" 
-                        className="w-full bg-primary hover:bg-primary/90"
-                        disabled={registerMutation.isPending}
-                      >
-                        {registerMutation.isPending ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Registering...
-                          </>
-                        ) : (
-                          "Register"
-                        )}
-                      </Button>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          <Card>
+            <CardHeader>
+              <CardTitle>Iniciar Sesión</CardTitle>
+              <CardDescription>
+                Ingrese sus credenciales para acceder al sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...loginForm}>
+                <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+                  <FormField
+                    control={loginForm.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Código de Usuario</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ingrese su código (5-6 dígitos)" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={loginForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contraseña</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Ingrese su contraseña" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-primary hover:bg-primary/90"
+                    disabled={loginMutation.isPending}
+                  >
+                    {loginMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                        Iniciando sesión...
+                      </>
+                    ) : (
+                      "Iniciar Sesión"
+                    )}
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+            <CardFooter className="flex justify-center border-t pt-4">
+              <p className="text-sm text-gray-500">Los usuarios son creados por el administrador del sistema</p>
+            </CardFooter>
+          </Card>
         </div>
       </div>
       

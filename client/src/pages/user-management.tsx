@@ -67,9 +67,12 @@ interface UserData {
 
 // Form schema for creating a user
 const createUserSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters").max(20, "Username must be at most 20 characters"),
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  username: z.string()
+    .min(5, "El código debe tener al menos 5 dígitos")
+    .max(6, "El código debe tener máximo 6 dígitos")
+    .regex(/^\d+$/, "El código debe contener solo números"),
+  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
   role: z.enum(["SuperAdmin", "Admin", "User"]),
 });
 
@@ -267,11 +270,11 @@ export default function UserManagementPage() {
   const columns: ColumnDef<UserData>[] = [
     {
       accessorKey: "username",
-      header: "Username",
+      header: "Código",
     },
     {
       accessorKey: "name",
-      header: "Full Name",
+      header: "Nombre Completo",
     },
     {
       accessorKey: "role",
@@ -347,12 +350,12 @@ export default function UserManagementPage() {
                     name="username"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Username</FormLabel>
+                        <FormLabel>Código de Usuario</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter username" {...field} />
+                          <Input placeholder="Ingrese código (5-6 dígitos)" {...field} />
                         </FormControl>
                         <FormDescription>
-                          Username is used for login and must be unique
+                          El código debe ser numérico y único (5-6 dígitos)
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -485,12 +488,12 @@ export default function UserManagementPage() {
               <Form {...editForm}>
                 <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-4">
                   <div className="space-y-1">
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel>Código de Usuario</FormLabel>
                     <div className="bg-gray-100 p-2 rounded-md font-medium text-gray-700">
                       {selectedUser.username}
                     </div>
                     <p className="text-sm text-gray-500">
-                      Username cannot be changed
+                      El código de usuario no puede ser modificado
                     </p>
                   </div>
                   

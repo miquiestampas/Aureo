@@ -92,9 +92,9 @@ export class MemStorage implements IStorage {
     
     // Create default super admin user
     this.createUser({
-      username: "admin",
+      username: "123456",
       password: "admin123", // This will be hashed in auth.ts
-      name: "System Administrator",
+      name: "Administrador del Sistema",
       role: "SuperAdmin"
     });
     
