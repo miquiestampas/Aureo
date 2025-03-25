@@ -306,25 +306,25 @@ export default function DashboardPage() {
                 
                 {/* Processing Queue */}
                 <div className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">Processing Queue</dt>
+                  <dt className="text-sm font-medium text-gray-500">Cola de Procesamiento</dt>
                   <dd className="mt-1 text-sm text-gray-900">
-                    {systemStatus?.pendingFiles ?? 0} files waiting
+                    {systemStatus?.pendingFiles ?? 0} archivos en espera
                   </dd>
                 </div>
                 
                 {/* Last System Check */}
                 <div className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">Last System Check</dt>
+                  <dt className="text-sm font-medium text-gray-500">Última Verificación</dt>
                   <dd className="mt-1 text-sm text-gray-900">
                     {systemStatus?.lastSystemCheck ? 
                       format(new Date(systemStatus.lastSystemCheck), "MMM d, h:mm a") : 
-                      "Not available"}
+                      "No disponible"}
                   </dd>
                 </div>
                 
                 {/* System Load */}
                 <div className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">System Load</dt>
+                  <dt className="text-sm font-medium text-gray-500">Carga del Sistema</dt>
                   <dd className="mt-1 text-sm text-gray-900">
                     <div className="w-full bg-gray-200 rounded-full h-2.5">
                       <div 
@@ -345,11 +345,11 @@ export default function DashboardPage() {
         {/* Recent Activity Section */}
         <div className="mt-8">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg leading-6 font-medium text-gray-900">Recent Activity</h2>
+            <h2 className="text-lg leading-6 font-medium text-gray-900">Actividad Reciente</h2>
             <div className="flex">
               <Button className="ml-3 inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90">
                 <Download className="mr-2 h-5 w-5" />
-                Export Report
+                Exportar Informe
               </Button>
             </div>
           </div>
@@ -365,7 +365,7 @@ export default function DashboardPage() {
               />
             ) : (
               <div className="p-8 text-center">
-                <p className="text-gray-500">Loading recent activities...</p>
+                <p className="text-gray-500">Cargando actividades recientes...</p>
               </div>
             )}
           </div>
