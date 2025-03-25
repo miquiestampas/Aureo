@@ -410,20 +410,20 @@ export default function ExcelStoresPage() {
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <Label>Sale Date</Label>
+                      <Label>Fecha de Venta</Label>
                       <div className="font-medium">
                         {detailsData.saleDate 
                           ? format(new Date(detailsData.saleDate), "MMM d, yyyy") 
-                          : "Not sold"
+                          : "No vendido"
                         }
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <Label>Price</Label>
+                      <Label>Precio</Label>
                       <div className="font-medium">{detailsData.price}</div>
                     </div>
                     <div className="space-y-1">
-                      <Label>Pawn Ticket</Label>
+                      <Label>Boleta de Empeño</Label>
                       <div className="font-medium">{detailsData.pawnTicket || "N/A"}</div>
                     </div>
                   </div>
@@ -432,23 +432,23 @@ export default function ExcelStoresPage() {
                 <TabsContent value="product" className="space-y-4 pt-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1 col-span-2">
-                      <Label>Item Details</Label>
+                      <Label>Detalles del Artículo</Label>
                       <div className="font-medium">{detailsData.itemDetails}</div>
                     </div>
                     <div className="space-y-1">
-                      <Label>Metals</Label>
+                      <Label>Metales</Label>
                       <div className="font-medium">{detailsData.metals || "N/A"}</div>
                     </div>
                     <div className="space-y-1">
-                      <Label>Engravings</Label>
+                      <Label>Grabados</Label>
                       <div className="font-medium">{detailsData.engravings || "N/A"}</div>
                     </div>
                     <div className="space-y-1">
-                      <Label>Stones</Label>
+                      <Label>Piedras</Label>
                       <div className="font-medium">{detailsData.stones || "N/A"}</div>
                     </div>
                     <div className="space-y-1">
-                      <Label>Carats</Label>
+                      <Label>Quilates</Label>
                       <div className="font-medium">{detailsData.carats || "N/A"}</div>
                     </div>
                   </div>
@@ -457,7 +457,7 @@ export default function ExcelStoresPage() {
                 <TabsContent value="customer" className="space-y-4 pt-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <Label>Customer Name</Label>
+                      <Label>Nombre del Cliente</Label>
                       <div className="font-medium">{detailsData.customerName || "N/A"}</div>
                     </div>
                     <div className="space-y-1">
