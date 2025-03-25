@@ -43,6 +43,7 @@ import {
   Info
 } from "lucide-react";
 import FileUploadModal from "@/components/FileUploadModal";
+import ExcelDataSearch from "@/components/ExcelDataSearch";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 

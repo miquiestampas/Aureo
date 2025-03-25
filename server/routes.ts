@@ -7,6 +7,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { processExcelFile, processPdfFile } from "./fileProcessors";
+import { InsertSearchHistory } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
@@ -267,6 +268,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(data);
     } catch (err) {
       next(err);
+    }
+  });
+  
+  // Excel search route
+  app.get("/api/search/excel-data", async (req, res, next) => {
+    try {
+      // Extract query parameters
+      const searchType = req.query.searchType as string || 'General';
+      const searchTerms = req.query.searchTerms as string;
+      const storeCode = req.query.storeCode as string;
+      
+      // Optional date filters
+      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : undefined;
+      const toDate = req.query.toDate ? new Date(req.query.toDate as string) : undefined;
+      
+      // Optional price filters
+      const priceMin = req.query.priceMin as string;
+      const priceMax = req.query.priceMax as string;
+      
+      // Optional flags
+      const includeArchived = req.query.includeArchived === 'true';
+      
+      // Field-specific search flags
+      const searchCustomerName = req.query.searchCustomerName !== 'false';
+      const searchCustomerContact = req.query.searchCustomerContact !== 'false';
+      const searchItemDetails = req.query.searchItemDetails !== 'false';
+      const searchMetals = req.query.searchMetals !== 'false';
+      const searchStones = req.query.searchStones !== 'false';
+      const searchEngravings = req.query.searchEngravings !== 'false';
+      
+      if (!searchTerms || searchTerms.length < 2) {
+        return res.status(400).json({ error: "Los términos de búsqueda deben tener al menos 2 caracteres" });
+      }
+      
+      // Construct filters object
+      const filters = {
+        storeCode,
+        fromDate,
+        toDate,
+        priceMin,
+        priceMax,
+        includeArchived,
+        searchCustomerName,
+        searchCustomerContact,
+        searchItemDetails,
+        searchMetals,
+        searchStones,
+        searchEngravings
+      };
+      
+      // Perform the search based on type
+      const results = await storage.searchExcelData(searchTerms, filters);
+      
+      // Add search to history if user is authenticated
+      if (req.isAuthenticated()) {
+        try {
+          const searchEntry: InsertSearchHistory = {
+            userId: req.user!.id,
+            searchType,
+            searchTerms,
+            searchDate: new Date(),
+            resultCount: results.length,
+            filters: JSON.stringify(filters)
+          };
+          
+          await storage.addSearchHistory(searchEntry);
+        } catch (historyError) {
+          console.error("Error saving search history:", historyError);
+          // Don't fail the request if history saving fails
+        }
+      }
+      
+      res.json({
+        results,
+        count: results.length,
+        searchType
+      });
+    } catch (error) {
+      console.error("Search error:", error);
+      res.status(500).json({ error: "Error al realizar la búsqueda" });
+    }
+  });
+  
+  // Search history routes
+  app.get("/api/search-history", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "No autorizado" });
+      }
+      
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const history = await storage.getRecentSearches(req.user!.id, limit);
+      
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: "Error al obtener historial de búsqueda" });
+      next(error);
+    }
+  });
+  
+  // Export search results
+  app.get("/api/export/excel-search", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "No autorizado" });
+      }
+      
+      const searchType = req.query.type as string || 'General';
+      const searchTerms = req.query.q as string;
+      
+      if (!searchTerms) {
+        return res.status(400).json({ error: "Se requieren términos de búsqueda" });
+      }
+      
+      // Simple implementation - just return the search results as JSON
+      // In a real implementation, you would format this as an Excel file
+      const results = await storage.searchExcelData(searchTerms, { searchType });
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="search-results-${Date.now()}.json"`);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: "Error al exportar resultados" });
+      next(error);
     }
   });
   

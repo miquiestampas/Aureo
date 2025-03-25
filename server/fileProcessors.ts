@@ -11,7 +11,12 @@ import * as ExcelJS from 'exceljs';
 let pdfParse: any = null;
 const getPdfParser = async () => {
   if (!pdfParse) {
-    pdfParse = await import('pdf-parse');
+    try {
+      pdfParse = await import('pdf-parse');
+    } catch (error) {
+      console.error("Error importing pdf-parse:", error);
+      throw new Error("Error al cargar la biblioteca para procesar PDF");
+    }
   }
   return pdfParse.default;
 };
@@ -239,26 +244,38 @@ export async function processPdfFile(filePath: string, activityId: number, store
     // Read file buffer
     const dataBuffer = await fs.promises.readFile(filePath);
     
-    // Get PDF parser dynamically and parse PDF
-    const parser = await getPdfParser();
-    const pdfData = await parser(dataBuffer);
-    
     // Extract basic info
     const title = path.basename(filePath, '.pdf');
     const fileStats = await fs.promises.stat(filePath);
     const fileSize = fileStats.size;
     
-    // Determine document type based on content (simple example)
-    let documentType = 'Unknown';
-    if (pdfData.text.includes('Invoice') || pdfData.text.includes('INVOICE')) {
-      documentType = 'Invoice';
-    } else if (pdfData.text.includes('Report') || pdfData.text.includes('REPORT')) {
-      documentType = 'Report';
-    } else if (pdfData.text.includes('Receipt') || pdfData.text.includes('RECEIPT')) {
-      documentType = 'Receipt';
+    let documentType = 'Desconocido';
+    let pdfText = '';
+    
+    try {
+      // Get PDF parser dynamically and parse PDF
+      const parser = await getPdfParser();
+      const pdfData = await parser(dataBuffer);
+      
+      // Extract text for document type determination
+      pdfText = pdfData.text || '';
+      
+      // Determine document type based on content
+      if (pdfText.toLowerCase().includes('factura') || pdfText.toLowerCase().includes('invoice')) {
+        documentType = 'Factura';
+      } else if (pdfText.toLowerCase().includes('informe') || pdfText.toLowerCase().includes('report')) {
+        documentType = 'Informe';
+      } else if (pdfText.toLowerCase().includes('recibo') || pdfText.toLowerCase().includes('receipt')) {
+        documentType = 'Recibo';
+      } else if (pdfText.toLowerCase().includes('contrato') || pdfText.toLowerCase().includes('contract')) {
+        documentType = 'Contrato';
+      }
+    } catch (parseError) {
+      console.warn(`Warning: Could not parse PDF content for type detection: ${parseError.message}`);
+      // Continue with unknown document type, we don't want to fail the whole process just for text extraction
     }
     
-    // Create PDF document record
+    // Create PDF document record even if we couldn't parse the content
     const pdfDocument: InsertPdfDocument = {
       storeCode,
       documentType,
