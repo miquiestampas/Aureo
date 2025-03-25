@@ -177,14 +177,50 @@ async function handleNewPdfFile(filePath: string) {
   try {
     const filename = path.basename(filePath);
     
-    // Extract store code from filename (assumes format: STORECODE_*.pdf)
-    let storeCode = 'UNKNOWN';
-    const filenameMatch = filename.match(/^([^_]+)_/);
-    if (filenameMatch && filenameMatch[1]) {
-      storeCode = filenameMatch[1];
+    // Extract store code from filename with improved detection
+    // First try STORECODE_*.pdf format
+    let storeCode = '';
+    const formatMatch = filename.match(/^([^_]+)_/);
+    if (formatMatch && formatMatch[1]) {
+      storeCode = formatMatch[1];
+    } 
+    // If not found, try to use the whole filename without extension as store code
+    else {
+      const nameWithoutExtension = path.parse(filename).name;
+      storeCode = nameWithoutExtension;
     }
     
     console.log(`New PDF file detected: ${filename} (Store: ${storeCode})`);
+    
+    // Check if the store exists
+    const storeExists = await storage.getStoreByCode(storeCode);
+    if (!storeExists) {
+      console.warn(`Store with code ${storeCode} does not exist. Marking file activity as failed.`);
+      
+      // Create file activity entry with error
+      const activity = await storage.createFileActivity({
+        filename,
+        storeCode,
+        fileType: 'PDF',
+        status: 'Failed',
+        processingDate: new Date(),
+        processedBy: 'System',
+        errorMessage: `La tienda con código ${storeCode} no existe en el sistema.`,
+        metadata: null
+      });
+      
+      // Emit file detection and failure events
+      emitFileDetected({
+        id: activity.id,
+        filename,
+        storeCode,
+        fileType: 'PDF',
+        status: 'Failed'
+      });
+      
+      emitFileProcessingStatus(activity.id, 'Failed', `La tienda con código ${storeCode} no existe en el sistema.`);
+      return;
+    }
     
     // Create file activity entry
     const activity = await storage.createFileActivity({
