@@ -1,15 +1,20 @@
 import { 
   users, stores, systemConfigs, fileActivities, excelData, pdfDocuments,
+  watchlistPersons, watchlistItems, alerts, searchHistory,
   type User, type InsertUser, type Store, type InsertStore, 
   type SystemConfig, type InsertSystemConfig, type FileActivity, 
   type InsertFileActivity, type ExcelData, type InsertExcelData,
-  type PdfDocument, type InsertPdfDocument
+  type PdfDocument, type InsertPdfDocument,
+  type WatchlistPerson, type InsertWatchlistPerson,
+  type WatchlistItem, type InsertWatchlistItem,
+  type Alert, type InsertAlert,
+  type SearchHistory, type InsertSearchHistory
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import connectPg from "connect-pg-simple";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, like, or, and, gte, lte } from "drizzle-orm";
 import { pool } from "./db";
 
 const MemoryStore = createMemoryStore(session);
@@ -95,6 +100,10 @@ export class MemStorage implements IStorage {
   private fileActivities: Map<number, FileActivity>;
   private excelData: Map<number, ExcelData>;
   private pdfDocuments: Map<number, PdfDocument>;
+  private watchlistPersons: Map<number, WatchlistPerson>;
+  private watchlistItems: Map<number, WatchlistItem>;
+  private alerts: Map<number, Alert>;
+  private searchHistories: Map<number, SearchHistory>;
   
   sessionStore: any; // Using any to bypass type issues with express-session
   
@@ -104,6 +113,10 @@ export class MemStorage implements IStorage {
   private activityId: number;
   private excelDataId: number;
   private pdfDocumentId: number;
+  private watchlistPersonId: number;
+  private watchlistItemId: number;
+  private alertId: number;
+  private searchHistoryId: number;
 
   constructor() {
     this.users = new Map();
@@ -112,6 +125,10 @@ export class MemStorage implements IStorage {
     this.fileActivities = new Map();
     this.excelData = new Map();
     this.pdfDocuments = new Map();
+    this.watchlistPersons = new Map();
+    this.watchlistItems = new Map();
+    this.alerts = new Map();
+    this.searchHistories = new Map();
     
     this.userId = 1;
     this.storeId = 1;
@@ -119,6 +136,10 @@ export class MemStorage implements IStorage {
     this.activityId = 1;
     this.excelDataId = 1;
     this.pdfDocumentId = 1;
+    this.watchlistPersonId = 1;
+    this.watchlistItemId = 1;
+    this.alertId = 1;
+    this.searchHistoryId = 1;
     
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // prune expired entries every 24h
@@ -337,6 +358,281 @@ export class MemStorage implements IStorage {
         const dateB = new Date(b.uploadDate).getTime();
         return dateB - dateA; // Sort in descending order (newest first)
       });
+  }
+  
+  // Implementación de nuevos métodos para cumplir con la interfaz
+  
+  // Excel Data Search and Lookup
+  async searchExcelData(query: string, filters?: any): Promise<ExcelData[]> {
+    const excelRecords = Array.from(this.excelData.values());
+    
+    // Filtra los registros basado en una búsqueda de texto
+    const filteredBySearch = excelRecords.filter(record => {
+      const searchTerms = query.toLowerCase();
+      return (
+        (record.customerName && record.customerName.toLowerCase().includes(searchTerms)) ||
+        (record.customerContact && record.customerContact.toLowerCase().includes(searchTerms)) ||
+        (record.orderNumber && record.orderNumber.toLowerCase().includes(searchTerms)) ||
+        (record.itemDetails && record.itemDetails.toLowerCase().includes(searchTerms)) ||
+        (record.metals && record.metals.toLowerCase().includes(searchTerms)) ||
+        (record.engravings && record.engravings.toLowerCase().includes(searchTerms)) ||
+        (record.pawnTicket && record.pawnTicket.toLowerCase().includes(searchTerms))
+      );
+    });
+    
+    // Aplicar filtros adicionales si están presentes
+    let result = filteredBySearch;
+    
+    if (filters) {
+      if (filters.storeCode) {
+        result = result.filter(record => record.storeCode === filters.storeCode);
+      }
+      
+      if (filters.dateFrom && filters.dateTo) {
+        const fromDate = new Date(filters.dateFrom).getTime();
+        const toDate = new Date(filters.dateTo).getTime();
+        
+        result = result.filter(record => {
+          const recordDate = new Date(record.orderDate).getTime();
+          return recordDate >= fromDate && recordDate <= toDate;
+        });
+      }
+    }
+    
+    // Ordenamos por fecha de orden, más reciente primero
+    return result.sort((a, b) => {
+      const dateA = new Date(a.orderDate).getTime();
+      const dateB = new Date(b.orderDate).getTime();
+      return dateB - dateA;
+    });
+  }
+  
+  async getExcelDataById(id: number): Promise<ExcelData | undefined> {
+    return this.excelData.get(id);
+  }
+  
+  // Watchlist Person methods
+  async createWatchlistPerson(person: InsertWatchlistPerson): Promise<WatchlistPerson> {
+    const id = this.watchlistPersonId++;
+    const watchlistPerson: WatchlistPerson = { 
+      ...person, 
+      id,
+      status: person.status || "Activo",
+      riskLevel: person.riskLevel || "Medio",
+      createdAt: new Date(),
+      lastUpdated: null
+    };
+    this.watchlistPersons.set(id, watchlistPerson);
+    return watchlistPerson;
+  }
+  
+  async getWatchlistPersons(includeInactive: boolean = false): Promise<WatchlistPerson[]> {
+    const persons = Array.from(this.watchlistPersons.values());
+    
+    if (!includeInactive) {
+      return persons.filter(person => person.status === "Activo")
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    }
+    
+    return persons.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+  
+  async getWatchlistPerson(id: number): Promise<WatchlistPerson | undefined> {
+    return this.watchlistPersons.get(id);
+  }
+  
+  async updateWatchlistPerson(id: number, personUpdate: Partial<WatchlistPerson>): Promise<WatchlistPerson | undefined> {
+    const person = this.watchlistPersons.get(id);
+    if (!person) return undefined;
+    
+    const updatedPerson = { 
+      ...person, 
+      ...personUpdate,
+      lastUpdated: new Date()
+    };
+    
+    this.watchlistPersons.set(id, updatedPerson);
+    return updatedPerson;
+  }
+  
+  async deleteWatchlistPerson(id: number): Promise<boolean> {
+    // En lugar de eliminar, marcamos como inactivo
+    const person = this.watchlistPersons.get(id);
+    if (!person) return false;
+    
+    const updatedPerson = {
+      ...person,
+      status: "Inactivo",
+      lastUpdated: new Date()
+    };
+    
+    this.watchlistPersons.set(id, updatedPerson);
+    return true;
+  }
+  
+  async searchWatchlistPersons(query: string): Promise<WatchlistPerson[]> {
+    const searchTerm = query.toLowerCase();
+    
+    return Array.from(this.watchlistPersons.values())
+      .filter(person => 
+        person.status === "Activo" && (
+          (person.fullName && person.fullName.toLowerCase().includes(searchTerm)) ||
+          (person.identificationNumber && person.identificationNumber.toLowerCase().includes(searchTerm)) ||
+          (person.phone && person.phone.toLowerCase().includes(searchTerm))
+        )
+      )
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+  
+  // Watchlist Item methods
+  async createWatchlistItem(item: InsertWatchlistItem): Promise<WatchlistItem> {
+    const id = this.watchlistItemId++;
+    const watchlistItem: WatchlistItem = { 
+      ...item, 
+      id,
+      status: item.status || "Activo",
+      riskLevel: item.riskLevel || "Medio",
+      createdAt: new Date(),
+      lastUpdated: null
+    };
+    this.watchlistItems.set(id, watchlistItem);
+    return watchlistItem;
+  }
+  
+  async getWatchlistItems(includeInactive: boolean = false): Promise<WatchlistItem[]> {
+    const items = Array.from(this.watchlistItems.values());
+    
+    if (!includeInactive) {
+      return items.filter(item => item.status === "Activo")
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    }
+    
+    return items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+  
+  async getWatchlistItem(id: number): Promise<WatchlistItem | undefined> {
+    return this.watchlistItems.get(id);
+  }
+  
+  async updateWatchlistItem(id: number, itemUpdate: Partial<WatchlistItem>): Promise<WatchlistItem | undefined> {
+    const item = this.watchlistItems.get(id);
+    if (!item) return undefined;
+    
+    const updatedItem = { 
+      ...item, 
+      ...itemUpdate,
+      lastUpdated: new Date()
+    };
+    
+    this.watchlistItems.set(id, updatedItem);
+    return updatedItem;
+  }
+  
+  async deleteWatchlistItem(id: number): Promise<boolean> {
+    // En lugar de eliminar, marcamos como inactivo
+    const item = this.watchlistItems.get(id);
+    if (!item) return false;
+    
+    const updatedItem = {
+      ...item,
+      status: "Inactivo",
+      lastUpdated: new Date()
+    };
+    
+    this.watchlistItems.set(id, updatedItem);
+    return true;
+  }
+  
+  async searchWatchlistItems(query: string): Promise<WatchlistItem[]> {
+    const searchTerm = query.toLowerCase();
+    
+    return Array.from(this.watchlistItems.values())
+      .filter(item => 
+        item.status === "Activo" && (
+          (item.description && item.description.toLowerCase().includes(searchTerm)) ||
+          (item.serialNumber && item.serialNumber.toLowerCase().includes(searchTerm)) ||
+          (item.model && item.model.toLowerCase().includes(searchTerm)) ||
+          (item.brand && item.brand.toLowerCase().includes(searchTerm)) ||
+          (item.identificationMarks && item.identificationMarks.toLowerCase().includes(searchTerm))
+        )
+      )
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+  
+  // Alert methods
+  async createAlert(alert: InsertAlert): Promise<Alert> {
+    const id = this.alertId++;
+    const newAlert: Alert = { 
+      ...alert, 
+      id,
+      status: alert.status || "Nueva",
+      createdAt: new Date(),
+      resolvedAt: null
+    };
+    this.alerts.set(id, newAlert);
+    return newAlert;
+  }
+  
+  async getAlerts(status?: string, limit: number = 50): Promise<Alert[]> {
+    let alerts = Array.from(this.alerts.values());
+    
+    if (status) {
+      alerts = alerts.filter(alert => alert.status === status);
+    }
+    
+    return alerts
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limit);
+  }
+  
+  async getAlert(id: number): Promise<Alert | undefined> {
+    return this.alerts.get(id);
+  }
+  
+  async updateAlertStatus(
+    id: number, 
+    status: string, 
+    reviewedBy: number,
+    notes?: string
+  ): Promise<Alert | undefined> {
+    const alert = this.alerts.get(id);
+    if (!alert) return undefined;
+    
+    const updatedAlert: Alert = { 
+      ...alert, 
+      status: status as "Nueva" | "Revisada" | "Falsa",
+      reviewedBy,
+      resolvedAt: new Date(),
+      ...(notes && { reviewNotes: notes })
+    };
+    
+    this.alerts.set(id, updatedAlert);
+    return updatedAlert;
+  }
+  
+  async getAlertsByExcelDataId(excelDataId: number): Promise<Alert[]> {
+    return Array.from(this.alerts.values())
+      .filter(alert => alert.excelDataId === excelDataId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+  
+  // Search History methods
+  async addSearchHistory(searchHistory: InsertSearchHistory): Promise<SearchHistory> {
+    const id = this.searchHistoryId++;
+    const history: SearchHistory = { 
+      ...searchHistory, 
+      id,
+      searchDate: new Date()
+    };
+    this.searchHistories.set(id, history);
+    return history;
+  }
+  
+  async getRecentSearches(userId: number, limit: number = 10): Promise<SearchHistory[]> {
+    return Array.from(this.searchHistories.values())
+      .filter(history => history.userId === userId)
+      .sort((a, b) => b.searchDate.getTime() - a.searchDate.getTime())
+      .slice(0, limit);
   }
 }
 
