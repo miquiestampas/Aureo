@@ -434,6 +434,347 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
+  // Watchlist Person routes
+  app.get("/api/watchlist/persons", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const includeInactive = req.query.includeInactive === 'true';
+        const persons = await storage.getWatchlistPersons(includeInactive);
+        res.json(persons);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.get("/api/watchlist/persons/search", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const { query } = req.query;
+        if (!query || typeof query !== 'string') {
+          return res.status(400).json({ message: "Se requiere parámetro de búsqueda" });
+        }
+        
+        // Registrar la búsqueda en el historial
+        await storage.addSearchHistory({
+          userId: req.user!.id,
+          searchType: "Cliente",
+          searchTerms: query,
+          resultCount: 0 // Se actualizará después
+        });
+        
+        const results = await storage.searchWatchlistPersons(query);
+        
+        // Actualizar el recuento de resultados
+        // En un sistema de producción, consideraríamos si vale la pena esta segunda llamada
+        // o si podríamos usar una cola de trabajos para actualizar el recuento de forma asíncrona
+        
+        res.json(results);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.post("/api/watchlist/persons", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Añadir createdBy al objeto
+        const personData = {
+          ...req.body,
+          createdBy: req.user!.id
+        };
+        
+        const person = await storage.createWatchlistPerson(personData);
+        res.status(201).json(person);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.get("/api/watchlist/persons/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const person = await storage.getWatchlistPerson(id);
+        if (!person) {
+          return res.status(404).json({ message: "Persona no encontrada" });
+        }
+        
+        res.json(person);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.patch("/api/watchlist/persons/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const updatedPerson = await storage.updateWatchlistPerson(id, req.body);
+        if (!updatedPerson) {
+          return res.status(404).json({ message: "Persona no encontrada" });
+        }
+        
+        res.json(updatedPerson);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.delete("/api/watchlist/persons/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const success = await storage.deleteWatchlistPerson(id);
+        if (!success) {
+          return res.status(404).json({ message: "Persona no encontrada" });
+        }
+        
+        res.status(204).send();
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Watchlist Item routes
+  app.get("/api/watchlist/items", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const includeInactive = req.query.includeInactive === 'true';
+        const items = await storage.getWatchlistItems(includeInactive);
+        res.json(items);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.get("/api/watchlist/items/search", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const { query } = req.query;
+        if (!query || typeof query !== 'string') {
+          return res.status(400).json({ message: "Se requiere parámetro de búsqueda" });
+        }
+        
+        // Registrar la búsqueda en el historial
+        await storage.addSearchHistory({
+          userId: req.user!.id,
+          searchType: "Artículo",
+          searchTerms: query,
+          resultCount: 0 // Se actualizará después
+        });
+        
+        const results = await storage.searchWatchlistItems(query);
+        
+        res.json(results);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.post("/api/watchlist/items", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Añadir createdBy al objeto
+        const itemData = {
+          ...req.body,
+          createdBy: req.user!.id
+        };
+        
+        const item = await storage.createWatchlistItem(itemData);
+        res.status(201).json(item);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.get("/api/watchlist/items/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const item = await storage.getWatchlistItem(id);
+        if (!item) {
+          return res.status(404).json({ message: "Artículo no encontrado" });
+        }
+        
+        res.json(item);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.patch("/api/watchlist/items/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const updatedItem = await storage.updateWatchlistItem(id, req.body);
+        if (!updatedItem) {
+          return res.status(404).json({ message: "Artículo no encontrado" });
+        }
+        
+        res.json(updatedItem);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.delete("/api/watchlist/items/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const success = await storage.deleteWatchlistItem(id);
+        if (!success) {
+          return res.status(404).json({ message: "Artículo no encontrado" });
+        }
+        
+        res.status(204).send();
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Alert routes
+  app.get("/api/alerts", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+        
+        const alerts = await storage.getAlerts(status, limit);
+        res.json(alerts);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.get("/api/alerts/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const alert = await storage.getAlert(id);
+        if (!alert) {
+          return res.status(404).json({ message: "Alerta no encontrada" });
+        }
+        
+        res.json(alert);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.post("/api/alerts", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Añadir createdBy al objeto
+        const alertData = {
+          ...req.body,
+          createdBy: req.user!.id
+        };
+        
+        const alert = await storage.createAlert(alertData);
+        res.status(201).json(alert);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.patch("/api/alerts/:id/status", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const { status, notes } = req.body;
+        if (!status) {
+          return res.status(400).json({ message: "Se requiere estado" });
+        }
+        
+        const updatedAlert = await storage.updateAlertStatus(id, status, req.user!.id, notes);
+        if (!updatedAlert) {
+          return res.status(404).json({ message: "Alerta no encontrada" });
+        }
+        
+        res.json(updatedAlert);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.get("/api/alerts/excel/:excelDataId", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const excelDataId = parseInt(req.params.excelDataId);
+        if (isNaN(excelDataId)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const alerts = await storage.getAlertsByExcelDataId(excelDataId);
+        res.json(alerts);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Search History routes
+  app.get("/api/search-history", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+        
+        const searchHistory = await storage.getRecentSearches(req.user!.id, limit);
+        res.json(searchHistory);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
   // Initialize file watchers on startup
   initializeFileWatchers().catch(err => 
     console.error("Error initializing file watchers on startup:", err)

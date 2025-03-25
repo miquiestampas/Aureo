@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { storage } from './storage';
 import { emitFileProcessingStatus } from './fileWatcher';
-import { InsertExcelData, InsertPdfDocument } from '@shared/schema';
+import { InsertExcelData, InsertPdfDocument, InsertAlert } from '@shared/schema';
 import { promisify } from 'util';
 import * as ExcelJS from 'exceljs';
 
@@ -15,6 +15,125 @@ const getPdfParser = async () => {
   }
   return pdfParse.default;
 };
+
+// Función para verificar si hay coincidencias con la lista de vigilancia
+async function checkWatchlistMatches(excelData: ExcelData) {
+  try {
+    // 1. Verificar coincidencias de personas
+    const watchlistPersons = await storage.getWatchlistPersons();
+    
+    // Verificar coincidencias por nombre
+    for (const person of watchlistPersons) {
+      // Si el nombre de la persona está en la lista de vigilancia
+      if (excelData.customerName && 
+          person.fullName && 
+          excelData.customerName.toLowerCase().includes(person.fullName.toLowerCase())) {
+        
+        // Calcular nivel de confianza (simple, basado en la longitud del nombre)
+        // Un valor más alto significa mayor confianza en la coincidencia
+        const confidence = (person.fullName.length / excelData.customerName.length) * 100;
+        
+        // Crear alerta solo si la confianza es mayor al 50%
+        if (confidence > 50) {
+          const alert: InsertAlert = {
+            excelDataId: excelData.id,
+            watchlistPersonId: person.id,
+            watchlistItemId: null,
+            alertType: "Persona",
+            status: "Nueva",
+            matchConfidence: confidence,
+            createdAt: new Date(),
+            reviewedBy: null,
+            reviewNotes: null,
+            resolvedAt: null
+          };
+          
+          await storage.createAlert(alert);
+          console.log(`🚨 Alerta creada: Coincidencia de persona "${person.fullName}" con confianza ${confidence.toFixed(2)}%`);
+        }
+      }
+      
+      // También verificar por número de identificación si está disponible
+      if (excelData.customerContact && 
+          person.identificationNumber && 
+          excelData.customerContact.includes(person.identificationNumber)) {
+        
+        const alert: InsertAlert = {
+          excelDataId: excelData.id,
+          watchlistPersonId: person.id,
+          watchlistItemId: null,
+          alertType: "Persona",
+          status: "Nueva",
+          matchConfidence: 95, // Alta confianza para coincidencias de ID
+          createdAt: new Date(),
+          reviewedBy: null,
+          reviewNotes: null,
+          resolvedAt: null
+        };
+        
+        await storage.createAlert(alert);
+        console.log(`🚨 Alerta creada: Coincidencia de ID "${person.identificationNumber}" con confianza 95%`);
+      }
+    }
+    
+    // 2. Verificar coincidencias de artículos
+    const watchlistItems = await storage.getWatchlistItems();
+    
+    for (const item of watchlistItems) {
+      // Verificar si la descripción del artículo está en los detalles del pedido
+      if (excelData.itemDetails && 
+          item.description && 
+          excelData.itemDetails.toLowerCase().includes(item.description.toLowerCase())) {
+        
+        // Calcular nivel de confianza
+        const confidence = (item.description.length / excelData.itemDetails.length) * 100;
+        
+        if (confidence > 40) {  // Umbral más bajo para artículos
+          const alert: InsertAlert = {
+            excelDataId: excelData.id,
+            watchlistPersonId: null,
+            watchlistItemId: item.id,
+            alertType: "Objeto",
+            status: "Nueva",
+            matchConfidence: confidence,
+            createdAt: new Date(),
+            reviewedBy: null,
+            reviewNotes: null,
+            resolvedAt: null
+          };
+          
+          await storage.createAlert(alert);
+          console.log(`🚨 Alerta creada: Coincidencia de artículo "${item.description}" con confianza ${confidence.toFixed(2)}%`);
+        }
+      }
+      
+      // También verificar por número de serie si está disponible
+      if (excelData.itemDetails && 
+          item.serialNumber && 
+          excelData.itemDetails.includes(item.serialNumber)) {
+        
+        const alert: InsertAlert = {
+          excelDataId: excelData.id,
+          watchlistPersonId: null,
+          watchlistItemId: item.id,
+          alertType: "Objeto",
+          status: "Nueva",
+          matchConfidence: 98, // Alta confianza para coincidencias de serie
+          createdAt: new Date(),
+          reviewedBy: null,
+          reviewNotes: null,
+          resolvedAt: null
+        };
+        
+        await storage.createAlert(alert);
+        console.log(`🚨 Alerta creada: Coincidencia de número de serie "${item.serialNumber}" con confianza 98%`);
+      }
+    }
+    
+  } catch (error) {
+    console.error("Error al verificar coincidencias con lista de vigilancia:", error);
+  }
+}
 
 // Process Excel file
 export async function processExcelFile(filePath: string, activityId: number, storeCode: string) {
@@ -74,9 +193,13 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       processedRows.push(excelData);
     });
     
-    // Save all extracted data
+    // Save all extracted data and check for watchlist matches
     for (const row of processedRows) {
-      await storage.createExcelData(row);
+      // Guardar los datos de Excel
+      const savedData = await storage.createExcelData(row);
+      
+      // Verificar coincidencias con la lista de vigilancia
+      await checkWatchlistMatches(savedData);
     }
     
     // Update file activity to Processed
