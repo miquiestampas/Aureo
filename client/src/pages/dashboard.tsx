@@ -80,7 +80,7 @@ export default function DashboardPage() {
         const storeCode = row.original.storeCode;
         return (
           <div>
-            <div className="text-sm font-medium text-gray-900">Tienda #{storeCode}</div>
+            <div className="text-sm font-medium text-gray-900">{storeCode}</div>
           </div>
         );
       }
