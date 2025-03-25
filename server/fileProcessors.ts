@@ -2,11 +2,13 @@ import fs from 'fs';
 import path from 'path';
 import { storage } from './storage';
 import { emitFileProcessingStatus } from './fileWatcher';
-import { InsertExcelData, InsertPdfDocument, InsertAlert } from '@shared/schema';
+import { InsertExcelData, InsertPdfDocument, InsertAlert, fileActivities, ExcelData } from '@shared/schema';
 import { promisify } from 'util';
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
 import csvParser from 'csv-parser';
+import { db } from './db';
+import { eq } from 'drizzle-orm';
 
 // Import pdf-parse dynamically to avoid initialization errors
 // We'll only use it when we actually need to parse a PDF
@@ -335,14 +337,30 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       if (excelStore) {
         console.log(`Found matching store in database: ${excelStore.code}`);
         
-        // Actualizar la actividad del archivo con el código correcto
-        // Actualizar el código de tienda en la actividad
+        // Actualizar la actividad del archivo con el código correcto de tienda
         const activity = await storage.getFileActivity(activityId);
         if (activity) {
-          await storage.updateFileActivityStatus(
-            activityId, 
-            'Processing'
-          );
+          try {
+            // Actualiza la actividad con el nuevo código de tienda
+            await storage.updateFileActivityStatus(activityId, 'Processing');
+            
+            // IMPORTANTE: También actualizamos la variable storeCode para que los datos se procesen con el código correcto
+            storeCode = excelStore.code;
+            
+            console.log(`Updated file activity ${activityId} with correct store code: ${excelStore.code}`);
+            
+            // Actualizar el registro de actividad en la base de datos
+            const fileAct = await storage.getFileActivity(activityId);
+            if (fileAct) {
+              // Actualizar manualmente el código de tienda en la base de datos
+              await db.update(fileActivities)
+                .set({ storeCode: excelStore.code })
+                .where(eq(fileActivities.id, activityId));
+              console.log(`Updated file activity in database with store code: ${excelStore.code}`);
+            }
+          } catch (updateError) {
+            console.error(`Error updating file activity with correct store code:`, updateError);
+          }
         }
         
         // Actualizar todos los registros para usar el código de tienda correcto
