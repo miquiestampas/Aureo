@@ -52,6 +52,7 @@ export interface IStorage {
   createFileActivity(activity: InsertFileActivity): Promise<FileActivity>;
   getFileActivity(id: number): Promise<FileActivity | undefined>;
   updateFileActivityStatus(id: number, status: string, errorMessage?: string): Promise<FileActivity | undefined>;
+  updateFileActivity(id: number, updates: Partial<FileActivity>): Promise<FileActivity | undefined>;
   getRecentFileActivities(limit: number): Promise<FileActivity[]>;
   getFileActivitiesByStore(storeCode: string): Promise<FileActivity[]>;
   
@@ -309,6 +310,22 @@ export class MemStorage implements IStorage {
       ...activity, 
       status, 
       ...(errorMessage && { errorMessage })
+    };
+    
+    this.fileActivities.set(id, updatedActivity);
+    return updatedActivity;
+  }
+
+  async updateFileActivity(
+    id: number,
+    updates: Partial<FileActivity>
+  ): Promise<FileActivity | undefined> {
+    const activity = this.fileActivities.get(id);
+    if (!activity) return undefined;
+    
+    const updatedActivity = { 
+      ...activity, 
+      ...updates
     };
     
     this.fileActivities.set(id, updatedActivity);
