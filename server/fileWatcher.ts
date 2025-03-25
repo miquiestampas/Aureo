@@ -224,21 +224,42 @@ async function handleNewPdfFile(filePath: string) {
     // Estrategias mejoradas para extraer el código de tienda del nombre del archivo
     let storeCode = '';
     
-    // 1. Intentar el formato STORECODE_*.pdf
-    const formatMatch = filename.match(/^([^_\.]+)_/);
-    if (formatMatch && formatMatch[1]) {
-      storeCode = formatMatch[1];
-    } 
-    // 2. Intentar el formato STORECODE.*.pdf
+    // Expresiones regulares para detectar códigos de tienda en diferentes formatos
+    // El patrón común de código de tienda suele ser letras/números seguidos por más letras/números
+    
+    // 1. Buscar por patrón J12345ABCDE (formato común que comienza con J seguido de números y letras)
+    const j_pattern = /\b(J\d{5}[A-Z0-9]{4,5})\b/i;
+    const j_match = filename.match(j_pattern);
+    
+    if (j_match && j_match[1]) {
+      storeCode = j_match[1];
+    }
+    // 2. Intentar formato general de códigos: LETRA+NÚMEROS o NÚMEROS+LETRA
     else {
-      const dotMatch = filename.match(/^([^\.]+)\./);
-      if (dotMatch && dotMatch[1]) {
-        storeCode = dotMatch[1];
+      const general_pattern = /\b([A-Z]\d{1,6}|J\d{2,6}[a-z]{1,3})\b/i;
+      const general_match = filename.match(general_pattern);
+      
+      if (general_match && general_match[1]) {
+        storeCode = general_match[1];
       }
-      // 3. Si no se encontró ningún patrón, usar el nombre completo sin extensión como código
+      // 3. Intentar el formato STORECODE_*.pdf
       else {
-        const nameWithoutExtension = path.parse(filename).name;
-        storeCode = nameWithoutExtension;
+        const formatMatch = filename.match(/^([^_\.]+)_/);
+        if (formatMatch && formatMatch[1]) {
+          storeCode = formatMatch[1];
+        } 
+        // 4. Intentar el formato STORECODE.*.pdf
+        else {
+          const dotMatch = filename.match(/^([^\.]+)\./);
+          if (dotMatch && dotMatch[1]) {
+            storeCode = dotMatch[1];
+          }
+          // 5. Si no se encontró ningún patrón, usar el nombre completo sin extensión como código
+          else {
+            const nameWithoutExtension = path.parse(filename).name;
+            storeCode = nameWithoutExtension;
+          }
+        }
       }
     }
     

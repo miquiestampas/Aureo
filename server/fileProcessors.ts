@@ -5,6 +5,8 @@ import { emitFileProcessingStatus } from './fileWatcher';
 import { InsertExcelData, InsertPdfDocument, InsertAlert } from '@shared/schema';
 import { promisify } from 'util';
 import * as ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
+import csvParser from 'csv-parser';
 
 // Import pdf-parse dynamically to avoid initialization errors
 // We'll only use it when we actually need to parse a PDF
@@ -140,7 +142,27 @@ async function checkWatchlistMatches(excelData: ExcelData) {
   }
 }
 
-// Process Excel file
+// Función para procesar los valores de una fila y crear una entrada InsertExcelData
+function createExcelDataFromValues(values: any[], storeCode: string, activityId: number): InsertExcelData {
+  return {
+    storeCode: storeCode, // Usamos el código de tienda proporcionado, no el del Excel
+    orderNumber: values[1]?.toString() || '', // Columna B
+    orderDate: values[2] ? new Date(values[2]) : new Date(), // Columna C
+    customerName: values[3]?.toString() || '', // Columna D
+    customerContact: values[4]?.toString() || '', // Columna E
+    itemDetails: values[5]?.toString() || '', // Columna F
+    metals: values[6]?.toString() || '', // Columna G
+    engravings: values[7]?.toString() || '', // Columna H
+    stones: values[8]?.toString() || '', // Columna I
+    carats: values[9]?.toString() || '', // Columna J
+    price: values[10]?.toString() || '', // Columna K
+    pawnTicket: values[11]?.toString() || '', // Columna L
+    saleDate: values[12] ? new Date(values[12]) : null, // Columna M
+    fileActivityId: activityId
+  };
+}
+
+// Process Excel file (xls, xlsx, csv)
 export async function processExcelFile(filePath: string, activityId: number, storeCode: string) {
   try {
     // Update file activity to Processing status
@@ -158,48 +180,81 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       throw new Error(`File ${filePath} does not exist`);
     }
     
-    // Parse Excel file
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
+    // Get file extension
+    const fileExt = path.extname(filePath).toLowerCase();
+    let processedRows: InsertExcelData[] = [];
     
-    // Assume first worksheet contains the data
-    const worksheet = workbook.worksheets[0];
-    if (!worksheet) {
-      throw new Error('Excel file contains no worksheets');
+    // Procesar según el tipo de archivo
+    if (fileExt === '.csv') {
+      // Procesar archivo CSV
+      const rows: any[] = [];
+      
+      // Leer el archivo CSV usando csvParser
+      await new Promise<void>((resolve, reject) => {
+        fs.createReadStream(filePath)
+          .pipe(csvParser())
+          .on('data', (row) => {
+            rows.push(row);
+          })
+          .on('end', () => {
+            resolve();
+          })
+          .on('error', (error) => {
+            reject(error);
+          });
+      });
+      
+      // Saltar la primera fila (encabezado) e indexar los valores por posición
+      rows.forEach((row, index) => {
+        if (index === 0) return; // Saltar encabezado
+        
+        // Extraer valores de las columnas en orden
+        const values = Object.values(row);
+        processedRows.push(createExcelDataFromValues([null, ...values], storeCode, activityId));
+      });
+    } 
+    else if (fileExt === '.xls') {
+      // Procesar archivo XLS (formato antiguo) usando la biblioteca XLSX
+      const workbook = XLSX.readFile(filePath);
+      const sheetName = workbook.SheetNames[0];
+      
+      if (!sheetName) {
+        throw new Error('El archivo Excel no contiene hojas');
+      }
+      
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      
+      // Saltar la primera fila (encabezado)
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i] as any[];
+        if (row.length > 0) {
+          processedRows.push(createExcelDataFromValues([null, ...row], storeCode, activityId));
+        }
+      }
+    } 
+    else {
+      // Procesar archivo XLSX usando ExcelJS (formato moderno)
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(filePath);
+      
+      // Asumir que la primera hoja contiene los datos
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
+        throw new Error('El archivo Excel no contiene hojas');
+      }
+      
+      // Procesar filas (saltar fila de encabezado)
+      worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        // Saltar fila de encabezado
+        if (rowNumber === 1) return;
+        
+        const values = row.values as any[];
+        processedRows.push(createExcelDataFromValues(values, storeCode, activityId));
+      });
     }
     
-    // Process rows (skip header row)
-    const processedRows: InsertExcelData[] = [];
-    
-    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      // Skip header row
-      if (rowNumber === 1) return;
-      
-      const values = row.values as any[];
-      
-      // Extract values from columns in a fixed order regardless of header names
-      // Columna A = storeCode, B = orderNumber, etc. (Excel usa índices basados en 1, pero values[0] es undefined)
-      const excelData: InsertExcelData = {
-        storeCode: storeCode, // Usamos el código de tienda proporcionado, no el del Excel
-        orderNumber: values[2]?.toString() || '', // Columna B
-        orderDate: new Date(values[3] || new Date()), // Columna C
-        customerName: values[4]?.toString() || '', // Columna D
-        customerContact: values[5]?.toString() || '', // Columna E
-        itemDetails: values[6]?.toString() || '', // Columna F
-        metals: values[7]?.toString() || '', // Columna G
-        engravings: values[8]?.toString() || '', // Columna H
-        stones: values[9]?.toString() || '', // Columna I
-        carats: values[10]?.toString() || '', // Columna J
-        price: values[11]?.toString() || '', // Columna K
-        pawnTicket: values[12]?.toString() || '', // Columna L
-        saleDate: values[13] ? new Date(values[13]) : null, // Columna M
-        fileActivityId: activityId
-      };
-      
-      processedRows.push(excelData);
-    });
-    
-    // Save all extracted data and check for watchlist matches
+    // Guardar todos los datos extraídos y verificar coincidencias con la lista de vigilancia
     for (const row of processedRows) {
       // Guardar los datos de Excel
       const savedData = await storage.createExcelData(row);
@@ -208,17 +263,17 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       await checkWatchlistMatches(savedData);
     }
     
-    // Update file activity to Processed
+    // Actualizar la actividad del archivo a Processed
     await storage.updateFileActivityStatus(activityId, 'Processed');
     emitFileProcessingStatus(activityId, 'Processed');
     
-    console.log(`Successfully processed Excel file ${path.basename(filePath)} with ${processedRows.length} records`);
+    console.log(`Archivo procesado correctamente: ${path.basename(filePath)} con ${processedRows.length} registros`);
     
   } catch (error) {
-    console.error(`Error processing Excel file ${filePath}:`, error);
+    console.error(`Error al procesar el archivo ${filePath}:`, error);
     
-    // Update file activity to Failed
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error during processing';
+    // Actualizar la actividad del archivo a Failed
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido durante el procesamiento';
     await storage.updateFileActivityStatus(activityId, 'Failed', errorMessage);
     emitFileProcessingStatus(activityId, 'Failed', errorMessage);
   }
