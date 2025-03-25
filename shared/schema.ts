@@ -180,18 +180,18 @@ export type WatchlistPerson = typeof watchlistPersons.$inferSelect;
 // Objeto de interés (Watchlist de artículos)
 export const watchlistItems = pgTable("watchlist_items", {
   id: serial("id").primaryKey(),
-  itemType: text("item_type").notNull(), // Tipo de joya, electrónico, etc.
+  itemType: text("itemtype").notNull(), // Tipo de joya, electrónico, etc.
   description: text("description").notNull(),
-  serialNumber: text("serial_number"),
-  identificationMarks: text("identification_marks"), // Marcas distintivas, grabados, etc.
+  serialNumber: text("serialnumber"),
+  identificationMarks: text("identificationmarks"), // Marcas distintivas, grabados, etc.
   model: text("model"),
   brand: text("brand"),
   notes: text("notes"),
-  riskLevel: text("risk_level", { enum: ["Alto", "Medio", "Bajo"] }).notNull().default("Medio"),
+  riskLevel: text("risklevel", { enum: ["Alto", "Medio", "Bajo"] }).notNull().default("Medio"),
   status: text("status", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  createdBy: integer("created_by").notNull(), // ID del usuario que agregó el registro
-  lastUpdated: timestamp("last_updated"),
+  createdAt: timestamp("createdat").notNull().defaultNow(),
+  createdBy: integer("createdby").notNull(), // ID del usuario que agregó el registro
+  lastUpdated: timestamp("lastupdated"),
 });
 
 export const insertWatchlistItemSchema = createInsertSchema(watchlistItems).pick({
