@@ -56,8 +56,7 @@ async function checkWatchlistMatches(excelData: ExcelData) {
             status: "Nueva",
             matchConfidence: confidence,
             reviewedBy: null,
-            reviewNotes: null,
-            resolvedAt: null
+            reviewNotes: null
           };
           
           await storage.createAlert(alert);
@@ -338,12 +337,15 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         console.log(`Found matching store in database: ${excelStore.code}`);
         
         // Actualizar la actividad del archivo con el código correcto
-        await storage.updateFileActivityStatus(
-          activityId, 
-          'Processing', 
-          null, 
-          { storeCode: excelStore.code }
-        );
+        // Actualizar el código de tienda en la actividad
+        const activity = await storage.getFileActivity(activityId);
+        if (activity) {
+          await storage.updateFileActivityStatus(
+            activityId, 
+            'Processing', 
+            null
+          );
+        }
         
         // Actualizar todos los registros para usar el código de tienda correcto
         for (const row of processedRows) {
