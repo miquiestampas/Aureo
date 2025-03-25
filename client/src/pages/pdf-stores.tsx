@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
+import PdfViewer from "@/components/PdfViewer";
 
 interface Store {
   id: number;
@@ -63,6 +64,8 @@ export default function PdfStoresPage() {
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<{ id: number, title: string, storeCode: string } | null>(null);
 
   // Fetch PDF stores
   const { data: stores } = useQuery<Store[]>({
@@ -208,6 +211,7 @@ export default function PdfStoresPage() {
               size="sm" 
               className="h-8 w-8 p-0"
               title="View document"
+              onClick={() => handleViewPdf(row.original)}
             >
               <Eye className="h-4 w-4" />
               <span className="sr-only">View document</span>
@@ -217,6 +221,7 @@ export default function PdfStoresPage() {
               size="sm" 
               className="h-8 w-8 p-0"
               title="Download document"
+              onClick={() => handleDownloadPdf(row.original.id)}
             >
               <Download className="h-4 w-4" />
               <span className="sr-only">Download document</span>
@@ -227,6 +232,48 @@ export default function PdfStoresPage() {
     }
   ];
   
+  // Handle view PDF
+  const handleViewPdf = (document: PdfDocument) => {
+    setSelectedDocument({
+      id: document.id,
+      title: document.title || `Documento-${document.id}`,
+      storeCode: document.storeCode
+    });
+    setViewerOpen(true);
+  };
+
+  // Handle download PDF
+  const handleDownloadPdf = async (documentId: number) => {
+    try {
+      // Crear un enlace invisible, configurarlo para descargar y hacer clic en él
+      const response = await fetch(`/api/pdf-documents/${documentId}/view`);
+      if (!response.ok) {
+        throw new Error("Error al descargar el documento");
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `documento-${documentId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Limpiar
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Error descargando PDF:", error);
+      toast({
+        title: "Error al descargar",
+        description: "No se pudo descargar el documento PDF.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
@@ -368,6 +415,17 @@ export default function PdfStoresPage() {
           </Card>
         )}
       </div>
+      
+      {/* PDF Viewer Modal */}
+      {selectedDocument && (
+        <PdfViewer
+          isOpen={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          documentId={selectedDocument.id}
+          storeCode={selectedDocument.storeCode}
+          documentName={selectedDocument.title}
+        />
+      )}
     </div>
   );
 }
