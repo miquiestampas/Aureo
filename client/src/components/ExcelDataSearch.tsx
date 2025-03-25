@@ -139,7 +139,7 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       params.append('searchType', values.searchType);
       params.append('searchTerms', values.searchTerms);
       
-      if (values.storeCode) {
+      if (values.storeCode && values.storeCode !== 'all') {
         params.append('storeCode', values.storeCode);
       }
       
@@ -392,7 +392,7 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">Todas las tiendas</SelectItem>
+                              <SelectItem value="all">Todas las tiendas</SelectItem>
                               {stores.map((store) => (
                                 <SelectItem key={store.id} value={store.code}>
                                   {store.name} ({store.code})
