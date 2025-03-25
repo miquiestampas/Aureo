@@ -1229,7 +1229,28 @@ export class DatabaseStorage implements IStorage {
       ? `SELECT * FROM watchlist_persons ORDER BY createdat DESC`
       : `SELECT * FROM watchlist_persons WHERE status = 'Activo' ORDER BY createdat DESC`;
     
-    return await db.execute(sql);
+    const result = await db.execute(sql);
+    
+    // Transformar el resultado en un array de WatchlistPerson
+    if (result && result.rows && Array.isArray(result.rows)) {
+      return result.rows.map(row => {
+        return {
+          id: row.id,
+          fullName: row.fullname,
+          identificationNumber: row.identificationnumber,
+          phone: row.phone,
+          notes: row.notes,
+          riskLevel: row.risklevel,
+          status: row.status,
+          createdAt: row.createdat,
+          createdBy: row.createdby,
+          lastUpdated: row.lastupdated
+        } as WatchlistPerson;
+      });
+    }
+    
+    // Si no hay resultados, devolver un array vacío
+    return [];
   }
   
   async getWatchlistPerson(id: number): Promise<WatchlistPerson | undefined> {
@@ -1281,7 +1302,28 @@ export class DatabaseStorage implements IStorage {
       ORDER BY createdat DESC
     `;
     
-    return await db.execute(sql, [searchQuery]);
+    const result = await db.execute(sql, [searchQuery]);
+    
+    // Transformar el resultado en un array de WatchlistPerson
+    if (result && result.rows && Array.isArray(result.rows)) {
+      return result.rows.map(row => {
+        return {
+          id: row.id,
+          fullName: row.fullname,
+          identificationNumber: row.identificationnumber,
+          phone: row.phone,
+          notes: row.notes,
+          riskLevel: row.risklevel,
+          status: row.status,
+          createdAt: row.createdat,
+          createdBy: row.createdby,
+          lastUpdated: row.lastupdated
+        } as WatchlistPerson;
+      });
+    }
+    
+    // Si no hay resultados, devolver un array vacío
+    return [];
   }
   
   // Watchlist Item methods
@@ -1417,7 +1459,28 @@ export class DatabaseStorage implements IStorage {
     const result = await db.execute(
       sql`SELECT * FROM "alerts" WHERE "exceldataid" = ${excelDataId} ORDER BY "created_at" DESC`
     );
-    return result.rows as Alert[];
+    
+    // Transformar el resultado en un array de Alert
+    if (result && result.rows && Array.isArray(result.rows)) {
+      return result.rows.map(row => {
+        return {
+          id: row.id,
+          alertType: row.alerttype,
+          excelDataId: row.exceldataid,
+          watchlistPersonId: row.watchlistpersonid,
+          watchlistItemId: row.watchlistitemid,
+          matchConfidence: row.matchconfidence,
+          status: row.status,
+          reviewedBy: row.reviewedby,
+          reviewNotes: row.reviewnotes,
+          createdAt: row.created_at,
+          resolvedAt: row.resolvedat
+        } as Alert;
+      });
+    }
+    
+    // Si no hay resultados, devolver un array vacío
+    return [];
   }
   
   // Search History methods
