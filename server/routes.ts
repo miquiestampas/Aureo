@@ -566,6 +566,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Database purge routes (SuperAdmin only)
+  app.post("/api/system/purge/stores", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const { password, storeType } = req.body;
+        
+        // Verify password
+        if (!req.user || !await verifyAdminPassword(req.user.id, password)) {
+          return res.status(401).json({ message: "Contraseña incorrecta. Operación cancelada." });
+        }
+        
+        let result;
+        if (storeType === 'Excel') {
+          result = await storage.purgeExcelStores();
+        } else if (storeType === 'PDF') {
+          result = await storage.purgePdfStores();
+        } else {
+          result = await storage.purgeAllStores();
+        }
+        
+        res.json({ 
+          message: `Tiendas de tipo ${storeType || 'todas'} eliminadas correctamente`, 
+          count: result.count 
+        });
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.post("/api/system/purge/data", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const { password, dataType, fromDate, toDate } = req.body;
+        
+        // Verify password
+        if (!req.user || !await verifyAdminPassword(req.user.id, password)) {
+          return res.status(401).json({ message: "Contraseña incorrecta. Operación cancelada." });
+        }
+        
+        let result;
+        let dateRange = null;
+        
+        if (fromDate || toDate) {
+          dateRange = {
+            from: fromDate ? new Date(fromDate) : null,
+            to: toDate ? new Date(toDate) : null
+          };
+        }
+        
+        if (dataType === 'Excel') {
+          result = await storage.purgeExcelData(dateRange);
+        } else if (dataType === 'PDF') {
+          result = await storage.purgePdfData(dateRange);
+        } else if (dataType === 'Activities') {
+          result = await storage.purgeFileActivities(dateRange);
+        } else if (dataType === 'All') {
+          result = await storage.purgeAllData(dateRange);
+        } else {
+          return res.status(400).json({ message: "Tipo de datos no válido" });
+        }
+        
+        res.json({ 
+          message: `Datos de tipo ${dataType} eliminados correctamente`, 
+          count: result.count 
+        });
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.post("/api/system/purge/all", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const { password, confirmation } = req.body;
+        
+        // Require a special confirmation phrase
+        if (confirmation !== "CONFIRMAR-ELIMINAR-TODO") {
+          return res.status(400).json({ message: "Frase de confirmación incorrecta. Operación cancelada." });
+        }
+        
+        // Verify password
+        if (!req.user || !await verifyAdminPassword(req.user.id, password)) {
+          return res.status(401).json({ message: "Contraseña incorrecta. Operación cancelada." });
+        }
+        
+        const result = await storage.purgeEntireDatabase();
+        
+        res.json({ 
+          message: "Base de datos eliminada completamente", 
+          tablesAffected: result.tablesAffected 
+        });
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Helper function to verify admin password
+  async function verifyAdminPassword(userId: number, password: string): Promise<boolean> {
+    try {
+      const user = await storage.getUser(userId);
+      if (!user) return false;
+      
+      // Use the same password comparison logic from auth.ts
+      const { comparePasswords } = require('./auth');
+      return await comparePasswords(password, user.password);
+    } catch (err) {
+      console.error("Error verifying admin password:", err);
+      return false;
+    }
+  }
+  
   // Start file watchers
   app.post("/api/system/start-watchers", (req, res, next) => {
     req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {

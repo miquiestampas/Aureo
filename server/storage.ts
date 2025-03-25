@@ -92,6 +92,16 @@ export interface IStorage {
   // Search History methods
   addSearchHistory(searchHistory: InsertSearchHistory): Promise<SearchHistory>;
   getRecentSearches(userId: number, limit?: number): Promise<SearchHistory[]>;
+
+  // Database cleaning methods
+  purgeExcelStores(): Promise<{ count: number }>;
+  purgePdfStores(): Promise<{ count: number }>;
+  purgeAllStores(): Promise<{ count: number }>;
+  purgeExcelData(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }>;
+  purgePdfData(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }>;
+  purgeFileActivities(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }>;
+  purgeAllData(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }>;
+  purgeEntireDatabase(): Promise<{ tablesAffected: number }>;
 }
 
 export class MemStorage implements IStorage {
@@ -733,6 +743,241 @@ export class DatabaseStorage implements IStorage {
       pool,
       createTableIfMissing: true
     });
+  }
+  
+  // Métodos de purga de datos para superadministradores
+  async purgeExcelStores(): Promise<{ count: number }> {
+    try {
+      // Obtener códigos de tiendas Excel
+      const excelStores = await this.getStoresByType('Excel');
+      const storeCodes = excelStores.map(store => store.code);
+      
+      // Primero eliminar datos relacionados
+      let deletedCount = 0;
+      if (storeCodes.length > 0) {
+        // Eliminar datos de Excel
+        const excelResult = await db.delete(excelData)
+          .where(inArray(excelData.storeCode, storeCodes))
+          .returning();
+        deletedCount += excelResult.length;
+        
+        // Eliminar actividades de archivos
+        const activityResult = await db.delete(fileActivities)
+          .where(inArray(fileActivities.storeCode, storeCodes))
+          .returning();
+        deletedCount += activityResult.length;
+        
+        // Eliminar las tiendas
+        const storeResult = await db.delete(stores)
+          .where(inArray(stores.code, storeCodes))
+          .returning();
+        deletedCount += storeResult.length;
+      }
+      
+      return { count: deletedCount };
+    } catch (error) {
+      console.error("Error eliminando tiendas Excel:", error);
+      throw new Error("Error al eliminar tiendas Excel");
+    }
+  }
+  
+  async purgePdfStores(): Promise<{ count: number }> {
+    try {
+      // Obtener códigos de tiendas PDF
+      const pdfStores = await this.getStoresByType('PDF');
+      const storeCodes = pdfStores.map(store => store.code);
+      
+      // Primero eliminar datos relacionados
+      let deletedCount = 0;
+      if (storeCodes.length > 0) {
+        // Eliminar documentos PDF
+        const pdfResult = await db.delete(pdfDocuments)
+          .where(inArray(pdfDocuments.storeCode, storeCodes))
+          .returning();
+        deletedCount += pdfResult.length;
+        
+        // Eliminar actividades de archivos
+        const activityResult = await db.delete(fileActivities)
+          .where(inArray(fileActivities.storeCode, storeCodes))
+          .returning();
+        deletedCount += activityResult.length;
+        
+        // Eliminar las tiendas
+        const storeResult = await db.delete(stores)
+          .where(inArray(stores.code, storeCodes))
+          .returning();
+        deletedCount += storeResult.length;
+      }
+      
+      return { count: deletedCount };
+    } catch (error) {
+      console.error("Error eliminando tiendas PDF:", error);
+      throw new Error("Error al eliminar tiendas PDF");
+    }
+  }
+  
+  async purgeAllStores(): Promise<{ count: number }> {
+    try {
+      // Primero eliminar datos relacionados
+      const excelCount = await db.delete(excelData).returning().then(res => res.length);
+      const pdfCount = await db.delete(pdfDocuments).returning().then(res => res.length);
+      const activityCount = await db.delete(fileActivities).returning().then(res => res.length);
+      const storeCount = await db.delete(stores).returning().then(res => res.length);
+      
+      const totalCount = excelCount + pdfCount + activityCount + storeCount;
+      return { count: totalCount };
+    } catch (error) {
+      console.error("Error eliminando todas las tiendas:", error);
+      throw new Error("Error al eliminar todas las tiendas");
+    }
+  }
+  
+  async purgeExcelData(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }> {
+    try {
+      let query = db.delete(excelData);
+      
+      if (dateRange) {
+        // Aplicar filtro de fechas si se proporciona
+        if (dateRange.from) {
+          query = query.where(gte(excelData.orderDate, dateRange.from));
+        }
+        if (dateRange.to) {
+          query = query.where(lte(excelData.orderDate, dateRange.to));
+        }
+      }
+      
+      // Eliminar los registros y calcular el número
+      const result = await query.returning();
+      
+      // También eliminar alertas asociadas con estos registros de Excel eliminados
+      if (result.length > 0) {
+        const excelIds = result.map(item => item.id);
+        await db.delete(alerts)
+          .where(inArray(alerts.excelDataId, excelIds));
+      }
+      
+      return { count: result.length };
+    } catch (error) {
+      console.error("Error eliminando datos Excel:", error);
+      throw new Error("Error al eliminar datos Excel");
+    }
+  }
+  
+  async purgePdfData(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }> {
+    try {
+      let query = db.delete(pdfDocuments);
+      
+      if (dateRange) {
+        // Aplicar filtro de fechas si se proporciona
+        if (dateRange.from) {
+          query = query.where(gte(pdfDocuments.uploadDate, dateRange.from));
+        }
+        if (dateRange.to) {
+          query = query.where(lte(pdfDocuments.uploadDate, dateRange.to));
+        }
+      }
+      
+      // Eliminar los registros y calcular el número
+      const result = await query.returning();
+      return { count: result.length };
+    } catch (error) {
+      console.error("Error eliminando documentos PDF:", error);
+      throw new Error("Error al eliminar documentos PDF");
+    }
+  }
+  
+  async purgeFileActivities(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }> {
+    try {
+      let query = db.delete(fileActivities);
+      
+      if (dateRange) {
+        // Aplicar filtro de fechas si se proporciona
+        if (dateRange.from) {
+          query = query.where(gte(fileActivities.processingDate, dateRange.from));
+        }
+        if (dateRange.to) {
+          query = query.where(lte(fileActivities.processingDate, dateRange.to));
+        }
+      }
+      
+      // Eliminar los registros y calcular el número
+      const result = await query.returning();
+      return { count: result.length };
+    } catch (error) {
+      console.error("Error eliminando actividades de archivos:", error);
+      throw new Error("Error al eliminar actividades de archivos");
+    }
+  }
+  
+  async purgeAllData(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }> {
+    try {
+      // Eliminar todos los datos pero conservar las tiendas
+      const excelCount = await this.purgeExcelData(dateRange);
+      const pdfCount = await this.purgePdfData(dateRange);
+      const activityCount = await this.purgeFileActivities(dateRange);
+      
+      // Eliminar también las alertas si no se eliminaron con los datos Excel
+      let alertCount = 0;
+      if (dateRange) {
+        let query = db.delete(alerts);
+        if (dateRange.from) {
+          query = query.where(gte(alerts.createdAt, dateRange.from));
+        }
+        if (dateRange.to) {
+          query = query.where(lte(alerts.createdAt, dateRange.to));
+        }
+        const result = await query.returning();
+        alertCount = result.length;
+      }
+      
+      const totalCount = excelCount.count + pdfCount.count + activityCount.count + alertCount;
+      return { count: totalCount };
+    } catch (error) {
+      console.error("Error eliminando todos los datos:", error);
+      throw new Error("Error al eliminar todos los datos");
+    }
+  }
+  
+  async purgeEntireDatabase(): Promise<{ tablesAffected: number }> {
+    try {
+      // Advertencia: Esto eliminará TODOS los datos de la base de datos
+      // Primero eliminar tablas con dependencias
+      await db.delete(alerts).execute();
+      await db.delete(searchHistory).execute();
+      await db.delete(excelData).execute();
+      await db.delete(pdfDocuments).execute();
+      await db.delete(fileActivities).execute();
+      await db.delete(watchlistItems).execute();
+      await db.delete(watchlistPersons).execute();
+      await db.delete(stores).execute();
+      await db.delete(systemConfigs).execute();
+      
+      // No eliminamos los usuarios para mantener el acceso al sistema
+      
+      // Crear las configuraciones predeterminadas nuevamente
+      await this.setConfig({
+        key: "EXCEL_WATCH_DIR",
+        value: "./data/excel",
+        description: "Directory to watch for Excel files"
+      });
+      
+      await this.setConfig({
+        key: "PDF_WATCH_DIR",
+        value: "./data/pdf",
+        description: "Directory to watch for PDF files"
+      });
+      
+      await this.setConfig({
+        key: "FILE_PROCESSING_ENABLED",
+        value: "true",
+        description: "Enable or disable file processing"
+      });
+      
+      return { tablesAffected: 9 }; // 9 tablas afectadas
+    } catch (error) {
+      console.error("Error eliminando toda la base de datos:", error);
+      throw new Error("Error al eliminar toda la base de datos");
+    }
   }
 
   // User methods
