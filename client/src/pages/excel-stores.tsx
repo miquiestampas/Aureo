@@ -301,14 +301,14 @@ export default function ExcelStoresPage() {
             
             <Button variant="outline">
               <Download className="mr-2 h-4 w-4" />
-              Export Data
+              Exportar Datos
             </Button>
           </div>
         </div>
         
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Select Store</CardTitle>
+            <CardTitle>Seleccionar Tienda</CardTitle>
           </CardHeader>
           <CardContent>
             <Select 
@@ -316,7 +316,7 @@ export default function ExcelStoresPage() {
               value={selectedStore || undefined}
             >
               <SelectTrigger className="w-full sm:w-72">
-                <SelectValue placeholder="Select a store to view data" />
+                <SelectValue placeholder="Seleccione una tienda para ver datos" />
               </SelectTrigger>
               <SelectContent>
                 {stores?.filter(store => store.type === "Excel").map(store => (
@@ -355,9 +355,9 @@ export default function ExcelStoresPage() {
               ) : (
                 <div className="flex flex-col items-center justify-center py-12">
                   <FileSpreadsheet className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium">No data available</h3>
+                  <h3 className="text-lg font-medium">No hay datos disponibles</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    No purchase records found for this store.
+                    No se encontraron registros de compras para esta tienda.
                   </p>
                 </div>
               )}
@@ -367,9 +367,9 @@ export default function ExcelStoresPage() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <FileSpreadsheet className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">Select a store to view data</h3>
+              <h3 className="text-lg font-medium">Seleccione una tienda para ver datos</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Choose an Excel store from the dropdown above to view its purchase data.
+                Elija una tienda Excel del menú desplegable para ver sus datos de compra.
               </p>
             </CardContent>
           </Card>
@@ -379,32 +379,32 @@ export default function ExcelStoresPage() {
         <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Purchase Details</DialogTitle>
+              <DialogTitle>Detalles de Compra</DialogTitle>
               <DialogDescription>
-                Complete information about the selected purchase order.
+                Información completa sobre la orden de compra seleccionada.
               </DialogDescription>
             </DialogHeader>
             
             {detailsData && (
               <Tabs defaultValue="general" className="mt-4">
                 <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="general">General Info</TabsTrigger>
-                  <TabsTrigger value="product">Product Details</TabsTrigger>
-                  <TabsTrigger value="customer">Customer Info</TabsTrigger>
+                  <TabsTrigger value="general">Información General</TabsTrigger>
+                  <TabsTrigger value="product">Detalles del Producto</TabsTrigger>
+                  <TabsTrigger value="customer">Datos del Cliente</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="general" className="space-y-4 pt-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <Label>Order Number</Label>
+                      <Label>Número de Orden</Label>
                       <div className="font-medium">{detailsData.orderNumber}</div>
                     </div>
                     <div className="space-y-1">
-                      <Label>Store Code</Label>
+                      <Label>Código de Tienda</Label>
                       <div className="font-medium">{detailsData.storeCode}</div>
                     </div>
                     <div className="space-y-1">
-                      <Label>Order Date</Label>
+                      <Label>Fecha de Orden</Label>
                       <div className="font-medium">
                         {format(new Date(detailsData.orderDate), "MMM d, yyyy")}
                       </div>
