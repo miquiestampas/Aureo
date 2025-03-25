@@ -74,7 +74,7 @@ export default function PdfStoresPage() {
   
   // Fetch PDF documents for selected store
   const { data: pdfDocuments, refetch: refetchPdfDocs } = useQuery<PdfDocument[]>({
-    queryKey: ['/api/pdf-documents', { storeCode: selectedStore }],
+    queryKey: [`/api/pdf-documents?storeCode=${selectedStore}`, { storeCode: selectedStore }],
     enabled: !!selectedStore,
   });
   
