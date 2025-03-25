@@ -1108,13 +1108,16 @@ function setupFileUpload() {
       fileSize: 10 * 1024 * 1024, // 10MB max file size
     },
     fileFilter: function(req, file, cb) {
-      // Accept only Excel and PDF files
+      // Accept Excel, CSV and PDF files
       if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
           file.mimetype === 'application/vnd.ms-excel' ||
+          file.mimetype === 'text/csv' ||
+          file.mimetype === 'application/csv' ||
+          file.mimetype === 'text/plain' ||  // Para archivos CSV guardados como TXT
           file.mimetype === 'application/pdf') {
         cb(null, true);
       } else {
-        cb(new Error('Only Excel and PDF files are allowed'), false);
+        cb(new Error('Solo se permiten archivos Excel, CSV y PDF'), false);
       }
     }
   });

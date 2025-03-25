@@ -56,7 +56,8 @@ async function checkWatchlistMatches(excelData: ExcelData) {
             status: "Nueva",
             matchConfidence: confidence,
             reviewedBy: null,
-            reviewNotes: null
+            reviewNotes: null,
+            resolvedAt: null
           };
           
           await storage.createAlert(alert);
@@ -77,7 +78,8 @@ async function checkWatchlistMatches(excelData: ExcelData) {
           status: "Nueva",
           matchConfidence: 95, // Alta confianza para coincidencias de ID
           reviewedBy: null,
-          reviewNotes: null
+          reviewNotes: null,
+          resolvedAt: null
         };
         
         await storage.createAlert(alert);
@@ -112,7 +114,8 @@ async function checkWatchlistMatches(excelData: ExcelData) {
             status: "Nueva",
             matchConfidence: confidence,
             reviewedBy: null,
-            reviewNotes: null
+            reviewNotes: null,
+            resolvedAt: null
           };
           
           await storage.createAlert(alert);
@@ -132,7 +135,6 @@ async function checkWatchlistMatches(excelData: ExcelData) {
           alertType: "Objeto",
           status: "Nueva",
           matchConfidence: 98, // Alta confianza para coincidencias de serie
-          createdAt: new Date(),
           reviewedBy: null,
           reviewNotes: null,
           resolvedAt: null
