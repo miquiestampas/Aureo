@@ -1,0 +1,376 @@
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { useSocketStore } from "@/lib/socket";
+import { 
+  Card, CardContent, CardFooter, CardHeader, CardTitle, 
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
+import {
+  Building2,
+  FileSpreadsheet,
+  FileText,
+  FileCheck,
+  Download,
+  CheckCircle,
+  XCircle,
+  Clock
+} from "lucide-react";
+import { ColumnDef } from "@tanstack/react-table";
+import { format } from "date-fns";
+
+interface SystemStatus {
+  totalStores: number;
+  excelStores: number;
+  pdfStores: number;
+  processedToday: number;
+  pendingFiles: number;
+  fileWatchingActive: boolean;
+  lastSystemCheck: string;
+  systemLoad: number;
+}
+
+interface FileActivity {
+  id: number;
+  filename: string;
+  storeCode: string;
+  fileType: "Excel" | "PDF";
+  status: "Pending" | "Processing" | "Processed" | "Failed";
+  processingDate: string;
+  processedBy: string;
+  errorMessage?: string;
+}
+
+export default function DashboardPage() {
+  // Socket state for real-time updates
+  const { watcherActive, recentEvents } = useSocketStore();
+  
+  // Fetch system status
+  const { data: systemStatus, refetch: refetchStatus } = useQuery<SystemStatus>({
+    queryKey: ['/api/system/status'],
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+  
+  // Fetch recent file activities
+  const { data: activities, refetch: refetchActivities } = useQuery<FileActivity[]>({
+    queryKey: ['/api/file-activities', { limit: 25 }],
+    refetchInterval: 15000, // Refetch every 15 seconds
+  });
+  
+  // Refetch data when receiving socket events
+  useEffect(() => {
+    if (recentEvents.length > 0) {
+      const lastEvent = recentEvents[0];
+      
+      if (lastEvent.type === 'fileDetected' || lastEvent.type === 'fileProcessingStatus') {
+        refetchActivities();
+        refetchStatus();
+      }
+    }
+  }, [recentEvents, refetchActivities, refetchStatus]);
+  
+  // Columns for activities table
+  const columns: ColumnDef<FileActivity>[] = [
+    {
+      accessorKey: "storeCode",
+      header: "Store",
+      cell: ({ row }) => {
+        const storeCode = row.original.storeCode;
+        return (
+          <div>
+            <div className="text-sm font-medium text-gray-900">Store #{storeCode}</div>
+          </div>
+        );
+      }
+    },
+    {
+      accessorKey: "fileType",
+      header: "File Type",
+      cell: ({ row }) => {
+        const fileType = row.original.fileType;
+        return (
+          <div className="flex items-center">
+            {fileType === "Excel" ? (
+              <FileSpreadsheet className="h-5 w-5 text-green-500 mr-2" />
+            ) : (
+              <FileText className="h-5 w-5 text-red-500 mr-2" />
+            )}
+            <span className="text-sm text-gray-900">{fileType}</span>
+          </div>
+        );
+      }
+    },
+    {
+      accessorKey: "processingDate",
+      header: "Date",
+      cell: ({ row }) => {
+        const date = new Date(row.original.processingDate);
+        return (
+          <div className="text-sm text-gray-900">
+            {format(date, "MMM d, h:mm a")}
+          </div>
+        );
+      }
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const status = row.original.status;
+        
+        switch(status) {
+          case "Processed":
+            return (
+              <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">
+                <CheckCircle className="h-3 w-3 mr-1" /> Processed
+              </Badge>
+            );
+          case "Processing":
+            return (
+              <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                <Clock className="h-3 w-3 mr-1" /> Processing
+              </Badge>
+            );
+          case "Failed":
+            return (
+              <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100">
+                <XCircle className="h-3 w-3 mr-1" /> Failed
+              </Badge>
+            );
+          default:
+            return (
+              <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                <Clock className="h-3 w-3 mr-1" /> Pending
+              </Badge>
+            );
+        }
+      }
+    },
+    {
+      accessorKey: "processedBy",
+      header: "Processed By",
+      cell: ({ row }) => {
+        return <div className="text-sm text-gray-500">{row.original.processedBy}</div>;
+      }
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => {
+        return (
+          <div className="text-right">
+            <Button variant="link" size="sm" className="text-primary hover:text-primary/90">
+              View
+            </Button>
+          </div>
+        );
+      }
+    }
+  ];
+  
+  return (
+    <div className="py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+        {/* Overview Stats */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Total Stores Card */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-primary rounded-md p-3">
+                  <Building2 className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Stores</dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {systemStatus?.totalStores ?? '...'}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="bg-gray-50 px-6 py-3">
+              <Link href="/store-management">
+                <a className="text-sm font-medium text-primary hover:text-primary/90">
+                  View all stores
+                </a>
+              </Link>
+            </CardFooter>
+          </Card>
+          
+          {/* Processed Today Card */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
+                  <FileCheck className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Processed Today</dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {systemStatus?.processedToday ?? '...'}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="bg-gray-50 px-6 py-3">
+              <Link href="/excel-stores">
+                <a className="text-sm font-medium text-primary hover:text-primary/90">
+                  View recent files
+                </a>
+              </Link>
+            </CardFooter>
+          </Card>
+          
+          {/* Excel Stores Card */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-green-600 rounded-md p-3">
+                  <FileSpreadsheet className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Excel Stores</dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {systemStatus?.excelStores ?? '...'}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="bg-gray-50 px-6 py-3">
+              <Link href="/excel-stores">
+                <a className="text-sm font-medium text-primary hover:text-primary/90">
+                  View Excel stores
+                </a>
+              </Link>
+            </CardFooter>
+          </Card>
+          
+          {/* PDF Stores Card */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-red-500 rounded-md p-3">
+                  <FileText className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">PDF Stores</dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {systemStatus?.pdfStores ?? '...'}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="bg-gray-50 px-6 py-3">
+              <Link href="/pdf-stores">
+                <a className="text-sm font-medium text-primary hover:text-primary/90">
+                  View PDF stores
+                </a>
+              </Link>
+            </CardFooter>
+          </Card>
+        </div>
+        
+        {/* System Status Section */}
+        <div className="mt-8">
+          <h2 className="text-lg leading-6 font-medium text-gray-900">System Status</h2>
+          <div className="mt-5 bg-white shadow overflow-hidden rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
+                {/* File Monitoring Status */}
+                <div className="sm:col-span-1">
+                  <dt className="text-sm font-medium text-gray-500">File Monitoring</dt>
+                  <dd className="mt-1 flex items-center">
+                    {systemStatus?.fileWatchingActive || watcherActive ? (
+                      <>
+                        <span className="flex-shrink-0 h-4 w-4 rounded-full bg-green-500"></span>
+                        <span className="ml-2 text-sm text-gray-900">Active</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-shrink-0 h-4 w-4 rounded-full bg-red-500"></span>
+                        <span className="ml-2 text-sm text-gray-900">Inactive</span>
+                      </>
+                    )}
+                  </dd>
+                </div>
+                
+                {/* Processing Queue */}
+                <div className="sm:col-span-1">
+                  <dt className="text-sm font-medium text-gray-500">Processing Queue</dt>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    {systemStatus?.pendingFiles ?? 0} files waiting
+                  </dd>
+                </div>
+                
+                {/* Last System Check */}
+                <div className="sm:col-span-1">
+                  <dt className="text-sm font-medium text-gray-500">Last System Check</dt>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    {systemStatus?.lastSystemCheck ? 
+                      format(new Date(systemStatus.lastSystemCheck), "MMM d, h:mm a") : 
+                      "Not available"}
+                  </dd>
+                </div>
+                
+                {/* System Load */}
+                <div className="sm:col-span-1">
+                  <dt className="text-sm font-medium text-gray-500">System Load</dt>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className="bg-green-500 h-2.5 rounded-full" 
+                        style={{ width: `${systemStatus?.systemLoad ?? 0}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-xs text-gray-600 mt-1">
+                      {systemStatus?.systemLoad ?? 0}% - Normal
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+        
+        {/* Recent Activity Section */}
+        <div className="mt-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg leading-6 font-medium text-gray-900">Recent Activity</h2>
+            <div className="flex">
+              <Button className="ml-3 inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90">
+                <Download className="mr-2 h-5 w-5" />
+                Export Report
+              </Button>
+            </div>
+          </div>
+          
+          <div className="mt-5 bg-white shadow overflow-hidden rounded-lg">
+            {activities ? (
+              <DataTable 
+                columns={columns} 
+                data={activities} 
+                searchKey="filename"
+                pageSizeOptions={[5, 10, 25, 50]}
+                showColumnToggle={true}
+              />
+            ) : (
+              <div className="p-8 text-center">
+                <p className="text-gray-500">Loading recent activities...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
