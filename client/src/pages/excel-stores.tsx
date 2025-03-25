@@ -245,9 +245,9 @@ export default function ExcelStoresPage() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Upload Excel File</DialogTitle>
+                  <DialogTitle>Subir Archivo Excel</DialogTitle>
                   <DialogDescription>
-                    Upload an Excel file containing store purchase data.
+                    Sube un archivo Excel que contenga datos de compras de la tienda.
                   </DialogDescription>
                 </DialogHeader>
                 
@@ -461,7 +461,7 @@ export default function ExcelStoresPage() {
                       <div className="font-medium">{detailsData.customerName || "N/A"}</div>
                     </div>
                     <div className="space-y-1">
-                      <Label>Contact Information</Label>
+                      <Label>Información de Contacto</Label>
                       <div className="font-medium">{detailsData.customerContact || "N/A"}</div>
                     </div>
                   </div>
@@ -474,7 +474,7 @@ export default function ExcelStoresPage() {
                 variant="outline" 
                 onClick={() => setDetailsDialogOpen(false)}
               >
-                Close
+                Cerrar
               </Button>
             </DialogFooter>
           </DialogContent>
