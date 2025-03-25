@@ -672,9 +672,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       if (!user) return false;
       
-      // Use the same password comparison logic from auth.ts
-      const { comparePasswords } = require('./auth');
-      return await comparePasswords(password, user.password);
+      // Comparar contraseñas manualmente ya que no podemos usar require
+      const [hashed, salt] = user.password.split(".");
+      const crypto = await import('crypto');
+      const hashedBuffer = Buffer.from(hashed, "hex");
+      const suppliedBuffer = crypto.scryptSync(password, salt, 64) as Buffer;
+      return crypto.timingSafeEqual(hashedBuffer, suppliedBuffer);
     } catch (err) {
       console.error("Error verifying admin password:", err);
       return false;
