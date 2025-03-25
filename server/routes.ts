@@ -409,6 +409,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Obtener documento PDF por ID
+  app.get("/api/pdf-documents/:id", async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const document = await storage.getPdfDocument(id);
+      
+      if (!document) {
+        return res.status(404).json({ message: "Documento PDF no encontrado" });
+      }
+      
+      // Verificar si el archivo existe
+      const filePath = document.path;
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Archivo PDF no encontrado en el servidor" });
+      }
+      
+      // Enviar el archivo PDF
+      res.sendFile(path.resolve(filePath));
+    } catch (err) {
+      console.error('Error obteniendo documento PDF:', err);
+      res.status(500).json({ message: "Error obteniendo documento PDF" });
+    }
+  });
+  
   // File upload routes
   app.post("/api/upload/excel", upload.single("file"), async (req, res, next) => {
     try {
