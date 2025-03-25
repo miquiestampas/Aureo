@@ -77,8 +77,7 @@ async function checkWatchlistMatches(excelData: ExcelData) {
           status: "Nueva",
           matchConfidence: 95, // Alta confianza para coincidencias de ID
           reviewedBy: null,
-          reviewNotes: null,
-          resolvedAt: null
+          reviewNotes: null
         };
         
         await storage.createAlert(alert);
@@ -113,8 +112,7 @@ async function checkWatchlistMatches(excelData: ExcelData) {
             status: "Nueva",
             matchConfidence: confidence,
             reviewedBy: null,
-            reviewNotes: null,
-            resolvedAt: null
+            reviewNotes: null
           };
           
           await storage.createAlert(alert);
@@ -135,8 +133,7 @@ async function checkWatchlistMatches(excelData: ExcelData) {
           status: "Nueva",
           matchConfidence: 98, // Alta confianza para coincidencias de serie
           reviewedBy: null,
-          reviewNotes: null,
-          resolvedAt: null
+          reviewNotes: null
         };
         
         await storage.createAlert(alert);
@@ -342,8 +339,7 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         if (activity) {
           await storage.updateFileActivityStatus(
             activityId, 
-            'Processing', 
-            null
+            'Processing'
           );
         }
         
