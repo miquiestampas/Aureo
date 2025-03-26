@@ -54,21 +54,14 @@ export default function FileUploadModal({ isOpen, onClose, storesByType, fileTyp
         throw new Error("Debe seleccionar al menos un archivo");
       }
       
-      // Para archivos PDF, siempre requerimos tienda
-      if (fileType === "PDF" && !selectedStore) {
-        throw new Error("Debe seleccionar una tienda para archivos PDF");
-      }
-      
       const formData = new FormData();
       
       if (uploadType === "individual") {
         // Single file upload
         formData.append("file", selectedFiles[0]);
         
-        // Solo añadimos storeCode para PDF, para Excel se detecta automáticamente
-        if (fileType === "PDF" && selectedStore) {
-          formData.append("storeCode", selectedStore);
-        }
+        // Usamos código de tienda PENDIENTE por defecto, se actualizará en el servidor tras detectarlo del archivo
+        formData.append("storeCode", "PENDIENTE");
         
         const response = await fetch(`/api/upload/${fileType.toLowerCase()}`, {
           method: "POST",
@@ -89,10 +82,8 @@ export default function FileUploadModal({ isOpen, onClose, storesByType, fileTyp
           formData.append("files", file);
         });
         
-        // Solo añadimos storeCode para PDF
-        if (fileType === "PDF" && selectedStore) {
-          formData.append("storeCode", selectedStore);
-        }
+        // Usamos código de tienda PENDIENTE por defecto, se actualizará en el servidor tras detectarlo del archivo
+        formData.append("storeCode", "PENDIENTE");
         
         const response = await fetch(`/api/upload/${fileType.toLowerCase()}/batch`, {
           method: "POST",
@@ -148,16 +139,7 @@ export default function FileUploadModal({ isOpen, onClose, storesByType, fileTyp
       return;
     }
     
-    // Solo verificamos tienda para PDF, Excel detecta automáticamente la tienda
-    if (fileType === "PDF" && !selectedStore) {
-      toast({
-        title: "Tienda no seleccionada",
-        description: "Por favor seleccione una tienda para los archivos PDF",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+    // Ya no necesitamos verificar la tienda, se detectará automáticamente
     uploadMutation.mutate();
   };
   
@@ -282,7 +264,7 @@ export default function FileUploadModal({ isOpen, onClose, storesByType, fileTyp
           </Button>
           <Button 
             onClick={handleUpload} 
-            disabled={(fileType === "PDF" && !selectedStore) || !selectedFiles || uploadMutation.isPending}
+            disabled={!selectedFiles || uploadMutation.isPending}
             className="bg-primary hover:bg-primary/90"
           >
             {uploadMutation.isPending ? (
