@@ -520,7 +520,7 @@ export async function processPdfFile(filePath: string, activityId: number, store
     const fileStats = await fs.promises.stat(filePath);
     const fileSize = fileStats.size;
     
-    let documentType = 'Desconocido';
+    let documentType = 'PDF';  // Cambiamos el valor por defecto a PDF en lugar de Desconocido
     let pdfText = '';
     
     try {

@@ -1202,10 +1202,15 @@ function setupFileUpload() {
       }
     },
     filename: function(req, file, cb) {
-      // Generate unique filename
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const storeCode = req.body.storeCode || 'UNKNOWN';
-      cb(null, `${storeCode}_${uniqueSuffix}_${file.originalname}`);
+      // Mantener el nombre original pero añadir fecha para evitar conflictos
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      
+      // Obtener nombre y extensión
+      const ext = path.extname(file.originalname);
+      const nameWithoutExt = path.basename(file.originalname, ext);
+      
+      // Generar el nuevo nombre: original_fecha.extensión
+      cb(null, `${nameWithoutExt}_${timestamp}${ext}`);
     }
   });
   
