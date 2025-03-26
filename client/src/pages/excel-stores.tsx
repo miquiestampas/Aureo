@@ -283,25 +283,15 @@ export default function ExcelStoresPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">Tiendas Excel</h1>
-          
-          <div className="flex space-x-2">
-            <Button 
-              className="bg-primary hover:bg-primary/90"
-              onClick={() => setShowFileUploadModal(true)}
-            >
-              <UploadCloud className="mr-2 h-4 w-4" />
-              Cargar Archivos
-            </Button>
-          </div>
-          
-          {/* Modal de Carga de Archivos */}
-          <FileUploadModal 
-            isOpen={showFileUploadModal}
-            onClose={() => setShowFileUploadModal(false)}
-            storesByType={(stores?.filter(store => store.type === "Excel") || []) as any[]}
-            fileType="Excel"
-          />
         </div>
+        
+        {/* Modal de Carga de Archivos */}
+        <FileUploadModal 
+          isOpen={showFileUploadModal}
+          onClose={() => setShowFileUploadModal(false)}
+          storesByType={(stores?.filter(store => store.type === "Excel") || []) as any[]}
+          fileType="Excel"
+        />
         
         {/* Búsqueda de tiendas */}
         <Card className="mb-6">
@@ -354,6 +344,13 @@ export default function ExcelStoresPage() {
                 Seleccione una tienda para ver sus registros importados. Actualmente hay {filteredStores.filter(s => s.type === "Excel")?.length || 0} tiendas configuradas.
               </CardDescription>
             </div>
+            <Button 
+              className="bg-primary hover:bg-primary/90"
+              onClick={() => setShowFileUploadModal(true)}
+            >
+              <UploadCloud className="mr-2 h-4 w-4" />
+              Cargar Archivos
+            </Button>
           </CardHeader>
           <CardContent>
             {isLoadingStores ? (
