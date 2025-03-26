@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 // Lista de localidades de Madrid
 const MADRID_LOCALITIES = [
@@ -98,7 +101,13 @@ import {
   Trash2,
   CheckCircle,
   XCircle,
-  Info
+  Info,
+  Search,
+  FileDown,
+  Filter,
+  Download,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 
@@ -156,11 +165,189 @@ export default function StoreManagementPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState<StoreData | null>(null);
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  
+  // Filtros
+  const [codeFilter, setCodeFilter] = useState("");
+  const [nameFilter, setNameFilter] = useState("");
+  const [localityFilter, setLocalityFilter] = useState("");
+  const [districtFilter, setDistrictFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  
+  // Referencias para exportación
+  const tableRef = useRef(null);
 
   // Fetch all stores
   const { data: stores, refetch: refetchStores } = useQuery<StoreData[]>({
     queryKey: ['/api/stores'],
   });
+  
+  // Filtrado de tiendas
+  const filteredStores = stores?.filter(store => {
+    // Filtro por código
+    if (codeFilter && !store.code.toLowerCase().includes(codeFilter.toLowerCase())) {
+      return false;
+    }
+    
+    // Filtro por nombre
+    if (nameFilter && !store.name.toLowerCase().includes(nameFilter.toLowerCase())) {
+      return false;
+    }
+    
+    // Filtro por localidad (incluye búsqueda en locality y location para compatibilidad)
+    if (localityFilter) {
+      const matchesLocality = store.locality && 
+        store.locality.toLowerCase().includes(localityFilter.toLowerCase());
+      const matchesLocation = store.location && 
+        store.location.toLowerCase().includes(localityFilter.toLowerCase());
+      
+      if (!matchesLocality && !matchesLocation) {
+        return false;
+      }
+    }
+    
+    // Filtro por distrito
+    if (districtFilter && 
+        (!store.district || !store.district.toLowerCase().includes(districtFilter.toLowerCase()))) {
+      return false;
+    }
+    
+    // Filtro por tipo
+    if (typeFilter !== "all" && store.type !== typeFilter) {
+      return false;
+    }
+    
+    // Filtro por estado
+    if (statusFilter !== "all" && 
+        ((statusFilter === "active" && !store.active) || 
+         (statusFilter === "inactive" && store.active))) {
+      return false;
+    }
+    
+    return true;
+  }) || [];
+  
+  // Métodos para exportación
+  const exportToPDF = () => {
+    if (!filteredStores.length) {
+      toast({
+        title: "No hay datos para exportar",
+        description: "No se encontraron tiendas con los filtros actuales",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const doc = new jsPDF();
+    
+    // Título
+    doc.setFontSize(18);
+    doc.text("Listado de Tiendas", 14, 22);
+    
+    // Filtros aplicados
+    doc.setFontSize(11);
+    let filterText = "Filtros aplicados: ";
+    const filters = [];
+    
+    if (codeFilter) filters.push(`Código: ${codeFilter}`);
+    if (nameFilter) filters.push(`Nombre: ${nameFilter}`);
+    if (localityFilter) filters.push(`Localidad: ${localityFilter}`);
+    if (districtFilter) filters.push(`Distrito: ${districtFilter}`);
+    if (typeFilter !== "all") filters.push(`Tipo: ${typeFilter}`);
+    if (statusFilter !== "all") filters.push(`Estado: ${statusFilter === "active" ? "Activo" : "Inactivo"}`);
+    
+    if (filters.length > 0) {
+      doc.text(filterText + filters.join(", "), 14, 30);
+    } else {
+      doc.text("Sin filtros aplicados", 14, 30);
+    }
+    
+    // Fecha de generación
+    const now = new Date();
+    doc.text(`Generado: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, 14, 38);
+    
+    // Tabla
+    autoTable(doc, {
+      startY: 45,
+      head: [["Código", "Nombre", "Tipo", "Localidad", "Distrito", "Estado"]],
+      body: filteredStores.map(store => [
+        store.code,
+        store.name,
+        store.type,
+        store.locality || (store.location || "—"),
+        store.district || "—",
+        store.active ? "Activa" : "Inactiva"
+      ]),
+      theme: 'grid'
+    });
+    
+    // Guardar el PDF
+    doc.save("listado-tiendas.pdf");
+    
+    toast({
+      title: "PDF exportado",
+      description: "El listado de tiendas ha sido exportado correctamente"
+    });
+  };
+  
+  const exportToExcel = () => {
+    if (!filteredStores.length) {
+      toast({
+        title: "No hay datos para exportar",
+        description: "No se encontraron tiendas con los filtros actuales",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Preparar los datos
+    const workbook = XLSX.utils.book_new();
+    
+    const worksheet = XLSX.utils.json_to_sheet(filteredStores.map(store => ({
+      "Código": store.code,
+      "Nombre": store.name,
+      "Tipo": store.type,
+      "Localidad": store.locality || (store.location || "—"),
+      "Distrito": store.district || "—",
+      "Estado": store.active ? "Activa" : "Inactiva",
+      "Dirección": store.address || "—",
+      "Teléfono": store.phone || "—",
+      "Email": store.email || "—",
+      "CIF": store.cif || "—",
+      "Razón Social": store.businessName || "—",
+      "Propietario": store.ownerName || "—"
+    })));
+    
+    // Ajustar anchos de columna
+    const columnWidths = [
+      { wch: 10 }, // Código
+      { wch: 25 }, // Nombre
+      { wch: 10 }, // Tipo
+      { wch: 20 }, // Localidad
+      { wch: 20 }, // Distrito
+      { wch: 10 }, // Estado
+      { wch: 30 }, // Dirección
+      { wch: 15 }, // Teléfono
+      { wch: 25 }, // Email
+      { wch: 15 }, // CIF
+      { wch: 25 }, // Razón Social
+      { wch: 25 }, // Propietario
+    ];
+    
+    worksheet["!cols"] = columnWidths;
+    
+    // Añadir la hoja al libro
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tiendas");
+    
+    // Guardar el archivo
+    XLSX.writeFile(workbook, "listado-tiendas.xlsx");
+    
+    toast({
+      title: "Excel exportado",
+      description: "El listado de tiendas ha sido exportado correctamente"
+    });
+  };
 
   // Create store form
   const createForm = useForm<StoreFormValues>({
@@ -781,19 +968,212 @@ export default function StoreManagementPage() {
           )}
         </div>
 
+        {/* Advanced Filter and Export */}
+        <Card className="mb-6">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Filter className="h-5 w-5 mr-2 text-primary" />
+                <CardTitle>Filtros Avanzados</CardTitle>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                className="text-gray-500"
+              >
+                {isFilterExpanded ? (
+                  <><ChevronUp className="h-4 w-4 mr-1" /> Ocultar</>
+                ) : (
+                  <><ChevronDown className="h-4 w-4 mr-1" /> Mostrar</>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          
+          {isFilterExpanded && (
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <Label htmlFor="code-filter">Código</Label>
+                  <div className="flex mt-1">
+                    <Input
+                      id="code-filter"
+                      placeholder="Buscar por código"
+                      value={codeFilter}
+                      onChange={(e) => setCodeFilter(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="name-filter">Nombre</Label>
+                  <div className="flex mt-1">
+                    <Input
+                      id="name-filter"
+                      placeholder="Buscar por nombre"
+                      value={nameFilter}
+                      onChange={(e) => setNameFilter(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="locality-filter">Localidad</Label>
+                  <div className="flex mt-1">
+                    <Select
+                      value={localityFilter}
+                      onValueChange={setLocalityFilter}
+                    >
+                      <SelectTrigger id="locality-filter" className="flex-1">
+                        <SelectValue placeholder="Todas las localidades" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todas las localidades</SelectItem>
+                        {MADRID_LOCALITIES.map((locality) => (
+                          <SelectItem key={locality} value={locality}>
+                            {locality}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="district-filter">Distrito</Label>
+                  <div className="flex mt-1">
+                    <Input
+                      id="district-filter"
+                      placeholder="Buscar por distrito"
+                      value={districtFilter}
+                      onChange={(e) => setDistrictFilter(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="type-filter">Tipo</Label>
+                  <div className="flex mt-1">
+                    <Select
+                      value={typeFilter}
+                      onValueChange={setTypeFilter}
+                    >
+                      <SelectTrigger id="type-filter" className="flex-1">
+                        <SelectValue placeholder="Todos los tipos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los tipos</SelectItem>
+                        <SelectItem value="Excel">Excel</SelectItem>
+                        <SelectItem value="PDF">PDF</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="status-filter">Estado</Label>
+                  <div className="flex mt-1">
+                    <Select
+                      value={statusFilter}
+                      onValueChange={setStatusFilter}
+                    >
+                      <SelectTrigger id="status-filter" className="flex-1">
+                        <SelectValue placeholder="Todos los estados" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los estados</SelectItem>
+                        <SelectItem value="active">Activas</SelectItem>
+                        <SelectItem value="inactive">Inactivas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-between items-center mt-6">
+                <div className="text-sm text-gray-500">
+                  {filteredStores.length} {filteredStores.length === 1 ? 'tienda encontrada' : 'tiendas encontradas'}
+                </div>
+                
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setCodeFilter("");
+                      setNameFilter("");
+                      setLocalityFilter("");
+                      setDistrictFilter("");
+                      setTypeFilter("all");
+                      setStatusFilter("all");
+                    }}
+                  >
+                    Limpiar Filtros
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
+                    onClick={exportToExcel}
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Exportar Excel
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200"
+                    onClick={exportToPDF}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Exportar PDF
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+        
         {/* Stores Table */}
         <Card>
           <CardHeader>
-            <div className="flex items-center">
-              <Store className="h-5 w-5 mr-2 text-primary" />
-              <CardTitle>Todas las Tiendas</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Store className="h-5 w-5 mr-2 text-primary" />
+                <CardTitle>Todas las Tiendas</CardTitle>
+              </div>
+              
+              {!isFilterExpanded && (
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    className="bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
+                    onClick={exportToExcel}
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Exportar Excel
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200"
+                    onClick={exportToPDF}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Exportar PDF
+                  </Button>
+                </div>
+              )}
             </div>
           </CardHeader>
-          <CardContent className="p-0">
-            {stores?.length ? (
+          <CardContent className="p-0" ref={tableRef}>
+            {filteredStores.length ? (
               <DataTable
                 columns={columns}
-                data={stores}
+                data={filteredStores}
                 searchKey="name"
               />
             ) : (
@@ -801,7 +1181,10 @@ export default function StoreManagementPage() {
                 <Store className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium">No se encontraron tiendas</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Cree una nueva tienda para comenzar.
+                  {codeFilter || nameFilter || localityFilter || districtFilter || typeFilter !== "all" || statusFilter !== "all"
+                    ? "Ajuste los filtros para ver resultados."
+                    : "Cree una nueva tienda para comenzar."
+                  }
                 </p>
               </div>
             )}
