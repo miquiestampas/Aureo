@@ -1446,11 +1446,11 @@ export class DatabaseStorage implements IStorage {
           
           // Construir condición para búsqueda numérica
           conditions.push(`(
-            "orderNumber" = ${addParam(query.trim())} OR
-            "orderNumber" ILIKE ${addParam(searchTerm)} OR
-            "customerContact" = ${addParam(query.trim())} OR
-            "customerContact" ILIKE ${addParam(searchTerm)} OR
-            (NULLIF("price", '') IS NOT NULL AND TRIM("price") != '' AND CAST("price" AS DECIMAL) = ${addParam(numericValue)})
+            order_number = ${addParam(query.trim())} OR
+            order_number ILIKE ${addParam(searchTerm)} OR
+            customer_contact = ${addParam(query.trim())} OR
+            customer_contact ILIKE ${addParam(searchTerm)} OR
+            (NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) = ${addParam(numericValue)})
           )`);
         } else {
           // Búsqueda de texto - usar ILIKE para todas las columnas de texto
