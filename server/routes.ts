@@ -587,7 +587,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No se ha cargado ningún archivo" });
       }
       
-      const defaultStoreCode = "PENDIENTE";
+      // Usamos un código de tienda vacío, que será reemplazado automáticamente
+      // durante el procesamiento del archivo basado en su nombre
+      const defaultStoreCode = "";
       // Si se proporciona un código de tienda explícitamente, lo usamos
       const storeCode = req.body.storeCode || defaultStoreCode;
       const activities = [];
