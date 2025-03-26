@@ -152,6 +152,12 @@ export default function ExcelStoresPage() {
     }
   };
   
+  // Función para manejar la subida de archivos para una tienda específica
+  const handleUploadFile = (store: Store) => {
+    setSelectedStore(store);
+    setShowFileUploadModal(true);
+  };
+  
   // Data columns for stores
   const storeColumns: ColumnDef<Store>[] = [
     {
@@ -193,17 +199,6 @@ export default function ExcelStoresPage() {
               variant="outline" 
               size="sm" 
               className="h-8 w-8 p-0" 
-              onClick={() => handleViewStoreData(store)}
-              title="Ver datos"
-            >
-              <Database className="h-4 w-4" />
-              <span className="sr-only">Ver datos</span>
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-8 w-8 p-0" 
               onClick={() => handleViewStoreFiles(store)}
               title="Ver archivos"
               disabled={isLoadingActivities}
@@ -214,6 +209,17 @@ export default function ExcelStoresPage() {
                 <FileSpreadsheet className="h-4 w-4" />
               )}
               <span className="sr-only">Ver archivos</span>
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8 w-8 p-0" 
+              onClick={() => handleUploadFile(store)}
+              title="Subir archivo"
+            >
+              <UploadCloud className="h-4 w-4" />
+              <span className="sr-only">Subir archivo</span>
             </Button>
           </div>
         );
