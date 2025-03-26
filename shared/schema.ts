@@ -65,11 +65,13 @@ export const fileActivities = pgTable("file_activities", {
   filename: text("filename").notNull(),
   storeCode: text("store_code").notNull(),
   fileType: text("file_type", { enum: ["Excel", "PDF"] }).notNull(),
-  status: text("status", { enum: ["Pending", "Processing", "Processed", "Failed"] }).notNull(),
+  status: text("status", { enum: ["Pending", "Processing", "Processed", "Failed", "PendingStoreAssignment"] }).notNull(),
   processingDate: timestamp("processing_date").notNull().defaultNow(),
   processedBy: text("processed_by").notNull(),
   errorMessage: text("error_message"),
   metadata: jsonb("metadata"),
+  // Campo para almacenar el código de tienda detectado pero pendiente de confirmar
+  detectedStoreCode: text("detected_store_code"),
 });
 
 export const insertFileActivitySchema = createInsertSchema(fileActivities).pick({
@@ -81,6 +83,7 @@ export const insertFileActivitySchema = createInsertSchema(fileActivities).pick(
   processedBy: true,
   errorMessage: true,
   metadata: true,
+  detectedStoreCode: true,
 });
 
 export type InsertFileActivity = z.infer<typeof insertFileActivitySchema>;

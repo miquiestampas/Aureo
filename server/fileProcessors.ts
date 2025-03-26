@@ -595,16 +595,45 @@ export async function processPdfFile(filePath: string, activityId: number, store
       console.log(`No store code pattern matched in filename: ${filename}`);
     }
     
-    // Si no hemos encontrado una tienda válida, usar una tienda PDF por defecto
+    // Si no hemos encontrado una tienda válida, poner el archivo en estado de asignación pendiente
     if (!foundInDatabase) {
-      // Obtener todas las tiendas PDF
+      console.log(`No matching store found for PDF file ${filename}. Setting to PendingStoreAssignment status.`);
+      
+      // Si se detectó un posible código pero no existe en la base de datos, lo guardamos
+      // para poder sugerir la creación de una nueva tienda con ese código
+      try {
+        const updates: Partial<FileActivity> = {
+          status: 'PendingStoreAssignment',
+        };
+        
+        // Si se detectó algún código, lo guardamos como sugerencia
+        if (pdfStoreCode) {
+          updates.detectedStoreCode = pdfStoreCode;
+          console.log(`Saved detected store code '${pdfStoreCode}' as suggestion for new store`);
+        }
+        
+        // Actualizar el registro de actividad
+        await storage.updateFileActivity(activityId, updates);
+        console.log(`Updated PDF activity status to PendingStoreAssignment`);
+        
+        // Notificar al frontend que el archivo necesita asignación de tienda
+        emitFileProcessingStatus(activityId, 'PendingStoreAssignment');
+        
+        // Salir temprano sin procesar el PDF completo
+        return;
+      } catch (updateError) {
+        console.error(`Error updating PDF activity status:`, updateError);
+        throw updateError;
+      }
+      
+      // Este código ya no se ejecuta, pero lo dejamos como referencia por si 
+      // se quiere volver al comportamiento anterior
+      /*
       const pdfStores = await storage.getStoresByType('PDF');
       if (pdfStores.length > 0) {
-        // Usar la primera tienda PDF disponible
         storeCode = pdfStores[0].code;
         console.log(`Using default PDF store: ${storeCode}`);
         
-        // Actualizar el registro de actividad
         try {
           await storage.updateFileActivity(activityId, { storeCode: storeCode });
           console.log(`Updated PDF activity with default store code: ${storeCode}`);
@@ -614,6 +643,8 @@ export async function processPdfFile(filePath: string, activityId: number, store
       } else {
         throw new Error(`No PDF stores exist in the system. Please create at least one PDF store.`);
       }
+      */
+      
     }
     
     // Read file buffer
