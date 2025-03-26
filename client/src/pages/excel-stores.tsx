@@ -5,6 +5,8 @@ import {
   Card, CardContent, CardHeader, CardTitle, CardDescription
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/ui/data-table";
 import {
   Dialog,
@@ -62,9 +64,27 @@ export default function ExcelStoresPage() {
   const [showStoreDataDialog, setShowStoreDataDialog] = useState(false);
   const [storeData, setStoreData] = useState<ExcelData[]>([]);
   
+  // Búsqueda por código, nombre o ubicación
+  const [codeFilter, setCodeFilter] = useState('');
+  const [nameFilter, setNameFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  
   // Fetch excel stores
-  const { data: stores, isLoading: isLoadingStores } = useQuery<Store[]>({
+  const { data: stores = [], isLoading: isLoadingStores } = useQuery<Store[]>({
     queryKey: ['/api/stores', { type: 'Excel' }],
+  });
+  
+  // Filtrado de tiendas
+  const filteredStores = stores.filter(store => {
+    const matchesCode = store.code.toLowerCase().includes(codeFilter.toLowerCase());
+    const matchesName = store.name.toLowerCase().includes(nameFilter.toLowerCase());
+    const matchesLocation = store.location?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false;
+    
+    return (
+      (codeFilter === '' || matchesCode) && 
+      (nameFilter === '' || matchesName) && 
+      (locationFilter === '' || matchesLocation)
+    );
   });
   
   // Fetch store data
@@ -301,9 +321,51 @@ export default function ExcelStoresPage() {
               </div>
             ) : (
               <>
+                {/* Búsqueda de tiendas */}
+                <div className="mb-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Buscar Tiendas</CardTitle>
+                      <CardDescription>Filtrar tiendas por código, nombre o ubicación</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="code-filter">Código</Label>
+                          <Input
+                            id="code-filter"
+                            placeholder="Filtrar por código..."
+                            value={codeFilter}
+                            onChange={(e) => setCodeFilter(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="name-filter">Nombre</Label>
+                          <Input
+                            id="name-filter"
+                            placeholder="Filtrar por nombre..."
+                            value={nameFilter}
+                            onChange={(e) => setNameFilter(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="location-filter">Ubicación</Label>
+                          <Input
+                            id="location-filter"
+                            placeholder="Filtrar por ubicación..."
+                            value={locationFilter}
+                            onChange={(e) => setLocationFilter(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                {/* Tabla de tiendas */}
                 <DataTable 
                   columns={storeColumns} 
-                  data={stores?.filter(store => store.type === "Excel") || []} 
+                  data={filteredStores.filter(store => store.type === "Excel") || []} 
                   searchFields={[
                     { key: "code", placeholder: "Buscar por código..." },
                     { key: "name", placeholder: "Buscar por nombre..." },
