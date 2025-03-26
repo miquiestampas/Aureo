@@ -58,7 +58,8 @@ import {
   Pencil,
   Trash2,
   CheckCircle,
-  XCircle
+  XCircle,
+  Info
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 
@@ -110,6 +111,7 @@ export default function StoreManagementPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState<StoreData | null>(null);
 
   // Fetch all stores
@@ -285,6 +287,12 @@ export default function StoreManagementPage() {
     setIsDeleteDialogOpen(true);
   };
   
+  // Open detail dialog for a store
+  const handleViewStoreDetails = (store: StoreData) => {
+    setSelectedStore(store);
+    setIsDetailDialogOpen(true);
+  };
+  
   // Check if user can edit/delete (only SuperAdmin and Admin)
   const canModify = user?.role === "SuperAdmin" || user?.role === "Admin";
   
@@ -346,6 +354,15 @@ export default function StoreManagementPage() {
           const store = row.original;
           return (
             <div className="flex space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600" 
+                onClick={() => handleViewStoreDetails(store)}
+              >
+                <Info className="h-4 w-4" />
+                <span className="sr-only">Ver Detalles</span>
+              </Button>
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -1006,6 +1023,151 @@ export default function StoreManagementPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Store Details Dialog */}
+        {selectedStore && (
+          <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle className="text-xl flex items-center">
+                  <Store className="h-5 w-5 mr-2 text-primary" />
+                  Detalles de Tienda: {selectedStore.name}
+                </DialogTitle>
+                <DialogDescription>
+                  Información completa de la tienda
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="border rounded-md p-4">
+                    <h3 className="font-medium mb-3 border-b pb-2">Información Básica</h3>
+                    
+                    <div className="space-y-2">
+                      <div>
+                        <span className="font-medium">Código:</span> 
+                        <span className="ml-2">{selectedStore.code}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Nombre:</span> 
+                        <span className="ml-2">{selectedStore.name}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Tipo:</span> 
+                        <span className="ml-2 flex items-center">
+                          {selectedStore.type === "Excel" ? (
+                            <><FileSpreadsheet className="h-4 w-4 mr-1 text-green-500" /> Excel</>
+                          ) : (
+                            <><FileText className="h-4 w-4 mr-1 text-red-500" /> PDF</>
+                          )}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Ubicación:</span> 
+                        <span className="ml-2">{selectedStore.location || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Estado:</span> 
+                        <span className="ml-2">
+                          {selectedStore.active ? (
+                            <Badge variant="outline" className="bg-green-100 text-green-800">
+                              <CheckCircle className="h-3 w-3 mr-1" /> Activa
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-red-100 text-red-800">
+                              <XCircle className="h-3 w-3 mr-1" /> Inactiva
+                            </Badge>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="border rounded-md p-4">
+                    <h3 className="font-medium mb-3 border-b pb-2">Fechas</h3>
+                    
+                    <div className="space-y-2">
+                      <div>
+                        <span className="font-medium">Fecha de inicio:</span> 
+                        <span className="ml-2">
+                          {selectedStore.startDate 
+                            ? new Date(selectedStore.startDate).toLocaleDateString() 
+                            : "—"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Fecha de cese:</span> 
+                        <span className="ml-2">
+                          {selectedStore.endDate 
+                            ? new Date(selectedStore.endDate).toLocaleDateString() 
+                            : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="border rounded-md p-4">
+                    <h3 className="font-medium mb-3 border-b pb-2">Información de Contacto</h3>
+                    
+                    <div className="space-y-2">
+                      <div>
+                        <span className="font-medium">Dirección:</span> 
+                        <span className="ml-2">{selectedStore.address || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Teléfono:</span> 
+                        <span className="ml-2">{selectedStore.phone || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Email:</span> 
+                        <span className="ml-2">{selectedStore.email || "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="border rounded-md p-4">
+                    <h3 className="font-medium mb-3 border-b pb-2">Información Comercial</h3>
+                    
+                    <div className="space-y-2">
+                      <div>
+                        <span className="font-medium">CIF:</span> 
+                        <span className="ml-2">{selectedStore.cif || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Razón Social:</span> 
+                        <span className="ml-2">{selectedStore.businessName || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Propietario:</span> 
+                        <span className="ml-2">{selectedStore.ownerName || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">DNI del Propietario:</span> 
+                        <span className="ml-2">{selectedStore.ownerIdNumber || "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {selectedStore.notes && (
+                <div className="mt-4 border rounded-md p-4">
+                  <h3 className="font-medium mb-3 border-b pb-2">Anotaciones</h3>
+                  <p className="whitespace-pre-line">{selectedStore.notes}</p>
+                </div>
+              )}
+              
+              <DialogFooter className="mt-6">
+                <Button onClick={() => setIsDetailDialogOpen(false)}>
+                  Cerrar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+        
       </div>
     </div>
   );
