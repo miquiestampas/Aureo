@@ -8,6 +8,54 @@ import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
 import csvParser from 'csv-parser';
 
+// Función para mover archivos después del procesamiento
+async function moveProcessedFile(filePath: string, status: 'Processed' | 'Failed') {
+  try {
+    // Obtener el directorio base y el nombre del archivo
+    const baseDir = path.dirname(filePath);
+    const fileName = path.basename(filePath);
+    
+    // Determinar si es un archivo Excel o PDF basado en la ruta
+    const fileType = baseDir.includes('excel') ? 'excel' : 'pdf';
+    
+    // Crear la ruta de destino
+    const targetDir = status === 'Processed' 
+      ? path.join(baseDir, 'procesados') 
+      : path.join(baseDir, 'errores');
+    
+    // Asegurar que el directorio de destino exista
+    if (!fs.existsSync(targetDir)) {
+      await fs.promises.mkdir(targetDir, { recursive: true });
+    }
+    
+    // Construir la ruta de destino completa
+    const targetPath = path.join(targetDir, fileName);
+    
+    // Si ya existe un archivo con el mismo nombre, añadir timestamp
+    if (fs.existsSync(targetPath)) {
+      const timestamp = new Date().getTime();
+      const fileExtension = path.extname(fileName);
+      const fileNameWithoutExt = path.basename(fileName, fileExtension);
+      const newFileName = `${fileNameWithoutExt}_${timestamp}${fileExtension}`;
+      const newTargetPath = path.join(targetDir, newFileName);
+      
+      // Mover el archivo
+      await fs.promises.rename(filePath, newTargetPath);
+      console.log(`Archivo ${fileName} movido a ${newTargetPath} (con timestamp para evitar duplicados)`);
+      return newTargetPath;
+    }
+    
+    // Mover el archivo
+    await fs.promises.rename(filePath, targetPath);
+    console.log(`Archivo ${fileName} movido a ${targetPath}`);
+    return targetPath;
+  } catch (error) {
+    console.error(`Error al mover el archivo ${filePath}:`, error);
+    // No lanzamos un error ya que no queremos interrumpir el proceso principal
+    return null;
+  }
+}
+
 // Import pdf-parse dynamically to avoid initialization errors
 // We'll only use it when we actually need to parse a PDF
 let pdfParse: any = null;
