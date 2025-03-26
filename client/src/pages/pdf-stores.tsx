@@ -78,10 +78,10 @@ export default function PdfStoresPage() {
     queryKey: ['/api/stores', { type: 'PDF' }],
   });
   
-  // Fetch PDF documents for selected store
+  // Fetch PDF documents for all stores or filtered store
   const { data: pdfDocuments, refetch: refetchPdfDocs } = useQuery<PdfDocument[]>({
     queryKey: [`/api/pdf-documents`, { storeCode: storeFilter }],
-    enabled: true, // Always fetch documents, filter client-side
+    enabled: true,
   });
   
   // Upload file mutation

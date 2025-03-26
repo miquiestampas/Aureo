@@ -264,16 +264,46 @@ async function handleNewPdfFile(filePath: string) {
     const allStores = await storage.getStores();
     let foundStore = null;
     
-    // Primero intentar coincidencia exacta de código
-    for (const store of allStores) {
-      if (filename.includes(store.code)) {
-        foundStore = store;
-        console.log(`PDF matched with store by code: ${store.code}`);
-        break;
+    // Extraer todos los dígitos del nombre del archivo
+    const fileDigits = filename.match(/\d+/g) || [];
+    console.log(`Extracted digits from filename ${filename}:`, fileDigits);
+    
+    // Buscar coincidencia parcial basada en los dígitos del nombre del archivo
+    if (fileDigits.length > 0) {
+      const pdfStores = allStores.filter(store => store.type === 'PDF');
+      
+      // Ordenamos las tiendas por longitud de código (más largo primero) para favorecer coincidencias más específicas
+      const sortedStores = pdfStores.sort((a, b) => b.code.length - a.code.length);
+      
+      for (const store of sortedStores) {
+        // Extraer los dígitos del código de la tienda
+        const storeDigits = store.code.match(/\d+/g) || [];
+        
+        // Comprobar si alguno de los grupos de dígitos del archivo contiene alguno de los grupos de dígitos de la tienda
+        const matchFound = storeDigits.some(storeDigit => 
+          fileDigits.some(fileDigit => fileDigit.includes(storeDigit) || storeDigit.includes(fileDigit))
+        );
+        
+        if (matchFound) {
+          foundStore = store;
+          console.log(`PDF matched with store by digit comparison: ${store.code}`);
+          break;
+        }
       }
     }
     
-    // Si no se encontró coincidencia, intentar con expresiones regulares
+    // Si no se encontró coincidencia por dígitos, intentar coincidencia exacta por código
+    if (!foundStore) {
+      for (const store of allStores) {
+        if (filename.includes(store.code)) {
+          foundStore = store;
+          console.log(`PDF matched with store by exact code: ${store.code}`);
+          break;
+        }
+      }
+    }
+    
+    // Si todavía no se encontró coincidencia, intentar con expresiones regulares
     if (!foundStore) {
       // Estrategias para extraer el código de tienda del nombre del archivo
       let storeCode = '';

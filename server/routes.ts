@@ -404,11 +404,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PDF document routes
   app.get("/api/pdf-documents", async (req, res, next) => {
     try {
-      if (!req.query.storeCode) {
-        return res.status(400).json({ message: "storeCode query parameter is required" });
+      const storeCode = req.query.storeCode as string | undefined;
+      
+      // Si no hay storeCode, devolver todos los documentos PDF (para la nueva interfaz)
+      if (!storeCode) {
+        const pdfStores = await storage.getStoresByType('PDF');
+        const allDocuments = [];
+        
+        for (const store of pdfStores) {
+          const storeDocuments = await storage.getPdfDocumentsByStore(store.code);
+          allDocuments.push(...storeDocuments);
+        }
+        
+        return res.json(allDocuments);
       }
       
-      const documents = await storage.getPdfDocumentsByStore(req.query.storeCode as string);
+      // Si hay storeCode, devolver solo los documentos de esa tienda
+      const documents = await storage.getPdfDocumentsByStore(storeCode);
       res.json(documents);
     } catch (err) {
       next(err);
