@@ -1670,7 +1670,7 @@ export class DatabaseStorage implements IStorage {
         params.push(status);
       }
       
-      sql += ` ORDER BY created_at DESC LIMIT $${params.length + 1}`;
+      sql += ` ORDER BY createdat DESC LIMIT $${params.length + 1}`;
       params.push(limit);
       
       // Ejecutar la consulta SQL directa
@@ -1719,7 +1719,7 @@ export class DatabaseStorage implements IStorage {
     try {
       // Usar SQL directo para evitar problemas de nomenclatura
       const result = await db.execute(
-        `SELECT * FROM "alerts" WHERE "excel_data_id" = $1 ORDER BY "created_at" DESC`,
+        `SELECT * FROM "alerts" WHERE "excel_data_id" = $1 ORDER BY "createdat" DESC`,
         [excelDataId]
       );
       
