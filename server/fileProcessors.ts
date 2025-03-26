@@ -1,26 +1,36 @@
 import fs from 'fs';
 import path from 'path';
 import { storage } from './storage';
-import { db } from './db';
 import { emitFileProcessingStatus } from './fileWatcher';
-import { InsertExcelData, InsertPdfDocument, InsertAlert, ExcelData, pdfDocuments } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { InsertExcelData, InsertPdfDocument, InsertAlert, ExcelData } from '@shared/schema';
 import { promisify } from 'util';
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
 import csvParser from 'csv-parser';
 
 // Función para mover archivos después del procesamiento
-async function moveProcessedFile(filePath: string, status: 'Processed' | 'Failed', storeCode: string = 'UNKNOWN', fileActivityId?: number) {
+async function moveProcessedFile(filePath: string, status: 'Processed' | 'Failed') {
   try {
     // Extraer información del archivo
     const originalFileName = path.basename(filePath);
+    const originalDir = path.dirname(filePath);
     
     // Determinar si es un archivo Excel o PDF basado en la extensión
     const extension = path.extname(originalFileName).toLowerCase();
     const isExcel = ['.xlsx', '.xls', '.csv'].includes(extension);
     const fileType = isExcel ? 'excel' : 'pdf';
-    const isPdf = !isExcel;
+    
+    // Asegurar que el nombre del archivo no sea demasiado largo
+    const fileExtension = path.extname(originalFileName);
+    const fileNameWithoutExt = path.basename(originalFileName, fileExtension);
+    
+    // Acortar nombre si es necesario
+    let shortFileName;
+    if (fileNameWithoutExt.length > 50) {
+      shortFileName = `${fileNameWithoutExt.substring(0, 40)}_${Date.now().toString().substring(8)}${fileExtension}`;
+    } else {
+      shortFileName = originalFileName;
+    }
     
     // Carpetas de destino con rutas básicas
     const destFolder = status === 'Processed' ? 'procesados' : 'errores';
@@ -29,22 +39,7 @@ async function moveProcessedFile(filePath: string, status: 'Processed' | 'Failed
     const rootDir = path.resolve('./data');
     const typeDir = path.join(rootDir, fileType);
     const targetDir = path.join(typeDir, destFolder);
-    
-    // Formato de la fecha: YYYYMMDD
-    const today = new Date();
-    const dateFormat = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-    
-    // Generar el nuevo nombre del archivo según las especificaciones
-    // Formato: STORECODE-READDATE.pdf (con guión)
-    const newFileName = `${storeCode}-${dateFormat}${extension}`;
-    let targetPath = path.join(targetDir, newFileName);
-    
-    // Si ya existe un archivo con el mismo nombre, añadir un número secuencial
-    let counter = 1;
-    while (fs.existsSync(targetPath)) {
-      targetPath = path.join(targetDir, `${storeCode}-${dateFormat}-${counter}${extension}`);
-      counter++;
-    }
+    const targetPath = path.join(targetDir, shortFileName);
     
     // Asegurar que los directorios existan
     if (!fs.existsSync(targetDir)) {
@@ -58,46 +53,62 @@ async function moveProcessedFile(filePath: string, status: 'Processed' | 'Failed
     }
     
     try {
-      // Copiar el archivo a su destino final
-      await fs.promises.copyFile(filePath, targetPath);
-      
-      // Eliminar el archivo original solo si la copia fue exitosa
-      try {
-        await fs.promises.unlink(filePath);
-      } catch (unlinkError) {
-        console.error(`No se pudo eliminar el archivo original ${filePath}:`, unlinkError);
-        // Continuar a pesar del error - al menos tenemos la copia
-      }
-      
-      console.log(`✅ Archivo ${originalFileName} movido a ${targetPath}`);
-      
-      // Si es un archivo PDF, necesitamos actualizar la ruta en la base de datos
-      if (isPdf && fileActivityId) {
+      // Si ya existe un archivo con el mismo nombre en el destino, añadir timestamp
+      if (fs.existsSync(targetPath)) {
+        const timestamp = Date.now().toString().substring(8); // usar solo los últimos 5 dígitos
+        const newFileName = `${fileNameWithoutExt}_${timestamp}${fileExtension}`;
+        const newTargetPath = path.join(targetDir, newFileName);
+        
+        // Intento final de copia
+        await fs.promises.copyFile(filePath, newTargetPath);
+        
+        // Eliminar el archivo original solo si la copia fue exitosa
         try {
-          // Buscar el documento PDF asociado a esta actividad
-          const [pdfDoc] = await db
-            .select()
-            .from(pdfDocuments)
-            .where(eq(pdfDocuments.fileActivityId, fileActivityId));
-          
-          if (pdfDoc) {
-            console.log(`Actualizando ruta del documento PDF ${pdfDoc.id} a ${targetPath}`);
-            // Actualizar la ruta del documento
-            await storage.updatePdfDocumentPath(pdfDoc.id, targetPath);
-          }
-        } catch (dbError) {
-          console.error(`Error al actualizar ruta del documento PDF:`, dbError);
-          // A pesar del error, continuamos con el proceso ya que al menos el archivo fue movido
+          await fs.promises.unlink(filePath);
+        } catch (unlinkError) {
+          console.error(`No se pudo eliminar el archivo original ${filePath}:`, unlinkError);
+          // Continuar a pesar del error - al menos tenemos la copia
         }
+        
+        console.log(`✅ Archivo ${originalFileName} movido a ${newTargetPath}`);
+        return newTargetPath;
+      } else {
+        // Copia directa si no hay colisión de nombres
+        await fs.promises.copyFile(filePath, targetPath);
+        
+        // Eliminar el archivo original solo si la copia fue exitosa
+        try {
+          await fs.promises.unlink(filePath);
+        } catch (unlinkError) {
+          console.error(`No se pudo eliminar el archivo original ${filePath}:`, unlinkError);
+          // Continuar a pesar del error - al menos tenemos la copia
+        }
+        
+        console.log(`✅ Archivo ${originalFileName} movido a ${targetPath}`);
+        return targetPath;
       }
-      
-      return targetPath;
     } catch (copyError) {
-      console.error(`Error al mover archivo ${filePath}:`, copyError);
-      return null;
+      // En caso de error de nombre demasiado largo, usar un nombre muy corto
+      if (copyError.code === 'ENAMETOOLONG') {
+        const shortName = `file_${Date.now().toString().substring(8)}${fileExtension}`;
+        const emergencyPath = path.join(targetDir, shortName);
+        
+        await fs.promises.copyFile(filePath, emergencyPath);
+        
+        try {
+          await fs.promises.unlink(filePath);
+        } catch (unlinkError) {
+          console.error(`No se pudo eliminar el archivo original ${filePath}:`, unlinkError);
+        }
+        
+        console.log(`⚠️ Archivo renombrado y movido a ${emergencyPath} (nombre original demasiado largo)`);
+        return emergencyPath;
+      } else {
+        throw copyError;
+      }
     }
   } catch (error) {
-    console.error(`❌ Error general al mover archivo ${filePath}:`, error);
+    console.error(`❌ Error al mover el archivo ${filePath}:`, error);
     return null;
   }
 }
@@ -509,8 +520,8 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     await storage.updateFileActivityStatus(activityId, 'Processed');
     emitFileProcessingStatus(activityId, 'Processed');
     
-    // Mover el archivo a la carpeta de procesados con el formato requerido
-    const newPath = await moveProcessedFile(filePath, 'Processed', storeCode);
+    // Mover el archivo a la carpeta de procesados
+    const newPath = await moveProcessedFile(filePath, 'Processed');
     
     // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
     if (newPath) {
@@ -527,8 +538,8 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     await storage.updateFileActivityStatus(activityId, 'Failed', errorMessage);
     emitFileProcessingStatus(activityId, 'Failed', errorMessage);
     
-    // Mover el archivo a la carpeta de errores usando el código de tienda
-    const newPath = await moveProcessedFile(filePath, 'Failed', storeCode, activityId);
+    // Mover el archivo a la carpeta de errores
+    const newPath = await moveProcessedFile(filePath, 'Failed');
     
     // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
     if (newPath) {
@@ -549,33 +560,35 @@ export async function processPdfFile(filePath: string, activityId: number, store
       throw new Error(`File ${filePath} does not exist`);
     }
     
-    // NOMBRE DEL ARCHIVO = CÓDIGO DE TIENDA
-    // Extraer el nombre base del archivo sin la extensión
-    const originalFilename = path.basename(filePath);
-    const filenameWithoutExt = path.basename(originalFilename, path.extname(originalFilename));
+    // Extraer el nombre del archivo para la detección de tienda
+    const filename = path.basename(filePath);
     
-    // Usar el nombre del archivo como código de tienda (sin incluir timestamp o números aleatorios)
-    // Si hay guiones o underscores, usar solo la primera parte
-    let pdfStoreCode = filenameWithoutExt.split(/[-_]/)[0];
+    // Intentar extraer código de tienda del nombre del archivo PDF
+    let pdfStoreCode = '';
     
-    // Eliminar cualquier UNKNOWN_ prefijo si existe
-    if (pdfStoreCode.startsWith('UNKNOWN_')) {
-      pdfStoreCode = pdfStoreCode.substring(8);
+    // 1. Buscar por patrón J12345ABCDE (formato común que comienza con J seguido de números y letras)
+    const j_pattern = /\b(J\d{5}[A-Z0-9]{4,5})\b/i;
+    const j_match = filename.match(j_pattern);
+      
+    if (j_match && j_match[1]) {
+      pdfStoreCode = j_match[1];
     }
-    
-    console.log(`Usando nombre de archivo como código de tienda: ${pdfStoreCode}`);
-    
-    // Si el nombre original ya tiene números, usarlo directamente
-    if (pdfStoreCode.match(/\d/)) {
-      // Ya tenemos un código válido
-    } 
-    // Caso de fallback: buscar códigos específicos
+    // 2. Intentar formato general de códigos: LETRA+NÚMEROS o NÚMEROS+LETRA
     else {
-      const known_stores = ['Montera', 'Central', 'Plaza', 'Norte', 'Sur'];
-      for (const knownStore of known_stores) {
-        if (originalFilename.toLowerCase().includes(knownStore.toLowerCase())) {
-          pdfStoreCode = knownStore;
-          break;
+      const general_pattern = /\b([A-Z]\d{1,6}|J\d{2,6}[a-z]{1,3})\b/i;
+      const general_match = filename.match(general_pattern);
+        
+      if (general_match && general_match[1]) {
+        pdfStoreCode = general_match[1];
+      }
+      // 3. Intentar el formato común de tiendas en el sistema
+      else {
+        const known_stores = ['Montera', 'Central', 'Plaza', 'Norte', 'Sur'];
+        for (const knownStore of known_stores) {
+          if (filename.toLowerCase().includes(knownStore.toLowerCase())) {
+            pdfStoreCode = knownStore;
+            break;
+          }
         }
       }
     }
@@ -624,12 +637,7 @@ export async function processPdfFile(filePath: string, activityId: number, store
     const dataBuffer = await fs.promises.readFile(filePath);
     
     // Extract basic info
-    let title = path.basename(filePath, '.pdf');
-    // Eliminar cualquier prefijo UNKNOWN_ si existe
-    if (title.startsWith('UNKNOWN_')) {
-      title = title.substring(8);
-    }
-    
+    const title = path.basename(filePath, '.pdf');
     const fileStats = await fs.promises.stat(filePath);
     const fileSize = fileStats.size;
     
@@ -676,13 +684,12 @@ export async function processPdfFile(filePath: string, activityId: number, store
     await storage.updateFileActivityStatus(activityId, 'Processed');
     emitFileProcessingStatus(activityId, 'Processed');
     
-    // Mover el archivo a la carpeta de procesados usando el nuevo formato de nombre
-    // Pasamos el activityId para que actualice la ruta del PDF en la base de datos
-    const newPath = await moveProcessedFile(filePath, 'Processed', storeCode, activityId);
+    // Mover el archivo a la carpeta de procesados
+    const newPath = await moveProcessedFile(filePath, 'Processed');
     
     // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
     if (newPath) {
-      // Actualizar la actividad con la nueva ubicación del archivo
+      // Actualizar solo la actividad, ya que el documento PDF mantiene su ruta original en la BD
       await storage.updateFileActivity(activityId, { 
         metadata: { 
           movedTo: newPath,
@@ -690,26 +697,8 @@ export async function processPdfFile(filePath: string, activityId: number, store
         } 
       });
       
-      // Ya no necesitamos este código porque updatePdfDocumentPath se llama desde moveProcessedFile
-      // pero lo dejamos comentado por si acaso hay que depurar algo
-      /*
-      try {
-        // Buscar el documento PDF recién creado
-        const pdfDocs = await storage.getPdfDocumentsByStore(storeCode);
-        const recentDoc = pdfDocs.find(doc => doc.fileActivityId === activityId);
-        
-        if (recentDoc) {
-          // Actualizar la ruta del documento para que apunte a la nueva ubicación
-          console.log(`Actualizando ruta del documento PDF: ${recentDoc.id} a ${newPath}`);
-          await db.update(pdfDocuments)
-            .set({ path: newPath })
-            .where(eq(pdfDocuments.id, recentDoc.id));
-        }
-      } catch (updateError) {
-        console.error(`Error actualizando ruta de documento PDF:`, updateError);
-        // No fallamos todo el proceso por esto, ya que el archivo ya se procesó correctamente
-      }
-      */
+      // No es necesario actualizar el documento en la BD, ya que su ruta es la original
+      // y solo cambia físicamente su ubicación
     }
     
     console.log(`Successfully processed PDF file ${path.basename(filePath)}`);
@@ -722,8 +711,8 @@ export async function processPdfFile(filePath: string, activityId: number, store
     await storage.updateFileActivityStatus(activityId, 'Failed', errorMessage);
     emitFileProcessingStatus(activityId, 'Failed', errorMessage);
     
-    // Mover el archivo a la carpeta de errores usando el código de tienda
-    const newPath = await moveProcessedFile(filePath, 'Failed', storeCode, activityId);
+    // Mover el archivo a la carpeta de errores
+    const newPath = await moveProcessedFile(filePath, 'Failed');
     
     // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
     if (newPath) {

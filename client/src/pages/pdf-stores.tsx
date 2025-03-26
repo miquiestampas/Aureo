@@ -4,13 +4,12 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useSocketStore } from "@/lib/socket";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Card, CardContent, CardHeader, CardTitle, CardDescription 
+  Card, CardContent, CardHeader, CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/ui/data-table";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -33,13 +32,7 @@ import {
   Download,
   FileSearch,
   Eye,
-  Calendar,
-  Search,
-  Store as StoreIcon,
-  Filter,
-  FileUp,
-  Files,
-  Loader2
+  Calendar
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -73,25 +66,26 @@ export default function PdfStoresPage() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<{ id: number, title: string, storeCode: string } | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [storeFilter, setStoreFilter] = useState<string | null>(null);
 
-  // Fetch all PDF stores
+  // Fetch PDF stores
   const { data: stores } = useQuery<Store[]>({
     queryKey: ['/api/stores', { type: 'PDF' }],
   });
   
-  // Fetch PDF documents for all stores or filtered store
+  // Fetch PDF documents for selected store
   const { data: pdfDocuments, refetch: refetchPdfDocs } = useQuery<PdfDocument[]>({
-    queryKey: [`/api/pdf-documents`, { storeCode: storeFilter }],
-    enabled: true,
+    queryKey: [`/api/pdf-documents?storeCode=${selectedStore}`, { storeCode: selectedStore }],
+    enabled: !!selectedStore,
   });
   
-  // Upload single file mutation
-  const uploadSingleMutation = useMutation({
-    mutationFn: async (file: File) => {
+  // Upload file mutation
+  const uploadMutation = useMutation({
+    mutationFn: async () => {
+      if (!uploadFile || !selectedStore) return;
+      
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", uploadFile);
+      formData.append("storeCode", selectedStore);
       
       const response = await fetch("/api/upload/pdf", {
         method: "POST",
@@ -101,16 +95,17 @@ export default function PdfStoresPage() {
       
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(error || "Error al subir archivo");
+        throw new Error(error || "Failed to upload file");
       }
       
       return response.json();
     },
     onSuccess: () => {
       toast({
-        title: "Archivo subido exitosamente",
-        description: "El archivo ha sido puesto en cola para su procesamiento.",
+        title: "File uploaded successfully",
+        description: "The file has been queued for processing.",
       });
+      setUploadDialogOpen(false);
       setUploadFile(null);
       
       // Refetch file activity data after successful upload
@@ -121,70 +116,32 @@ export default function PdfStoresPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error en la subida",
+        title: "Upload failed",
         description: error.message,
         variant: "destructive",
       });
     }
   });
   
-  // Upload multiple files mutation
-  const uploadMultipleMutation = useMutation({
-    mutationFn: async (files: File[]) => {
-      const formData = new FormData();
-      files.forEach(file => {
-        formData.append("files", file);
-      });
-      
-      const response = await fetch("/api/upload/pdf/batch", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || "Error al subir archivos");
-      }
-      
-      return response.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Archivos subidos exitosamente",
-        description: `${data.files.length} archivos han sido puestos en cola para su procesamiento.`,
-      });
-      
-      // Refetch file activity data after successful upload
-      setTimeout(() => {
-        refetchPdfDocs();
-        queryClient.invalidateQueries({ queryKey: ['/api/file-activities'] });
-      }, 1000);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error en la subida",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  });
-  
-  // Handle single file selection and upload
-  const handleSingleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setUploadFile(file);
-      uploadSingleMutation.mutate(file);
+      setUploadFile(e.target.files[0]);
     }
   };
   
-  // Handle multiple files selection and upload
-  const handleMultipleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const files = Array.from(e.target.files);
-      uploadMultipleMutation.mutate(files);
+  // Handle file upload
+  const handleUpload = () => {
+    if (!uploadFile) {
+      toast({
+        title: "No file selected",
+        description: "Please select a file to upload",
+        variant: "destructive",
+      });
+      return;
     }
+    
+    uploadMutation.mutate();
   };
   
   // Format file size
@@ -200,7 +157,7 @@ export default function PdfStoresPage() {
   
   // Refetch data when receiving socket events
   useEffect(() => {
-    if (recentEvents.length > 0) {
+    if (recentEvents.length > 0 && selectedStore) {
       const lastEvent = recentEvents[0];
       
       if (lastEvent.type === 'fileProcessingStatus' && 
@@ -208,71 +165,19 @@ export default function PdfStoresPage() {
         refetchPdfDocs();
       }
     }
-  }, [recentEvents, refetchPdfDocs]);
-
-  // Store columns for the store table
-  const storeColumns: ColumnDef<Store>[] = [
-    {
-      accessorKey: "name",
-      header: "Nombre",
-      cell: ({ row }) => {
-        return (
-          <div className="flex items-center">
-            <StoreIcon className="h-4 w-4 mr-2 text-primary" />
-            <span>{row.original.name}</span>
-          </div>
-        );
-      }
-    },
-    {
-      accessorKey: "code",
-      header: "Código",
-    },
-    {
-      accessorKey: "location",
-      header: "Ubicación",
-    },
-    {
-      accessorKey: "active",
-      header: "Estado",
-      cell: ({ row }) => {
-        return row.original.active ? (
-          <Badge className="bg-green-500">Activo</Badge>
-        ) : (
-          <Badge variant="outline">Inactivo</Badge>
-        );
-      }
-    },
-    {
-      id: "actions",
-      header: "Acciones",
-      cell: ({ row }) => {
-        return (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setStoreFilter(row.original.code)}
-            className={storeFilter === row.original.code ? "bg-primary text-white hover:bg-primary-focus" : ""}
-          >
-            <FileSearch className="h-4 w-4 mr-2" />
-            Ver documentos
-          </Button>
-        );
-      }
-    }
-  ];
+  }, [recentEvents, selectedStore, refetchPdfDocs]);
   
-  // Data columns for the document table
-  const documentColumns: ColumnDef<PdfDocument>[] = [
+  // Data columns
+  const columns: ColumnDef<PdfDocument>[] = [
     {
       accessorKey: "title",
-      header: "Título del Documento",
+      header: "Document Title",
     },
     {
       accessorKey: "documentType",
-      header: "Tipo",
+      header: "Type",
       cell: ({ row }) => {
-        const type = row.original.documentType || "Desconocido";
+        const type = row.original.documentType || "Unknown";
         return (
           <div className="flex items-center">
             <span>{type}</span>
@@ -281,36 +186,23 @@ export default function PdfStoresPage() {
       }
     },
     {
-      accessorKey: "storeCode",
-      header: "Tienda",
-      cell: ({ row }) => {
-        const store = stores?.find(s => s.code === row.original.storeCode);
-        return (
-          <div className="flex items-center">
-            <StoreIcon className="h-4 w-4 mr-2 text-primary" />
-            <span>{store?.name || row.original.storeCode}</span>
-          </div>
-        );
-      }
-    },
-    {
       accessorKey: "uploadDate",
-      header: "Fecha de subida",
+      header: "Upload Date",
       cell: ({ row }) => {
         const date = new Date(row.original.uploadDate);
-        return format(date, "d MMM yyyy, HH:mm");
+        return format(date, "MMM d, yyyy, h:mm a");
       }
     },
     {
       accessorKey: "fileSize",
-      header: "Tamaño",
+      header: "File Size",
       cell: ({ row }) => {
         return formatFileSize(row.original.fileSize);
       }
     },
     {
       id: "actions",
-      header: "Acciones",
+      header: "Actions",
       cell: ({ row }) => {
         return (
           <div className="flex space-x-2">
@@ -318,21 +210,21 @@ export default function PdfStoresPage() {
               variant="outline" 
               size="sm" 
               className="h-8 w-8 p-0"
-              title="Ver documento"
+              title="View document"
               onClick={() => handleViewPdf(row.original)}
             >
               <Eye className="h-4 w-4" />
-              <span className="sr-only">Ver documento</span>
+              <span className="sr-only">View document</span>
             </Button>
             <Button 
               variant="outline" 
               size="sm" 
               className="h-8 w-8 p-0"
-              title="Descargar documento"
+              title="Download document"
               onClick={() => handleDownloadPdf(row.original.id)}
             >
               <Download className="h-4 w-4" />
-              <span className="sr-only">Descargar documento</span>
+              <span className="sr-only">Download document</span>
             </Button>
           </div>
         );
@@ -381,194 +273,147 @@ export default function PdfStoresPage() {
       });
     }
   };
-  
-  // Filter documents based on store filter and search term
-  const filteredDocuments = pdfDocuments?.filter(doc => {
-    const matchesStore = storeFilter ? doc.storeCode === storeFilter : true;
-    const matchesSearch = searchTerm.trim() === '' ? true : 
-      (doc.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      doc.documentType?.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    return matchesStore && matchesSearch;
-  });
-
-  // Clear filters function
-  const clearFilters = () => {
-    setSearchTerm("");
-    setStoreFilter(null);
-  };
 
   return (
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">Tiendas PDF</h1>
-        </div>
-        
-        {/* Upload Modules */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Single File Upload */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center">
-                <FileUp className="h-5 w-5 mr-2 text-primary" />
-                Subida Individual
-              </CardTitle>
-              <CardDescription>
-                Sube un solo documento PDF que será asociado automáticamente a su tienda.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex flex-col space-y-2">
-                  <Label htmlFor="single-file" className="text-sm font-medium">
-                    Seleccionar un archivo PDF
-                  </Label>
-                  <Input
-                    id="single-file"
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleSingleFileChange}
-                    disabled={uploadSingleMutation.isPending}
-                    className="cursor-pointer"
-                  />
-                  {uploadSingleMutation.isPending && (
-                    <div className="flex items-center mt-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Subiendo archivo...
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  El nombre del documento debe contener el código de la tienda o dígitos que permitan identificarla.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <h1 className="text-2xl font-semibold text-gray-900">PDF Stores</h1>
           
-          {/* Batch File Upload */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center">
-                <Files className="h-5 w-5 mr-2 text-primary" />
-                Subida por Lotes
-              </CardTitle>
-              <CardDescription>
-                Sube múltiples documentos PDF que serán asociados automáticamente a sus tiendas.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex flex-col space-y-2">
-                  <Label htmlFor="multiple-files" className="text-sm font-medium">
-                    Seleccionar varios archivos PDF
-                  </Label>
-                  <Input
-                    id="multiple-files"
-                    type="file"
-                    accept=".pdf"
-                    multiple
-                    onChange={handleMultipleFilesChange}
-                    disabled={uploadMultipleMutation.isPending}
-                    className="cursor-pointer"
-                  />
-                  {uploadMultipleMutation.isPending && (
-                    <div className="flex items-center mt-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Subiendo archivos...
-                    </div>
-                  )}
+          <div className="flex space-x-2">
+            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90">
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload PDF File
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Upload PDF Document</DialogTitle>
+                  <DialogDescription>
+                    Upload a PDF document for the selected store.
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="store">Select Store</Label>
+                    <Select 
+                      onValueChange={(value) => setSelectedStore(value)}
+                      value={selectedStore || undefined}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a store" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stores?.filter(store => store.type === "PDF").map(store => (
+                          <SelectItem key={store.id} value={store.code}>
+                            {store.name} ({store.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="file">PDF File</Label>
+                    <Input 
+                      id="file" 
+                      type="file" 
+                      accept=".pdf" 
+                      onChange={handleFileChange}
+                    />
+                    <p className="text-sm text-gray-500">
+                      Only PDF files are accepted.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Los nombres de los documentos deben contener los códigos de las tiendas o dígitos que permitan identificarlas.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleUpload} 
+                    disabled={!selectedStore || !uploadFile || uploadMutation.isPending}
+                  >
+                    {uploadMutation.isPending ? "Uploading..." : "Upload"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
         
-        {/* Stores Table */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <StoreIcon className="h-5 w-5 mr-2" />
-              Tiendas PDF
-            </CardTitle>
+            <CardTitle>Select Store</CardTitle>
           </CardHeader>
           <CardContent>
-            {stores?.filter(store => store.type === "PDF").length ? (
-              <DataTable
-                columns={storeColumns}
-                data={stores.filter(store => store.type === "PDF")}
-                searchKey="name"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center py-6">
-                <StoreIcon className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">No hay tiendas disponibles</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  No se encontraron tiendas PDF en el sistema.
-                </p>
-              </div>
-            )}
+            <Select 
+              onValueChange={(value) => setSelectedStore(value)}
+              value={selectedStore || undefined}
+            >
+              <SelectTrigger className="w-full sm:w-72">
+                <SelectValue placeholder="Select a store to view documents" />
+              </SelectTrigger>
+              <SelectContent>
+                {stores?.filter(store => store.type === "PDF").map(store => (
+                  <SelectItem key={store.id} value={store.code}>
+                    {store.name} ({store.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
         
-        {/* Documents Section */}
-        <Card>
-          <CardHeader className="border-b">
-            <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-              <CardTitle>
-                <div className="flex items-center">
-                  <FileText className="h-5 w-5 mr-2 text-red-500" />
-                  Documentos PDF
-                  {storeFilter && (
-                    <Badge className="ml-2 bg-primary" variant="secondary">
-                      {stores?.find(s => s.code === storeFilter)?.name || storeFilter}
-                    </Badge>
-                  )}
+        {selectedStore ? (
+          <Card>
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle>
+                  <div className="flex items-center">
+                    <FileText className="h-5 w-5 mr-2 text-red-500" />
+                    Documents: {stores?.find(s => s.code === selectedStore)?.name || selectedStore}
+                  </div>
+                </CardTitle>
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <FileSearch className="h-4 w-4 mr-1" />
+                  {pdfDocuments?.length || 0} documents
                 </div>
-              </CardTitle>
-              <div className="flex flex-col space-y-2 sm:flex-row sm:space-x-2 sm:space-y-0">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar documentos..."
-                    className="pl-8 w-full sm:w-64"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {pdfDocuments?.length ? (
+                <DataTable
+                  columns={columns}
+                  data={pdfDocuments}
+                  searchKey="title"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">No documents available</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    No PDF documents found for this store.
+                  </p>
                 </div>
-                {(searchTerm || storeFilter) && (
-                  <Button variant="ghost" onClick={clearFilters} className="h-9">
-                    <Filter className="h-4 w-4 mr-2" />
-                    Limpiar filtros
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {filteredDocuments?.length ? (
-              <DataTable
-                columns={documentColumns}
-                data={filteredDocuments}
-                searchKey="title"
-                showColumnToggle={true}
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12">
-                <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">No hay documentos disponibles</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {storeFilter ? 
-                    `No se encontraron documentos PDF para la tienda seleccionada.` : 
-                    `No se encontraron documentos PDF en el sistema.`}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium">Select a store to view documents</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Choose a PDF store from the dropdown above to view its documents.
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
       
       {/* PDF Viewer Modal */}
