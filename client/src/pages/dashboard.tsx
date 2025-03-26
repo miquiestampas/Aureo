@@ -9,6 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -21,7 +26,8 @@ import {
   XCircle,
   Clock,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  Plus
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -47,6 +53,180 @@ interface FileActivity {
   processedBy: string;
   errorMessage?: string;
   detectedStoreCode?: string;
+}
+
+// Interfaces adicionales
+interface Store {
+  id: number;
+  code: string;
+  name: string;
+  type: "Excel" | "PDF";
+  location: string | null;
+  active: boolean;
+}
+
+// Componente para manejar la asignación de tiendas
+function StoreAssignmentCard({ file, onAssigned }: { file: FileActivity, onAssigned: () => void }) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedStore, setSelectedStore] = useState<string>("");
+  const [stores, setStores] = useState<Store[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+
+  // Cargar tiendas por tipo
+  useEffect(() => {
+    const loadStores = async () => {
+      try {
+        const response = await fetch(`/api/stores?type=${file.fileType}`);
+        if (response.ok) {
+          const data = await response.json();
+          setStores(data.filter((store: Store) => store.active));
+        }
+      } catch (error) {
+        console.error("Error al cargar tiendas:", error);
+      }
+    };
+    
+    if (isDialogOpen) {
+      loadStores();
+    }
+  }, [isDialogOpen, file.fileType]);
+
+  // Asignar tienda al archivo
+  const assignStore = useMutation({
+    mutationFn: async () => {
+      if (!selectedStore) {
+        throw new Error("Debe seleccionar una tienda");
+      }
+      
+      const response = await apiRequest("POST", `/api/file-activities/${file.id}/assign-store`, {
+        storeCode: selectedStore
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Error al asignar tienda");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Tienda asignada",
+        description: "El archivo ha sido asignado correctamente a la tienda",
+        variant: "default",
+      });
+      setIsDialogOpen(false);
+      setSelectedStore("");
+      onAssigned();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error al asignar tienda",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleAssign = () => {
+    assignStore.mutate();
+  };
+
+  return (
+    <div className="bg-gray-50 rounded-lg shadow p-4">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center">
+            {file.fileType === "Excel" ? (
+              <FileSpreadsheet className="h-5 w-5 text-green-500 mr-2" />
+            ) : (
+              <FileText className="h-5 w-5 text-red-500 mr-2" />
+            )}
+            <span className="text-sm font-medium text-gray-900">{file.filename}</span>
+          </div>
+          
+          <div className="mt-2 text-xs text-gray-500">
+            <p>Procesado: {new Date(file.processingDate).toLocaleString()}</p>
+            {file.detectedStoreCode && (
+              <p className="mt-1">
+                <span className="font-medium">Código detectado:</span> {file.detectedStoreCode} (no reconocido)
+              </p>
+            )}
+          </div>
+        </div>
+        
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsDialogOpen(true)}
+            className="text-blue-600 border-blue-200 hover:bg-blue-50"
+          >
+            Asignar Tienda
+          </Button>
+        </div>
+      </div>
+      
+      {/* Dialog para asignar tienda */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Asignar Tienda al Archivo</DialogTitle>
+            <DialogDescription>
+              Seleccione la tienda a la que desea asignar el archivo <span className="font-medium">{file.filename}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="store-select">Tienda</Label>
+              <Select
+                value={selectedStore}
+                onValueChange={setSelectedStore}
+              >
+                <SelectTrigger id="store-select">
+                  <SelectValue placeholder="Seleccionar tienda" />
+                </SelectTrigger>
+                <SelectContent>
+                  {stores.map((store) => (
+                    <SelectItem key={store.id} value={store.code}>
+                      {store.code} - {store.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {file.detectedStoreCode && (
+              <div className="bg-orange-50 p-3 rounded-md text-sm">
+                <p className="font-medium text-orange-800">Información</p>
+                <p className="text-orange-700 mt-1">
+                  Se detectó el código <span className="font-medium">{file.detectedStoreCode}</span> en el nombre del archivo, 
+                  pero no coincide con ninguna tienda registrada en el sistema.
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleAssign}
+              disabled={!selectedStore || assignStore.isPending}
+            >
+              {assignStore.isPending ? "Asignando..." : "Confirmar Asignación"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -438,6 +618,27 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+        
+        {/* Pending Store Assignments Section */}
+        {pendingAssignments && pendingAssignments.length > 0 && (
+          <div className="mt-8">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg leading-6 font-medium text-gray-900">Archivos Pendientes de Asignación</h2>
+              <Badge variant="outline" className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+                {pendingAssignments.length} {pendingAssignments.length === 1 ? 'archivo' : 'archivos'}
+              </Badge>
+            </div>
+            <div className="mt-5 bg-white shadow overflow-hidden rounded-lg">
+              <div className="p-6">
+                <div className="space-y-4">
+                  {pendingAssignments.map((file) => (
+                    <StoreAssignmentCard key={file.id} file={file} onAssigned={() => refetchPendingAssignments()} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Recent Activity Section */}
         <div className="mt-8">
