@@ -4,7 +4,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useSocketStore } from "@/lib/socket";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Card, CardContent, CardHeader, CardTitle 
+  Card, CardContent, CardHeader, CardTitle, CardDescription
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,11 +32,19 @@ import {
   Download,
   FileSearch,
   Eye,
-  Calendar
+  Calendar,
+  Database,
+  UploadCloud,
+  Trash2
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import PdfViewer from "@/components/PdfViewer";
+import FileUploadModal from "@/components/FileUploadModal";
+import { Badge } from "@/components/ui/badge";
+
+// Definición del tipo específico para Store
+type StoreType = "Excel" | "PDF";
 
 interface Store {
   id: number;
@@ -61,88 +69,38 @@ interface PdfDocument {
 export default function PdfStoresPage() {
   const { toast } = useToast();
   const { recentEvents } = useSocketStore();
-  const [selectedStore, setSelectedStore] = useState<string | null>(null);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [showStoreDataDialog, setShowStoreDataDialog] = useState(false);
+  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<{ id: number, title: string, storeCode: string } | null>(null);
+  const [fileUploadModalOpen, setFileUploadModalOpen] = useState(false);
+  const [storeActivities, setStoreActivities] = useState<Record<string, any[]>>({});
+  const [expandedStore, setExpandedStore] = useState<string | null>(null);
+  const [storeData, setStoreData] = useState<PdfDocument[]>([]);
+  const [isLoadingStoreData, setIsLoadingStoreData] = useState(false);
+  
+  // Búsqueda por código, nombre o ubicación
+  const [codeFilter, setCodeFilter] = useState('');
+  const [nameFilter, setNameFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
 
   // Fetch PDF stores
-  const { data: stores } = useQuery<Store[]>({
+  const { data: stores = [] } = useQuery<Store[]>({
     queryKey: ['/api/stores', { type: 'PDF' }],
   });
   
-  // Fetch PDF documents for selected store
-  const { data: pdfDocuments, refetch: refetchPdfDocs } = useQuery<PdfDocument[]>({
-    queryKey: [`/api/pdf-documents?storeCode=${selectedStore}`, { storeCode: selectedStore }],
-    enabled: !!selectedStore,
-  });
-  
-  // Upload file mutation
-  const uploadMutation = useMutation({
-    mutationFn: async () => {
-      if (!uploadFile || !selectedStore) return;
-      
-      const formData = new FormData();
-      formData.append("file", uploadFile);
-      formData.append("storeCode", selectedStore);
-      
-      const response = await fetch("/api/upload/pdf", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || "Failed to upload file");
-      }
-      
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "File uploaded successfully",
-        description: "The file has been queued for processing.",
-      });
-      setUploadDialogOpen(false);
-      setUploadFile(null);
-      
-      // Refetch file activity data after successful upload
-      setTimeout(() => {
-        refetchPdfDocs();
-        queryClient.invalidateQueries({ queryKey: ['/api/file-activities'] });
-      }, 1000);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Upload failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  });
-  
-  // Handle file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setUploadFile(e.target.files[0]);
-    }
-  };
-  
-  // Handle file upload
-  const handleUpload = () => {
-    if (!uploadFile) {
-      toast({
-        title: "No file selected",
-        description: "Please select a file to upload",
-        variant: "destructive",
-      });
-      return;
-    }
+  // Filtrado de tiendas
+  const filteredStores = stores.filter(store => {
+    const matchesCode = store.code.toLowerCase().includes(codeFilter.toLowerCase());
+    const matchesName = store.name.toLowerCase().includes(nameFilter.toLowerCase());
+    const matchesLocation = store.location?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false;
     
-    uploadMutation.mutate();
-  };
+    return (
+      (codeFilter === '' || matchesCode) && 
+      (nameFilter === '' || matchesName) && 
+      (locationFilter === '' || matchesLocation)
+    );
+  });
   
   // Format file size
   const formatFileSize = (bytes: number): string => {
@@ -157,52 +115,113 @@ export default function PdfStoresPage() {
   
   // Refetch data when receiving socket events
   useEffect(() => {
-    if (recentEvents.length > 0 && selectedStore) {
+    if (recentEvents.length > 0) {
       const lastEvent = recentEvents[0];
       
       if (lastEvent.type === 'fileProcessingStatus' && 
           lastEvent.data.status === 'Processed') {
-        refetchPdfDocs();
+        // Refresh data if needed
+        if (expandedStore && expandedStore === lastEvent.data.storeCode) {
+          handleViewStoreFiles({ code: expandedStore } as Store);
+        }
       }
     }
-  }, [recentEvents, selectedStore, refetchPdfDocs]);
+  }, [recentEvents]);
   
-  // Data columns
-  const columns: ColumnDef<PdfDocument>[] = [
+  // Columns for the store table
+  const storeColumns: ColumnDef<Store>[] = [
+    {
+      accessorKey: "code",
+      header: "Código",
+    },
+    {
+      accessorKey: "name",
+      header: "Nombre",
+    },
+    {
+      accessorKey: "location",
+      header: "Ubicación",
+    },
+    {
+      accessorKey: "active",
+      header: "Estado",
+      cell: ({ row }) => (
+        <Badge variant={row.original.active ? "default" : "destructive"}>
+          {row.original.active ? "Activo" : "Inactivo"}
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Acciones",
+      cell: ({ row }) => {
+        const store = row.original;
+        return (
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              title="Ver documentos"
+              onClick={() => handleViewStoreData(store)}
+            >
+              <Database className="h-4 w-4" />
+              <span className="sr-only">Ver documentos</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              title="Ver archivos"
+              onClick={() => handleViewStoreFiles(store)}
+            >
+              <FileText className="h-4 w-4" />
+              <span className="sr-only">Ver archivos</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              title="Subir archivo"
+              onClick={() => handleUploadFile(store)}
+            >
+              <UploadCloud className="h-4 w-4" />
+              <span className="sr-only">Subir archivo</span>
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+  
+  // Columns for the data table
+  const dataColumns: ColumnDef<PdfDocument>[] = [
     {
       accessorKey: "title",
-      header: "Document Title",
+      header: "Título del documento",
     },
     {
       accessorKey: "documentType",
-      header: "Type",
-      cell: ({ row }) => {
-        const type = row.original.documentType || "Unknown";
-        return (
-          <div className="flex items-center">
-            <span>{type}</span>
-          </div>
-        );
-      }
+      header: "Tipo",
     },
     {
       accessorKey: "uploadDate",
-      header: "Upload Date",
+      header: "Fecha de subida",
       cell: ({ row }) => {
         const date = new Date(row.original.uploadDate);
-        return format(date, "MMM d, yyyy, h:mm a");
+        return format(date, "dd/MM/yyyy HH:mm");
       }
     },
     {
       accessorKey: "fileSize",
-      header: "File Size",
+      header: "Tamaño",
       cell: ({ row }) => {
         return formatFileSize(row.original.fileSize);
       }
     },
     {
       id: "actions",
-      header: "Actions",
+      header: "Acciones",
       cell: ({ row }) => {
         return (
           <div className="flex space-x-2">
@@ -210,27 +229,105 @@ export default function PdfStoresPage() {
               variant="outline" 
               size="sm" 
               className="h-8 w-8 p-0"
-              title="View document"
+              title="Ver documento"
               onClick={() => handleViewPdf(row.original)}
             >
               <Eye className="h-4 w-4" />
-              <span className="sr-only">View document</span>
+              <span className="sr-only">Ver documento</span>
             </Button>
             <Button 
               variant="outline" 
               size="sm" 
               className="h-8 w-8 p-0"
-              title="Download document"
+              title="Descargar documento"
               onClick={() => handleDownloadPdf(row.original.id)}
             >
               <Download className="h-4 w-4" />
-              <span className="sr-only">Download document</span>
+              <span className="sr-only">Descargar documento</span>
             </Button>
           </div>
         );
       }
     }
   ];
+  
+  // Handle view PDF store data
+  const handleViewStoreData = async (store: Store) => {
+    setSelectedStore(store);
+    setIsLoadingStoreData(true);
+    
+    try {
+      const response = await fetch(`/api/pdf-documents?storeCode=${store.code}`);
+      if (!response.ok) {
+        throw new Error("Error al cargar los documentos");
+      }
+      
+      const data = await response.json();
+      setStoreData(data);
+    } catch (error) {
+      console.error("Error fetching store data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los documentos",
+        variant: "destructive",
+      });
+      setStoreData([]);
+    } finally {
+      setIsLoadingStoreData(false);
+      setShowStoreDataDialog(true);
+    }
+  };
+  
+  // Handle view store files
+  const handleViewStoreFiles = async (store: Store) => {
+    // Toggle expanded state if clicking the same store
+    if (expandedStore === store.code) {
+      setExpandedStore(null);
+      return;
+    }
+    
+    setExpandedStore(store.code);
+    
+    // Solo cargar los archivos si no se han cargado ya
+    if (!storeActivities[store.code]) {
+      try {
+        const response = await fetch(`/api/file-activities?storeCode=${store.code}`);
+        if (!response.ok) {
+          throw new Error("Error al cargar los archivos");
+        }
+        
+        const data = await response.json();
+        setStoreActivities(prev => ({
+          ...prev,
+          [store.code]: data.filter((activity: any) => activity.fileType === "PDF")
+        }));
+      } catch (error) {
+        console.error("Error fetching store files:", error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los archivos",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+  
+  // Handle upload file
+  const handleUploadFile = (store: Store) => {
+    setSelectedStore(store);
+    setFileUploadModalOpen(true);
+  };
+  
+  // Handle file upload success
+  const handleUploadSuccess = () => {
+    // Refresh the files list if the store was expanded
+    if (expandedStore === selectedStore?.code) {
+      handleViewStoreFiles(selectedStore);
+    }
+    
+    // Reset selected store
+    setSelectedStore(null);
+  };
   
   // Handle view PDF
   const handleViewPdf = (document: PdfDocument) => {
@@ -245,7 +342,6 @@ export default function PdfStoresPage() {
   // Handle download PDF
   const handleDownloadPdf = async (documentId: number) => {
     try {
-      // Crear un enlace invisible, configurarlo para descargar y hacer clic en él
       const response = await fetch(`/api/pdf-documents/${documentId}/view`);
       if (!response.ok) {
         throw new Error("Error al descargar el documento");
@@ -278,142 +374,336 @@ export default function PdfStoresPage() {
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">PDF Stores</h1>
-          
-          <div className="flex space-x-2">
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload PDF File
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Upload PDF Document</DialogTitle>
-                  <DialogDescription>
-                    Upload a PDF document for the selected store.
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="store">Select Store</Label>
-                    <Select 
-                      onValueChange={(value) => setSelectedStore(value)}
-                      value={selectedStore || undefined}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a store" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stores?.filter(store => store.type === "PDF").map(store => (
-                          <SelectItem key={store.id} value={store.code}>
-                            {store.name} ({store.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="file">PDF File</Label>
-                    <Input 
-                      id="file" 
-                      type="file" 
-                      accept=".pdf" 
-                      onChange={handleFileChange}
-                    />
-                    <p className="text-sm text-gray-500">
-                      Only PDF files are accepted.
-                    </p>
-                  </div>
-                </div>
-                
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={handleUpload} 
-                    disabled={!selectedStore || !uploadFile || uploadMutation.isPending}
-                  >
-                    {uploadMutation.isPending ? "Uploading..." : "Upload"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+          <h1 className="text-2xl font-semibold text-gray-900">Tiendas PDF</h1>
         </div>
         
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Select Store</CardTitle>
+            <CardTitle>Buscar Tiendas</CardTitle>
+            <CardDescription>Filtrar tiendas por código, nombre o ubicación</CardDescription>
           </CardHeader>
           <CardContent>
-            <Select 
-              onValueChange={(value) => setSelectedStore(value)}
-              value={selectedStore || undefined}
-            >
-              <SelectTrigger className="w-full sm:w-72">
-                <SelectValue placeholder="Select a store to view documents" />
-              </SelectTrigger>
-              <SelectContent>
-                {stores?.filter(store => store.type === "PDF").map(store => (
-                  <SelectItem key={store.id} value={store.code}>
-                    {store.name} ({store.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="code-filter">Código</Label>
+                <Input
+                  id="code-filter"
+                  placeholder="Filtrar por código..."
+                  value={codeFilter}
+                  onChange={(e) => setCodeFilter(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="name-filter">Nombre</Label>
+                <Input
+                  id="name-filter"
+                  placeholder="Filtrar por nombre..."
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="location-filter">Ubicación</Label>
+                <Input
+                  id="location-filter"
+                  placeholder="Filtrar por ubicación..."
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                />
+              </div>
+            </div>
           </CardContent>
         </Card>
         
-        {selectedStore ? (
-          <Card>
-            <CardHeader className="border-b">
-              <div className="flex items-center justify-between">
-                <CardTitle>
-                  <div className="flex items-center">
-                    <FileText className="h-5 w-5 mr-2 text-red-500" />
-                    Documents: {stores?.find(s => s.code === selectedStore)?.name || selectedStore}
-                  </div>
-                </CardTitle>
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <FileSearch className="h-4 w-4 mr-1" />
-                  {pdfDocuments?.length || 0} documents
-                </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Tiendas PDF</CardTitle>
+              <CardDescription>
+                Lista de tiendas que utilizan archivos PDF
+              </CardDescription>
+            </div>
+            <Button 
+              onClick={() => {
+                setSelectedStore(null);
+                setFileUploadModalOpen(true);
+              }}
+              className="bg-primary hover:bg-primary/90"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Subir PDF
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {filteredStores.filter(store => store.type === "PDF").length === 0 ? (
+              <div className="text-center py-10">
+                <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-medium">No hay tiendas PDF</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  No se encontraron tiendas PDF con los filtros seleccionados.
+                </p>
               </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {pdfDocuments?.length ? (
-                <DataTable
-                  columns={columns}
-                  data={pdfDocuments}
-                  searchKey="title"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium">No documents available</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    No PDF documents found for this store.
-                  </p>
+            ) : (
+              <>
+                <div className="rounded-md border">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        {storeColumns.map((column) => (
+                          <th
+                            key={column.id || String(column.accessorKey)}
+                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                          >
+                            {column.header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredStores
+                        .filter(store => store.type === "PDF")
+                        .map((store) => (
+                          <tr key={store.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {store.code}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {store.name}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {store.location}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <Badge variant={store.active ? "default" : "destructive"}>
+                                {store.active ? "Activo" : "Inactivo"}
+                              </Badge>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <div className="flex space-x-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0"
+                                  title="Ver documentos"
+                                  onClick={() => handleViewStoreData(store)}
+                                >
+                                  <Database className="h-4 w-4" />
+                                  <span className="sr-only">Ver documentos</span>
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0"
+                                  title="Ver archivos"
+                                  onClick={() => handleViewStoreFiles(store)}
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  <span className="sr-only">Ver archivos</span>
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0"
+                                  title="Subir archivo"
+                                  onClick={() => handleUploadFile(store)}
+                                >
+                                  <UploadCloud className="h-4 w-4" />
+                                  <span className="sr-only">Subir archivo</span>
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">Select a store to view documents</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Choose a PDF store from the dropdown above to view its documents.
-              </p>
-            </CardContent>
-          </Card>
-        )}
+                
+                {/* Expandable files section */}
+                {filteredStores.filter(store => store.type === "PDF").map((store) => {
+                  if (expandedStore !== store.code) return null;
+                  
+                  const activities = storeActivities[store.code] || [];
+                  
+                  return (
+                    <div key={`files-${store.code}`} className="mt-4 rounded-md border p-4">
+                      <h3 className="text-lg font-medium mb-2">Archivos de {store.name}</h3>
+                      
+                      {activities.length === 0 ? (
+                        <div className="text-center py-6">
+                          <p className="text-muted-foreground">No hay archivos disponibles para esta tienda</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Archivo</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {activities.map((activity: any) => (
+                                <tr key={activity.id} className="hover:bg-gray-50">
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    {activity.filename}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <Badge 
+                                      variant={
+                                        activity.status === "Processed" ? "default" : 
+                                        activity.status === "Failed" ? "destructive" : 
+                                        "secondary"
+                                      }
+                                    >
+                                      {activity.status === "Processed" ? "Procesado" : 
+                                       activity.status === "Processing" ? "Procesando" :
+                                       activity.status === "Failed" ? "Error" : activity.status}
+                                    </Badge>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {new Date(activity.processingDate).toLocaleString()}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <div className="flex space-x-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        title="Descargar"
+                                        onClick={() => {
+                                          fetch(`/api/file-activities/${activity.id}/download`)
+                                            .then(response => {
+                                              if (!response.ok) {
+                                                throw new Error('Error al descargar el archivo');
+                                              }
+                                              return response.blob();
+                                            })
+                                            .then(blob => {
+                                              const url = window.URL.createObjectURL(blob);
+                                              const a = document.createElement('a');
+                                              a.style.display = 'none';
+                                              a.href = url;
+                                              a.download = activity.filename;
+                                              document.body.appendChild(a);
+                                              a.click();
+                                              window.URL.revokeObjectURL(url);
+                                              document.body.removeChild(a);
+                                            })
+                                            .catch(error => {
+                                              toast({
+                                                title: "Error",
+                                                description: error instanceof Error ? error.message : "Error al descargar el archivo",
+                                                variant: "destructive",
+                                              });
+                                            });
+                                        }}
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                          <polyline points="7 10 12 15 17 10"></polyline>
+                                          <line x1="12" y1="15" x2="12" y2="3"></line>
+                                        </svg>
+                                        <span className="sr-only">Descargar</span>
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        title="Eliminar"
+                                        onClick={() => {
+                                          if (confirm(`¿Está seguro que desea eliminar el archivo ${activity.filename}?`)) {
+                                            fetch(`/api/file-activities/${activity.id}`, {
+                                              method: 'DELETE'
+                                            })
+                                            .then(response => {
+                                              if (!response.ok) {
+                                                throw new Error('Error al eliminar el archivo');
+                                              }
+                                              
+                                              // Actualizar la lista eliminando la actividad
+                                              setStoreActivities(prev => ({
+                                                ...prev,
+                                                [store.code]: prev[store.code].filter((item: any) => item.id !== activity.id)
+                                              }));
+                                              
+                                              toast({
+                                                title: "Archivo eliminado",
+                                                description: "El archivo se ha eliminado correctamente",
+                                              });
+                                            })
+                                            .catch(error => {
+                                              toast({
+                                                title: "Error",
+                                                description: error instanceof Error ? error.message : "Error al eliminar el archivo",
+                                                variant: "destructive",
+                                              });
+                                            });
+                                          }
+                                        }}
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                                          <path d="M3 6h18"></path>
+                                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                        </svg>
+                                        <span className="sr-only">Eliminar</span>
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                      
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            
+            {/* Dialog for Store Data */}
+            <Dialog open={showStoreDataDialog} onOpenChange={setShowStoreDataDialog}>
+              <DialogContent className="max-w-5xl">
+                <DialogHeader>
+                  <DialogTitle>
+                    Datos de la tienda: {selectedStore?.name} ({selectedStore?.code})
+                  </DialogTitle>
+                  <DialogDescription>
+                    Documentos PDF importados
+                  </DialogDescription>
+                </DialogHeader>
+                
+                {isLoadingStoreData ? (
+                  <div className="py-8 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                  </div>
+                ) : storeData.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <p className="text-muted-foreground">No hay documentos disponibles para esta tienda</p>
+                  </div>
+                ) : (
+                  <div className="overflow-auto max-h-[60vh]">
+                    <DataTable
+                      columns={dataColumns}
+                      data={storeData}
+                      searchKey="title"
+                    />
+                  </div>
+                )}
+                
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowStoreDataDialog(false)}>
+                    Cerrar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </Card>
       </div>
       
       {/* PDF Viewer Modal */}
@@ -426,6 +716,14 @@ export default function PdfStoresPage() {
           documentName={selectedDocument.title}
         />
       )}
+      
+      {/* File Upload Modal */}
+      <FileUploadModal
+        isOpen={fileUploadModalOpen}
+        onClose={() => setFileUploadModalOpen(false)}
+        storesByType={stores.filter(store => store.type === "PDF") as any}
+        fileType="PDF"
+      />
     </div>
   );
 }
