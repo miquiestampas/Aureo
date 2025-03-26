@@ -288,7 +288,7 @@ async function handleNewPdfFile(filePath: string) {
       // Si el nombre tiene números, buscar coincidencia parcial basada en los dígitos
       const fileDigits = storeCode.match(/\d+/g) || [];
       
-      if (fileDigits.length > 0) {
+      if (fileDigits.length > 0 && pdfStores.length > 0) {
         console.log(`Extracted digits from filename ${filename}:`, fileDigits);
         
         // Ordenamos las tiendas por longitud de código (más largo primero)
@@ -310,9 +310,6 @@ async function handleNewPdfFile(filePath: string) {
           }
         }
       }
-      
-      // Intentar buscar la tienda con el código extraído
-      foundStore = await storage.getStoreByCode(storeCode);
       
       // Si aún no hay coincidencia, usar la primera tienda PDF disponible
       if (!foundStore) {
