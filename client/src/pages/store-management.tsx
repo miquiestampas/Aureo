@@ -3,6 +3,45 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+
+// Lista de localidades de Madrid
+const MADRID_LOCALITIES = [
+  "Madrid",
+  "Alcalá de Henares",
+  "Alcobendas",
+  "Alcorcón",
+  "Algete",
+  "Alpedrete",
+  "Aranjuez",
+  "Arganda del Rey",
+  "Arroyomolinos",
+  "Boadilla del Monte",
+  "Ciempozuelos",
+  "Collado Villalba",
+  "Colmenar Viejo",
+  "Coslada",
+  "El Escorial",
+  "Fuenlabrada",
+  "Galapagar",
+  "Getafe",
+  "Humanes de Madrid",
+  "Las Rozas",
+  "Leganés",
+  "Majadahonda",
+  "Móstoles",
+  "Navalcarnero",
+  "Parla",
+  "Pinto",
+  "Pozuelo de Alarcón",
+  "Rivas-Vaciamadrid",
+  "San Fernando de Henares",
+  "San Lorenzo de El Escorial",
+  "San Sebastián de los Reyes",
+  "Torrejón de Ardoz",
+  "Tres Cantos",
+  "Valdemoro",
+  "Villaviciosa de Odón"
+];
 import { 
   Card, CardContent, CardHeader, CardTitle, CardDescription 
 } from "@/components/ui/card";
