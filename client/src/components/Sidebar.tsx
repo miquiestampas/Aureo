@@ -9,6 +9,7 @@ import {
   Users,
   Settings,
   LogOut,
+  ActivitySquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -102,6 +103,13 @@ export default function Sidebar() {
             icon={<FileText size={20} />}
             label="Tiendas PDF"
             active={location === '/pdf-stores'}
+          />
+          
+          <NavItem
+            href="/activity-control"
+            icon={<ActivitySquare size={20} />}
+            label="Control de Actividad"
+            active={location === '/activity-control'}
           />
           
           <NavItem

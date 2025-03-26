@@ -20,6 +20,7 @@ import PdfStoresPage from "@/pages/pdf-stores";
 import StoreManagementPage from "@/pages/store-management";
 import UserManagementPage from "@/pages/user-management";
 import SystemConfigPage from "@/pages/system-config";
+import ActivityControlPage from "@/pages/activity-control";
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -132,6 +133,15 @@ function Router() {
         component={() => (
           <AppLayout>
             <SystemConfigPage />
+          </AppLayout>
+        )} 
+      />
+      
+      <ProtectedRoute 
+        path="/activity-control" 
+        component={() => (
+          <AppLayout>
+            <ActivityControlPage />
           </AppLayout>
         )} 
       />
