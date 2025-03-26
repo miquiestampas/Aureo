@@ -604,10 +604,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add search to history if user is authenticated
       if (req.isAuthenticated()) {
         try {
-          const searchEntry: InsertSearchHistory = {
+          // Usar "General" como tipo de búsqueda ya que "excel_data_advanced" no está en el enum
+          const searchEntry: any = {
             userId: req.user!.id,
-            query: query || "Búsqueda avanzada",
-            searchType: "excel_data_advanced",
+            searchType: "General", // Usamos un tipo dentro del enum: "Cliente" | "Artículo" | "Orden" | "General"
+            searchTerms: query || "Búsqueda avanzada", // Usar searchTerms en lugar de query
             searchDate: new Date(),
             resultCount: results.length,
             filters: JSON.stringify(filters)

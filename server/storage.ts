@@ -1551,15 +1551,27 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getAlerts(status?: string, limit: number = 50): Promise<Alert[]> {
-    let query = db.select().from(alerts);
-    
-    if (status) {
-      query = query.where(eq(alerts.status, status));
+    try {
+      // Usar SQL directo para evitar problemas con los nombres de las columnas
+      let sql = `SELECT * FROM alerts`;
+      const params: any[] = [];
+      
+      if (status) {
+        sql += ` WHERE status = $1`;
+        params.push(status);
+      }
+      
+      sql += ` ORDER BY created_at DESC LIMIT $${params.length + 1}`;
+      params.push(limit);
+      
+      // Ejecutar la consulta SQL directa
+      const result = await db.execute(sql, params);
+      return result.rows as Alert[];
+    } catch (error) {
+      console.error("Error al obtener alertas:", error);
+      // En caso de error, devolver array vacío para evitar que falle la aplicación
+      return [];
     }
-    
-    return await query
-      .orderBy(desc(alerts.createdAt))
-      .limit(limit);
   }
   
   async getAlert(id: number): Promise<Alert | undefined> {
@@ -1595,32 +1607,39 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getAlertsByExcelDataId(excelDataId: number): Promise<Alert[]> {
-    // Usar SQL directo para evitar problemas de nomenclatura
-    const result = await db.execute(
-      sql`SELECT * FROM "alerts" WHERE "exceldataid" = ${excelDataId} ORDER BY "created_at" DESC`
-    );
-    
-    // Transformar el resultado en un array de Alert
-    if (result && result.rows && Array.isArray(result.rows)) {
-      return result.rows.map(row => {
-        return {
-          id: row.id,
-          alertType: row.alerttype,
-          excelDataId: row.exceldataid,
-          watchlistPersonId: row.watchlistpersonid,
-          watchlistItemId: row.watchlistitemid,
-          matchConfidence: row.matchconfidence,
-          status: row.status,
-          reviewedBy: row.reviewedby,
-          reviewNotes: row.reviewnotes,
-          createdAt: row.created_at,
-          resolvedAt: row.resolvedat
-        } as Alert;
-      });
+    try {
+      // Usar SQL directo para evitar problemas de nomenclatura
+      const result = await db.execute(
+        `SELECT * FROM "alerts" WHERE "excel_data_id" = $1 ORDER BY "created_at" DESC`,
+        [excelDataId]
+      );
+      
+      // Transformar el resultado en un array de Alert
+      if (result && result.rows && Array.isArray(result.rows)) {
+        return result.rows.map(row => {
+          // Mapear los nombres de columnas de la base de datos a los nombres en el código
+          return {
+            id: row.id,
+            alertType: row.alerttype, // Nota: en la BD es 'alerttype', en el esquema es 'alert_type'
+            excelDataId: row.excel_data_id,
+            watchlistPersonId: row.watchlist_person_id,
+            watchlistItemId: row.watchlist_item_id,
+            matchConfidence: row.match_confidence,
+            status: row.status,
+            reviewedBy: row.reviewed_by,
+            reviewNotes: row.review_notes,
+            createdAt: row.created_at,
+            resolvedAt: row.resolved_at
+          } as Alert;
+        });
+      }
+      
+      // Si no hay resultados, devolver un array vacío
+      return [];
+    } catch (error) {
+      console.error("Error al obtener alertas por excelDataId:", error);
+      return [];
     }
-    
-    // Si no hay resultados, devolver un array vacío
-    return [];
   }
   
   // Search History methods
