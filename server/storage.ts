@@ -1421,132 +1421,143 @@ export class DatabaseStorage implements IStorage {
     console.log("DatabaseStorage.searchExcelData - Parámetros:", { query, filters });
     
     try {
-      // Si el query es numérico, buscar coincidencias exactas en campos numéricos
-      const isNumericQuery = !isNaN(Number(query)) && query.trim() !== '';
-      
-      // Crear la consulta base con Drizzle usando SQL directa para mayor control
-      // Esto nos permite manejar mejor las búsquedas de texto vs. números
-      const conditions: string[] = [];
+      // Usaremos un enfoque diferente con consultas paramétricas
+      let sql = `
+        SELECT * FROM excel_data 
+        WHERE 1=1
+      `;
       const params: any[] = [];
-      let index = 1;
       
-      function addParam(value: any) {
-        params.push(value);
-        return `$${index++}`;
-      }
-      
-      // Verificar si hay una consulta general
-      const hasQuery = query && query.trim() !== '';
-      
-      if (hasQuery) {
-        if (isNumericQuery) {
-          // Búsqueda numérica - buscar coincidencias exactas y parciales
+      // Procesar la consulta general si existe
+      if (query && query.trim() !== '') {
+        const searchTerm = `%${query.trim()}%`;
+        params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+        
+        // Consulta por texto
+        sql += `
+          AND (
+            customer_name ILIKE $1 OR
+            customer_contact ILIKE $2 OR
+            order_number ILIKE $3 OR
+            item_details ILIKE $4 OR
+            metals ILIKE $5 OR
+            engravings ILIKE $6 OR
+            stones ILIKE $7 OR
+            pawn_ticket ILIKE $8
+          )
+        `;
+        
+        // Si es un número, agregar búsqueda numérica
+        if (!isNaN(Number(query.trim()))) {
           const numericValue = Number(query.trim());
-          const searchTerm = `%${query.trim()}%`;
+          params.push(query.trim(), searchTerm, query.trim(), searchTerm, numericValue);
           
-          // Construir condición para búsqueda numérica
-          conditions.push(`(
-            order_number = ${addParam(query.trim())} OR
-            order_number ILIKE ${addParam(searchTerm)} OR
-            customer_contact = ${addParam(query.trim())} OR
-            customer_contact ILIKE ${addParam(searchTerm)} OR
-            (NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) = ${addParam(numericValue)})
-          )`);
-        } else {
-          // Búsqueda de texto - usar ILIKE para todas las columnas de texto
-          const searchTerm = `%${query.trim()}%`;
-          
-          conditions.push(`(
-            customer_name ILIKE ${addParam(searchTerm)} OR
-            customer_contact ILIKE ${addParam(searchTerm)} OR
-            order_number ILIKE ${addParam(searchTerm)} OR
-            item_details ILIKE ${addParam(searchTerm)} OR
-            metals ILIKE ${addParam(searchTerm)} OR
-            engravings ILIKE ${addParam(searchTerm)} OR
-            stones ILIKE ${addParam(searchTerm)} OR
-            pawn_ticket ILIKE ${addParam(searchTerm)}
-          )`);
+          sql = sql.replace('WHERE 1=1', `
+            WHERE (
+              (
+                customer_name ILIKE $1 OR
+                customer_contact ILIKE $2 OR
+                order_number ILIKE $3 OR
+                item_details ILIKE $4 OR
+                metals ILIKE $5 OR
+                engravings ILIKE $6 OR
+                stones ILIKE $7 OR
+                pawn_ticket ILIKE $8
+              ) OR (
+                order_number = $9 OR
+                order_number ILIKE $10 OR
+                customer_contact = $11 OR
+                customer_contact ILIKE $12 OR
+                (NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) = $13)
+              )
+            )
+          `);
         }
       }
       
-      // Aplicar filtros adicionales si están presentes
+      // Aplicar filtros adicionales
+      let filterIndex = params.length + 1;
+      
       if (filters) {
         // Filtro por tienda
         if (filters.storeCode && filters.storeCode !== "all") {
-          conditions.push(`store_code = ${addParam(filters.storeCode)}`);
+          sql += ` AND store_code = $${filterIndex++}`;
+          params.push(filters.storeCode);
         }
         
         // Filtros específicos por campo de texto
         if (filters.customerName) {
-          conditions.push(`customer_name ILIKE ${addParam(`%${filters.customerName}%`)}`);
+          sql += ` AND customer_name ILIKE $${filterIndex++}`;
+          params.push(`%${filters.customerName}%`);
         }
         
         if (filters.customerContact) {
-          conditions.push(`customer_contact ILIKE ${addParam(`%${filters.customerContact}%`)}`);
+          sql += ` AND customer_contact ILIKE $${filterIndex++}`;
+          params.push(`%${filters.customerContact}%`);
         }
         
         if (filters.orderNumber) {
-          conditions.push(`order_number ILIKE ${addParam(`%${filters.orderNumber}%`)}`);
+          sql += ` AND order_number ILIKE $${filterIndex++}`;
+          params.push(`%${filters.orderNumber}%`);
         }
         
         if (filters.itemDetails) {
-          conditions.push(`item_details ILIKE ${addParam(`%${filters.itemDetails}%`)}`);
+          sql += ` AND item_details ILIKE $${filterIndex++}`;
+          params.push(`%${filters.itemDetails}%`);
         }
         
         if (filters.metals) {
-          conditions.push(`metals ILIKE ${addParam(`%${filters.metals}%`)}`);
+          sql += ` AND metals ILIKE $${filterIndex++}`;
+          params.push(`%${filters.metals}%`);
         }
         
         // Filtros de fecha
         if (filters.fromDate) {
-          conditions.push(`order_date >= ${addParam(filters.fromDate)}`);
+          sql += ` AND order_date >= $${filterIndex++}`;
+          params.push(filters.fromDate);
         }
         
         if (filters.toDate) {
-          conditions.push(`order_date <= ${addParam(filters.toDate)}`);
+          sql += ` AND order_date <= $${filterIndex++}`;
+          params.push(filters.toDate);
         }
         
         // Filtros de precio - manejar todos los casos posibles
         if (filters.priceExact && !isNaN(parseFloat(filters.priceExact))) {
           const price = parseFloat(filters.priceExact);
-          conditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) = ${addParam(price)}`);
+          sql += ` AND NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) = $${filterIndex++}`;
+          params.push(price);
         } else {
           if (filters.priceMin && !isNaN(parseFloat(filters.priceMin))) {
             const minPrice = parseFloat(filters.priceMin);
             if (filters.priceIncludeEqual) {
-              conditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) >= ${addParam(minPrice)}`);
+              sql += ` AND NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) >= $${filterIndex++}`;
             } else {
-              conditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) > ${addParam(minPrice)}`);
+              sql += ` AND NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) > $${filterIndex++}`;
             }
+            params.push(minPrice);
           }
           
           if (filters.priceMax && !isNaN(parseFloat(filters.priceMax))) {
             const maxPrice = parseFloat(filters.priceMax);
             if (filters.priceIncludeEqual) {
-              conditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) <= ${addParam(maxPrice)}`);
+              sql += ` AND NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) <= $${filterIndex++}`;
             } else {
-              conditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) < ${addParam(maxPrice)}`);
+              sql += ` AND NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) < $${filterIndex++}`;
             }
+            params.push(maxPrice);
           }
         }
       }
       
-      // Construir la consulta completa
-      let sqlQuery = 'SELECT * FROM excel_data';
-      
-      // Agregar WHERE si hay condiciones
-      if (conditions.length > 0) {
-        sqlQuery += ` WHERE ${conditions.join(' AND ')}`;
-      }
-      
       // Ordenar por fecha de orden descendente
-      sqlQuery += ' ORDER BY order_date DESC';
+      sql += ' ORDER BY order_date DESC';
       
-      console.log("SQL Query:", sqlQuery);
+      console.log("SQL Query:", sql);
       console.log("SQL Params:", params);
       
       // Ejecutar la consulta
-      const result = await db.execute(sqlQuery, params);
+      const result = await db.execute(sql, params);
       
       if (!result.rows || !Array.isArray(result.rows)) {
         console.log("No se encontraron resultados o formato de respuesta inesperado");
