@@ -528,7 +528,7 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     emitFileProcessingStatus(activityId, 'Failed', errorMessage);
     
     // Mover el archivo a la carpeta de errores usando el código de tienda
-    const newPath = await moveProcessedFile(filePath, 'Failed', storeCode);
+    const newPath = await moveProcessedFile(filePath, 'Failed', storeCode, activityId);
     
     // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
     if (newPath) {
@@ -723,7 +723,7 @@ export async function processPdfFile(filePath: string, activityId: number, store
     emitFileProcessingStatus(activityId, 'Failed', errorMessage);
     
     // Mover el archivo a la carpeta de errores usando el código de tienda
-    const newPath = await moveProcessedFile(filePath, 'Failed', storeCode);
+    const newPath = await moveProcessedFile(filePath, 'Failed', storeCode, activityId);
     
     // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
     if (newPath) {
