@@ -1473,7 +1473,15 @@ export class DatabaseStorage implements IStorage {
           
           // Añadir condición de precio sólo si el valor es mayor que cero
           if (numericValue > 0) {
-            numericConditions.push(`(NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) = ${numericValue})`);
+            // Usamos una expresión CASE para prevenir errores con valores no numéricos
+            numericConditions.push(`(
+              NULLIF(price, '') IS NOT NULL 
+              AND TRIM(price) != '' 
+              AND CASE 
+                WHEN TRIM(price) ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(price AS DECIMAL) = ${numericValue}
+                ELSE false
+              END
+            )`);
           }
           
           sqlConditions.push(`(${textConditions.join(' OR ')} OR ${numericConditions.join(' OR ')})`);
@@ -1528,23 +1536,58 @@ export class DatabaseStorage implements IStorage {
         // Filtros de precio - manejar todos los casos posibles
         if (filters.priceExact && !isNaN(parseFloat(filters.priceExact))) {
           const price = parseFloat(filters.priceExact);
-          sqlConditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) = ${price}`);
+          sqlConditions.push(`(
+            NULLIF(price, '') IS NOT NULL 
+            AND TRIM(price) != '' 
+            AND CASE 
+              WHEN TRIM(price) ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(price AS DECIMAL) = ${price}
+              ELSE false
+            END
+          )`);
         } else {
           if (filters.priceMin && !isNaN(parseFloat(filters.priceMin))) {
             const minPrice = parseFloat(filters.priceMin);
             if (filters.priceIncludeEqual) {
-              sqlConditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) >= ${minPrice}`);
+              sqlConditions.push(`(
+                NULLIF(price, '') IS NOT NULL 
+                AND TRIM(price) != '' 
+                AND CASE 
+                  WHEN TRIM(price) ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(price AS DECIMAL) >= ${minPrice}
+                  ELSE false
+                END
+              )`);
             } else {
-              sqlConditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) > ${minPrice}`);
+              sqlConditions.push(`(
+                NULLIF(price, '') IS NOT NULL 
+                AND TRIM(price) != '' 
+                AND CASE 
+                  WHEN TRIM(price) ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(price AS DECIMAL) > ${minPrice}
+                  ELSE false
+                END
+              )`);
             }
           }
           
           if (filters.priceMax && !isNaN(parseFloat(filters.priceMax))) {
             const maxPrice = parseFloat(filters.priceMax);
             if (filters.priceIncludeEqual) {
-              sqlConditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) <= ${maxPrice}`);
+              sqlConditions.push(`(
+                NULLIF(price, '') IS NOT NULL 
+                AND TRIM(price) != '' 
+                AND CASE 
+                  WHEN TRIM(price) ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(price AS DECIMAL) <= ${maxPrice}
+                  ELSE false
+                END
+              )`);
             } else {
-              sqlConditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) < ${maxPrice}`);
+              sqlConditions.push(`(
+                NULLIF(price, '') IS NOT NULL 
+                AND TRIM(price) != '' 
+                AND CASE 
+                  WHEN TRIM(price) ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(price AS DECIMAL) < ${maxPrice}
+                  ELSE false
+                END
+              )`);
             }
           }
         }
