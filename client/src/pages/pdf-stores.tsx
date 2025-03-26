@@ -168,16 +168,7 @@ export default function PdfStoresPage() {
               <Database className="h-4 w-4" />
               <span className="sr-only">Ver documentos</span>
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-8 w-8 p-0"
-              title="Ver archivos"
-              onClick={() => handleViewStoreFiles(store)}
-            >
-              <FileText className="h-4 w-4" />
-              <span className="sr-only">Ver archivos</span>
-            </Button>
+
             <Button 
               variant="outline" 
               size="sm" 
@@ -418,7 +409,7 @@ export default function PdfStoresPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Tiendas PDF</CardTitle>
+              <CardTitle>Tiendas con datos PDF</CardTitle>
               <CardDescription>
                 Lista de tiendas que utilizan archivos PDF
               </CardDescription>
@@ -490,16 +481,7 @@ export default function PdfStoresPage() {
                                   <Database className="h-4 w-4" />
                                   <span className="sr-only">Ver documentos</span>
                                 </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="h-8 w-8 p-0"
-                                  title="Ver archivos"
-                                  onClick={() => handleViewStoreFiles(store)}
-                                >
-                                  <FileText className="h-4 w-4" />
-                                  <span className="sr-only">Ver archivos</span>
-                                </Button>
+
                                 <Button 
                                   variant="outline" 
                                   size="sm" 
