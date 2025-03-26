@@ -170,7 +170,7 @@ export default function StoreManagementPage() {
   // Filtros
   const [codeFilter, setCodeFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
-  const [localityFilter, setLocalityFilter] = useState("");
+  const [localityFilter, setLocalityFilter] = useState("_empty");
   const [districtFilter, setDistrictFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -196,7 +196,7 @@ export default function StoreManagementPage() {
     }
     
     // Filtro por localidad (incluye búsqueda en locality y location para compatibilidad)
-    if (localityFilter) {
+    if (localityFilter && localityFilter !== "_empty") {
       const matchesLocality = store.locality && 
         store.locality.toLowerCase().includes(localityFilter.toLowerCase());
       const matchesLocation = store.location && 
@@ -252,7 +252,7 @@ export default function StoreManagementPage() {
     
     if (codeFilter) filters.push(`Código: ${codeFilter}`);
     if (nameFilter) filters.push(`Nombre: ${nameFilter}`);
-    if (localityFilter) filters.push(`Localidad: ${localityFilter}`);
+    if (localityFilter && localityFilter !== "_empty") filters.push(`Localidad: ${localityFilter}`);
     if (districtFilter) filters.push(`Distrito: ${districtFilter}`);
     if (typeFilter !== "all") filters.push(`Tipo: ${typeFilter}`);
     if (statusFilter !== "all") filters.push(`Estado: ${statusFilter === "active" ? "Activo" : "Inactivo"}`);
@@ -1031,7 +1031,7 @@ export default function StoreManagementPage() {
                         <SelectValue placeholder="Todas las localidades" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todas las localidades</SelectItem>
+                        <SelectItem value="_empty">Todas las localidades</SelectItem>
                         {MADRID_LOCALITIES.map((locality) => (
                           <SelectItem key={locality} value={locality}>
                             {locality}
@@ -1105,7 +1105,7 @@ export default function StoreManagementPage() {
                     onClick={() => {
                       setCodeFilter("");
                       setNameFilter("");
-                      setLocalityFilter("");
+                      setLocalityFilter("_empty");
                       setDistrictFilter("");
                       setTypeFilter("all");
                       setStatusFilter("all");
