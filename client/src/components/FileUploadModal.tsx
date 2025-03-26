@@ -205,34 +205,16 @@ export default function FileUploadModal({ isOpen, onClose, storesByType, fileTyp
           </TabsList>
           
           <TabsContent value="individual" className="space-y-4 pt-4">
-            {fileType === "PDF" ? (
-              <div className="space-y-2">
-                <Label htmlFor="store">Seleccionar Tienda</Label>
-                <Select 
-                  onValueChange={(value) => setSelectedStore(value)}
-                  value={selectedStore || undefined}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccione una tienda" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {storesByType.map(store => (
-                      <SelectItem key={store.id} value={store.code}>
-                        {store.name} ({store.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Carga de Excel</AlertTitle>
-                <AlertDescription>
-                  Para archivos Excel no necesita seleccionar una tienda. La tienda se detectará automáticamente del nombre del archivo.
-                </AlertDescription>
-              </Alert>
-            )}
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Detección automática de tienda</AlertTitle>
+              <AlertDescription>
+                {fileType === "Excel" 
+                  ? "Para archivos Excel no necesita seleccionar una tienda. La tienda se detectará automáticamente del nombre del archivo o del contenido."
+                  : "Para archivos PDF no necesita seleccionar una tienda. La tienda se detectará automáticamente del nombre del archivo."
+                }
+              </AlertDescription>
+            </Alert>
             
             <div className="space-y-2">
               <Label htmlFor="file">Archivo {fileType}</Label>
@@ -254,32 +236,11 @@ export default function FileUploadModal({ isOpen, onClose, storesByType, fileTyp
               <AlertTitle>Modo de carga por lotes</AlertTitle>
               <AlertDescription>
                 Este modo permite subir múltiples archivos a la vez. 
-                {fileType === "Excel" 
-                  ? " Para Excel, el código de tienda se detectará automáticamente de los nombres de archivo."
-                  : " Para PDF, todos se procesarán con la misma tienda seleccionada."}
+                El código de tienda se detectará automáticamente de los nombres de archivo para todos los documentos.
               </AlertDescription>
             </Alert>
             
-            {fileType === "PDF" && (
-              <div className="space-y-2">
-                <Label htmlFor="store-batch">Seleccionar Tienda</Label>
-                <Select 
-                  onValueChange={(value) => setSelectedStore(value)}
-                  value={selectedStore || undefined}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccione una tienda" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {storesByType.map(store => (
-                      <SelectItem key={store.id} value={store.code}>
-                        {store.name} ({store.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+
             
             <div className="space-y-2">
               <Label htmlFor="files">Seleccionar Archivos</Label>
