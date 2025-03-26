@@ -9,6 +9,10 @@ let excelWatcher: chokidar.FSWatcher | null = null;
 let pdfWatcher: chokidar.FSWatcher | null = null;
 let io: Server | null = null;
 
+// Conjunto para mantener el seguimiento de archivos ya procesados
+// y evitar procesamiento duplicado
+const processedFiles = new Set<string>();
+
 // Set up the Socket.IO server
 export function setupSocketIO(server: any) {
   io = new Server(server, {
@@ -111,6 +115,9 @@ export async function stopFileWatchers() {
       pdfWatcher = null;
     }
     
+    // Limpiar el conjunto de archivos procesados cuando se detienen los observadores
+    processedFiles.clear();
+    
     console.log('File watchers stopped');
     emitWatcherStatus(false);
     
@@ -133,6 +140,15 @@ async function ensureDirectoryExists(dir: string) {
 async function handleNewExcelFile(filePath: string) {
   try {
     const filename = path.basename(filePath);
+    
+    // Verificar si el archivo ya ha sido procesado
+    if (processedFiles.has(filePath)) {
+      console.log(`El archivo Excel ${filename} ya fue procesado anteriormente. Omitiendo.`);
+      return;
+    }
+    
+    // Agregar el archivo al conjunto de archivos procesados
+    processedFiles.add(filePath);
     
     // Buscar todas las tiendas y usar la primera que coincida con el nombre del archivo
     const allStores = await storage.getStores();
@@ -247,6 +263,15 @@ async function handleNewExcelFile(filePath: string) {
 async function handleNewPdfFile(filePath: string) {
   try {
     const filename = path.basename(filePath);
+    
+    // Verificar si el archivo ya ha sido procesado
+    if (processedFiles.has(filePath)) {
+      console.log(`El archivo PDF ${filename} ya fue procesado anteriormente. Omitiendo.`);
+      return;
+    }
+    
+    // Agregar el archivo al conjunto de archivos procesados
+    processedFiles.add(filePath);
     
     // Buscar todas las tiendas y usar la primera que coincida con el nombre del archivo
     const allStores = await storage.getStores();
