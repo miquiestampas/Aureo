@@ -4,7 +4,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useSocketStore } from "@/lib/socket";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Card, CardContent, CardHeader, CardTitle 
+  Card, CardContent, CardHeader, CardTitle, CardDescription 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +36,10 @@ import {
   Calendar,
   Search,
   Store as StoreIcon,
-  Filter
+  Filter,
+  FileUp,
+  Files,
+  Loader2
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -84,14 +87,11 @@ export default function PdfStoresPage() {
     enabled: true,
   });
   
-  // Upload file mutation
-  const uploadMutation = useMutation({
-    mutationFn: async () => {
-      if (!uploadFile || !selectedStore) return;
-      
+  // Upload single file mutation
+  const uploadSingleMutation = useMutation({
+    mutationFn: async (file: File) => {
       const formData = new FormData();
-      formData.append("file", uploadFile);
-      formData.append("storeCode", selectedStore);
+      formData.append("file", file);
       
       const response = await fetch("/api/upload/pdf", {
         method: "POST",
@@ -111,7 +111,6 @@ export default function PdfStoresPage() {
         title: "Archivo subido exitosamente",
         description: "El archivo ha sido puesto en cola para su procesamiento.",
       });
-      setUploadDialogOpen(false);
       setUploadFile(null);
       
       // Refetch file activity data after successful upload
@@ -129,25 +128,63 @@ export default function PdfStoresPage() {
     }
   });
   
-  // Handle file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Upload multiple files mutation
+  const uploadMultipleMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append("files", file);
+      });
+      
+      const response = await fetch("/api/upload/pdf/batch", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Error al subir archivos");
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Archivos subidos exitosamente",
+        description: `${data.files.length} archivos han sido puestos en cola para su procesamiento.`,
+      });
+      
+      // Refetch file activity data after successful upload
+      setTimeout(() => {
+        refetchPdfDocs();
+        queryClient.invalidateQueries({ queryKey: ['/api/file-activities'] });
+      }, 1000);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error en la subida",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+  
+  // Handle single file selection and upload
+  const handleSingleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setUploadFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setUploadFile(file);
+      uploadSingleMutation.mutate(file);
     }
   };
   
-  // Handle file upload
-  const handleUpload = () => {
-    if (!uploadFile) {
-      toast({
-        title: "No hay archivo seleccionado",
-        description: "Por favor seleccione un archivo para subir",
-        variant: "destructive",
-      });
-      return;
+  // Handle multiple files selection and upload
+  const handleMultipleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files);
+      uploadMultipleMutation.mutate(files);
     }
-    
-    uploadMutation.mutate();
   };
   
   // Format file size
@@ -366,71 +403,88 @@ export default function PdfStoresPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">Tiendas PDF</h1>
-          
-          <div className="flex space-x-2">
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Subir Archivo PDF
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Subir Documento PDF</DialogTitle>
-                  <DialogDescription>
-                    Suba un documento PDF para la tienda seleccionada.
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="store">Seleccionar Tienda</Label>
-                    <Select 
-                      onValueChange={(value) => setSelectedStore(value)}
-                      value={selectedStore || undefined}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar una tienda" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stores?.filter(store => store.type === "PDF").map(store => (
-                          <SelectItem key={store.id} value={store.code}>
-                            {store.name} ({store.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="file">Archivo PDF</Label>
-                    <Input 
-                      id="file" 
-                      type="file" 
-                      accept=".pdf" 
-                      onChange={handleFileChange}
-                    />
-                    <p className="text-sm text-gray-500">
-                      Sólo se aceptan archivos PDF.
-                    </p>
-                  </div>
+        </div>
+        
+        {/* Upload Modules */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* Single File Upload */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center">
+                <FileUp className="h-5 w-5 mr-2 text-primary" />
+                Subida Individual
+              </CardTitle>
+              <CardDescription>
+                Sube un solo documento PDF que será asociado automáticamente a su tienda.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex flex-col space-y-2">
+                  <Label htmlFor="single-file" className="text-sm font-medium">
+                    Seleccionar un archivo PDF
+                  </Label>
+                  <Input
+                    id="single-file"
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleSingleFileChange}
+                    disabled={uploadSingleMutation.isPending}
+                    className="cursor-pointer"
+                  />
+                  {uploadSingleMutation.isPending && (
+                    <div className="flex items-center mt-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Subiendo archivo...
+                    </div>
+                  )}
                 </div>
-                
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button 
-                    onClick={handleUpload} 
-                    disabled={!selectedStore || !uploadFile || uploadMutation.isPending}
-                  >
-                    {uploadMutation.isPending ? "Subiendo..." : "Subir"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+                <p className="text-xs text-muted-foreground">
+                  El nombre del documento debe contener el código de la tienda o dígitos que permitan identificarla.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Batch File Upload */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center">
+                <Files className="h-5 w-5 mr-2 text-primary" />
+                Subida por Lotes
+              </CardTitle>
+              <CardDescription>
+                Sube múltiples documentos PDF que serán asociados automáticamente a sus tiendas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex flex-col space-y-2">
+                  <Label htmlFor="multiple-files" className="text-sm font-medium">
+                    Seleccionar varios archivos PDF
+                  </Label>
+                  <Input
+                    id="multiple-files"
+                    type="file"
+                    accept=".pdf"
+                    multiple
+                    onChange={handleMultipleFilesChange}
+                    disabled={uploadMultipleMutation.isPending}
+                    className="cursor-pointer"
+                  />
+                  {uploadMultipleMutation.isPending && (
+                    <div className="flex items-center mt-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Subiendo archivos...
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Los nombres de los documentos deben contener los códigos de las tiendas o dígitos que permitan identificarlas.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
         
         {/* Stores Table */}
