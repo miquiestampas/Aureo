@@ -52,6 +52,8 @@ interface Store {
   name: string;
   type: string;
   location: string;
+  district?: string;
+  locality?: string;
   active: boolean;
 }
 
@@ -93,7 +95,12 @@ export default function PdfStoresPage() {
   const filteredStores = stores.filter(store => {
     const matchesCode = store.code.toLowerCase().includes(codeFilter.toLowerCase());
     const matchesName = store.name.toLowerCase().includes(nameFilter.toLowerCase());
-    const matchesLocation = store.location?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false;
+    
+    // Buscar en location, district o locality
+    const matchesLocation = 
+      (store.location?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false) ||
+      (store.district?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false) ||
+      (store.locality?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false);
     
     return (
       (codeFilter === '' || matchesCode) && 
@@ -139,8 +146,21 @@ export default function PdfStoresPage() {
       header: "Nombre",
     },
     {
-      accessorKey: "location",
+      id: "ubicacion",
       header: "Ubicación",
+      cell: ({ row }) => {
+        const store = row.original;
+        if (store.district || store.locality) {
+          return (
+            <div>
+              {store.district && <div>{store.district}</div>}
+              {store.locality && <div className="text-gray-500 text-xs">{store.locality}</div>}
+            </div>
+          );
+        } else {
+          return store.location || "—";
+        }
+      }
     },
     {
       accessorKey: "active",
@@ -462,7 +482,14 @@ export default function PdfStoresPage() {
                               {store.name}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {store.location}
+                              {store.district || store.locality ? (
+                                <div>
+                                  {store.district && <div>{store.district}</div>}
+                                  {store.locality && <div className="text-gray-500 text-xs">{store.locality}</div>}
+                                </div>
+                              ) : (
+                                store.location || "—"
+                              )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               <Badge variant={store.active ? "default" : "destructive"}>

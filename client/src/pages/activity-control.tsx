@@ -45,6 +45,8 @@ interface Store {
   name: string;
   type: StoreType;
   location: string;
+  district?: string;
+  locality?: string;
   active: boolean;
 }
 
