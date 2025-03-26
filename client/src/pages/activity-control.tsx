@@ -157,7 +157,13 @@ export default function ActivityControlPage() {
     
     const matchesCode = store.code.toLowerCase().includes(codeFilter.toLowerCase());
     const matchesName = store.name.toLowerCase().includes(nameFilter.toLowerCase());
-    const matchesLocation = store.location?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false;
+    
+    // Buscar en location, district o locality
+    const matchesLocation = 
+      (store.location?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false) ||
+      (store.district?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false) ||
+      (store.locality?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false);
+    
     const matchesType = typeFilter === "all" || store.type === typeFilter;
     const matchesStatus = statusFilter === "all" || item.status === statusFilter;
     
@@ -214,10 +220,20 @@ export default function ActivityControlPage() {
       }
     },
     {
-      accessorKey: "store.location",
+      id: "ubicacion",
       header: "Ubicación",
       cell: ({ row }) => {
-        return <span>{row.original.store.location}</span>;
+        const store = row.original.store;
+        if (store.district || store.locality) {
+          return (
+            <div>
+              {store.district && <div>{store.district}</div>}
+              {store.locality && <div className="text-gray-500 text-xs">{store.locality}</div>}
+            </div>
+          );
+        } else {
+          return <span>{store.location || "—"}</span>;
+        }
       }
     },
     {
