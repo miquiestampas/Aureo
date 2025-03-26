@@ -440,7 +440,9 @@ export class MemStorage implements IStorage {
   
   // Excel Data Search and Lookup
   async searchExcelData(query: string, filters?: any): Promise<ExcelData[]> {
+    console.log("searchExcelData llamado con:", { query, filters });
     const excelRecords = Array.from(this.excelData.values());
+    console.log(`Total de registros disponibles: ${excelRecords.length}`);
     
     // Filtra los registros basado en una búsqueda de texto
     const filteredBySearch = excelRecords.filter(record => {

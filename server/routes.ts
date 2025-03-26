@@ -514,6 +514,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Excel advanced search route for Purchase Control
   app.post("/api/search/excel-data/advanced", async (req, res, next) => {
     try {
+      console.log("Búsqueda avanzada recibida:", req.body);
+      
       // Extract all filters from the body
       const {
         query = "",
