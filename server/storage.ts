@@ -444,79 +444,140 @@ export class MemStorage implements IStorage {
     const excelRecords = Array.from(this.excelData.values());
     console.log(`Total de registros disponibles: ${excelRecords.length}`);
     
-    // Filtra los registros basado en una búsqueda de texto
-    const filteredBySearch = excelRecords.filter(record => {
+    // Primera etapa de filtrado: prefiltrar por campos específicos si están presentes
+    let prefilteredRecords = excelRecords;
+    
+    if (filters) {
+      // Filtro por campos específicos de la búsqueda avanzada
+      
+      // Filtro por tienda (siempre aplicar primero este filtro si existe)
+      if (filters.storeCode) {
+        prefilteredRecords = prefilteredRecords.filter(record => 
+          record.storeCode === filters.storeCode
+        );
+        console.log(`Filtrado por tienda ${filters.storeCode}: ${prefilteredRecords.length} registros`);
+      }
+      
+      // Filtro por número de orden
+      if (filters.orderNumber) {
+        const orderNumberSearch = filters.orderNumber.toLowerCase();
+        prefilteredRecords = prefilteredRecords.filter(record => 
+          record.orderNumber && record.orderNumber.toLowerCase().includes(orderNumberSearch)
+        );
+        console.log(`Filtrado por número de orden: ${prefilteredRecords.length} registros`);
+      }
+      
+      // Filtro por nombre del cliente
+      if (filters.customerName) {
+        const customerNameSearch = filters.customerName.toLowerCase();
+        prefilteredRecords = prefilteredRecords.filter(record => 
+          record.customerName && record.customerName.toLowerCase().includes(customerNameSearch)
+        );
+        console.log(`Filtrado por nombre del cliente: ${prefilteredRecords.length} registros`);
+      }
+      
+      // Filtro por contacto del cliente
+      if (filters.customerContact) {
+        const customerContactSearch = filters.customerContact.toLowerCase();
+        prefilteredRecords = prefilteredRecords.filter(record => 
+          record.customerContact && record.customerContact.toLowerCase().includes(customerContactSearch)
+        );
+        console.log(`Filtrado por contacto del cliente: ${prefilteredRecords.length} registros`);
+      }
+      
+      // Filtro por detalles del artículo
+      if (filters.itemDetails) {
+        const itemDetailsSearch = filters.itemDetails.toLowerCase();
+        prefilteredRecords = prefilteredRecords.filter(record => 
+          record.itemDetails && record.itemDetails.toLowerCase().includes(itemDetailsSearch)
+        );
+        console.log(`Filtrado por detalles del artículo: ${prefilteredRecords.length} registros`);
+      }
+      
+      // Filtro por metales
+      if (filters.metals) {
+        const metalsSearch = filters.metals.toLowerCase();
+        prefilteredRecords = prefilteredRecords.filter(record => 
+          record.metals && record.metals.toLowerCase().includes(metalsSearch)
+        );
+        console.log(`Filtrado por metales: ${prefilteredRecords.length} registros`);
+      }
+    }
+    
+    // Segunda etapa: aplicar búsqueda general por texto si hay una consulta
+    let filteredBySearch = prefilteredRecords;
+    
+    if (query && query.trim() !== '') {
       const searchTerms = query.toLowerCase();
       
-      // Usar solo los campos de búsqueda especificados o todos por defecto
-      if (filters && filters.searchType) {
-        switch (filters.searchType) {
-          case 'Cliente':
-            return (
-              (filters.searchCustomerName !== false && record.customerName && 
-               record.customerName.toLowerCase().includes(searchTerms)) ||
-              (filters.searchCustomerContact !== false && record.customerContact && 
-               record.customerContact.toLowerCase().includes(searchTerms))
-            );
-          case 'Artículo':
-            return (
-              (filters.searchItemDetails !== false && record.itemDetails && 
-               record.itemDetails.toLowerCase().includes(searchTerms)) ||
-              (filters.searchMetals !== false && record.metals && 
-               record.metals.toLowerCase().includes(searchTerms)) ||
-              (filters.searchStones !== false && record.stones && 
-               record.stones.toLowerCase().includes(searchTerms)) ||
-              (filters.searchEngravings !== false && record.engravings && 
-               record.engravings.toLowerCase().includes(searchTerms))
-            );
-          case 'Orden':
-            return (
-              (record.orderNumber && record.orderNumber.toLowerCase().includes(searchTerms)) ||
-              (record.pawnTicket && record.pawnTicket.toLowerCase().includes(searchTerms))
-            );
-          case 'General':
-          default:
-            // Si es búsqueda general, usar todos los campos o los especificados
-            return (
-              (filters.searchCustomerName !== false && record.customerName && 
-               record.customerName.toLowerCase().includes(searchTerms)) ||
-              (filters.searchCustomerContact !== false && record.customerContact && 
-               record.customerContact.toLowerCase().includes(searchTerms)) ||
-              (record.orderNumber && record.orderNumber.toLowerCase().includes(searchTerms)) ||
-              (filters.searchItemDetails !== false && record.itemDetails && 
-               record.itemDetails.toLowerCase().includes(searchTerms)) ||
-              (filters.searchMetals !== false && record.metals && 
-               record.metals.toLowerCase().includes(searchTerms)) ||
-              (filters.searchStones !== false && record.stones && 
-               record.stones.toLowerCase().includes(searchTerms)) ||
-              (filters.searchEngravings !== false && record.engravings && 
-               record.engravings.toLowerCase().includes(searchTerms)) ||
-              (record.pawnTicket && record.pawnTicket.toLowerCase().includes(searchTerms))
-            );
+      filteredBySearch = prefilteredRecords.filter(record => {
+        // Usar solo los campos de búsqueda especificados o todos por defecto
+        if (filters && filters.searchType) {
+          switch (filters.searchType) {
+            case 'Cliente':
+              return (
+                (filters.searchCustomerName !== false && record.customerName && 
+                record.customerName.toLowerCase().includes(searchTerms)) ||
+                (filters.searchCustomerContact !== false && record.customerContact && 
+                record.customerContact.toLowerCase().includes(searchTerms))
+              );
+            case 'Artículo':
+              return (
+                (filters.searchItemDetails !== false && record.itemDetails && 
+                record.itemDetails.toLowerCase().includes(searchTerms)) ||
+                (filters.searchMetals !== false && record.metals && 
+                record.metals.toLowerCase().includes(searchTerms)) ||
+                (filters.searchStones !== false && record.stones && 
+                record.stones.toLowerCase().includes(searchTerms)) ||
+                (filters.searchEngravings !== false && record.engravings && 
+                record.engravings.toLowerCase().includes(searchTerms))
+              );
+            case 'Orden':
+              return (
+                (record.orderNumber && record.orderNumber.toLowerCase().includes(searchTerms)) ||
+                (record.pawnTicket && record.pawnTicket.toLowerCase().includes(searchTerms))
+              );
+            case 'General':
+            default:
+              // Si es búsqueda general, usar todos los campos o los especificados
+              return (
+                (filters.searchCustomerName !== false && record.customerName && 
+                record.customerName.toLowerCase().includes(searchTerms)) ||
+                (filters.searchCustomerContact !== false && record.customerContact && 
+                record.customerContact.toLowerCase().includes(searchTerms)) ||
+                (record.orderNumber && record.orderNumber.toLowerCase().includes(searchTerms)) ||
+                (filters.searchItemDetails !== false && record.itemDetails && 
+                record.itemDetails.toLowerCase().includes(searchTerms)) ||
+                (filters.searchMetals !== false && record.metals && 
+                record.metals.toLowerCase().includes(searchTerms)) ||
+                (filters.searchStones !== false && record.stones && 
+                record.stones.toLowerCase().includes(searchTerms)) ||
+                (filters.searchEngravings !== false && record.engravings && 
+                record.engravings.toLowerCase().includes(searchTerms)) ||
+                (record.pawnTicket && record.pawnTicket.toLowerCase().includes(searchTerms))
+              );
+          }
+        } else {
+          // Comportamiento por defecto (buscar en todos los campos)
+          return (
+            (record.customerName && record.customerName.toLowerCase().includes(searchTerms)) ||
+            (record.customerContact && record.customerContact.toLowerCase().includes(searchTerms)) ||
+            (record.orderNumber && record.orderNumber.toLowerCase().includes(searchTerms)) ||
+            (record.itemDetails && record.itemDetails.toLowerCase().includes(searchTerms)) ||
+            (record.metals && record.metals.toLowerCase().includes(searchTerms)) ||
+            (record.engravings && record.engravings.toLowerCase().includes(searchTerms)) ||
+            (record.pawnTicket && record.pawnTicket.toLowerCase().includes(searchTerms))
+          );
         }
-      } else {
-        // Comportamiento por defecto (buscar en todos los campos)
-        return (
-          (record.customerName && record.customerName.toLowerCase().includes(searchTerms)) ||
-          (record.customerContact && record.customerContact.toLowerCase().includes(searchTerms)) ||
-          (record.orderNumber && record.orderNumber.toLowerCase().includes(searchTerms)) ||
-          (record.itemDetails && record.itemDetails.toLowerCase().includes(searchTerms)) ||
-          (record.metals && record.metals.toLowerCase().includes(searchTerms)) ||
-          (record.engravings && record.engravings.toLowerCase().includes(searchTerms)) ||
-          (record.pawnTicket && record.pawnTicket.toLowerCase().includes(searchTerms))
-        );
-      }
-    });
+      });
+      
+      console.log(`Filtrado por términos de búsqueda '${searchTerms}': ${filteredBySearch.length} registros`);
+    }
     
-    // Aplicar filtros adicionales si están presentes
+    // Tercera etapa: aplicar filtros de fechas y precios
     let result = filteredBySearch;
     
     if (filters) {
-      // Filtro por tienda
-      if (filters.storeCode) {
-        result = result.filter(record => record.storeCode === filters.storeCode);
-      }
-      
       // Filtro por rango de fechas
       if (filters.fromDate) {
         const fromDate = new Date(filters.fromDate).getTime();
@@ -524,6 +585,7 @@ export class MemStorage implements IStorage {
           const recordDate = new Date(record.orderDate).getTime();
           return recordDate >= fromDate;
         });
+        console.log(`Filtrado por fecha desde ${filters.fromDate}: ${result.length} registros`);
       }
       
       if (filters.toDate) {
@@ -532,9 +594,51 @@ export class MemStorage implements IStorage {
           const recordDate = new Date(record.orderDate).getTime();
           return recordDate <= toDate;
         });
+        console.log(`Filtrado por fecha hasta ${filters.toDate}: ${result.length} registros`);
       }
       
-      // Filtro por rango de precios
+      // Filtro por precio
+      if (filters.price) {
+        const priceValue = parseFloat(filters.price);
+        if (!isNaN(priceValue)) {
+          switch (filters.priceOperator) {
+            case ">":
+              result = result.filter(record => {
+                const recordPrice = parseFloat(record.price.replace(/[^0-9.-]+/g, ""));
+                return !isNaN(recordPrice) && recordPrice > priceValue;
+              });
+              break;
+            case "<":
+              result = result.filter(record => {
+                const recordPrice = parseFloat(record.price.replace(/[^0-9.-]+/g, ""));
+                return !isNaN(recordPrice) && recordPrice < priceValue;
+              });
+              break;
+            case ">=":
+              result = result.filter(record => {
+                const recordPrice = parseFloat(record.price.replace(/[^0-9.-]+/g, ""));
+                return !isNaN(recordPrice) && recordPrice >= priceValue;
+              });
+              break;
+            case "<=":
+              result = result.filter(record => {
+                const recordPrice = parseFloat(record.price.replace(/[^0-9.-]+/g, ""));
+                return !isNaN(recordPrice) && recordPrice <= priceValue;
+              });
+              break;
+            case "=":
+            default:
+              result = result.filter(record => {
+                const recordPrice = parseFloat(record.price.replace(/[^0-9.-]+/g, ""));
+                return !isNaN(recordPrice) && Math.abs(recordPrice - priceValue) < 0.01; // Comparación con tolerancia
+              });
+              break;
+          }
+          console.log(`Filtrado por precio ${filters.priceOperator} ${priceValue}: ${result.length} registros`);
+        }
+      }
+      
+      // Filtro por rango de precios (modo antiguo, mantener por compatibilidad)
       if (filters.priceMin) {
         const minPrice = parseFloat(filters.priceMin);
         if (!isNaN(minPrice)) {
@@ -542,6 +646,7 @@ export class MemStorage implements IStorage {
             const recordPrice = parseFloat(record.price.replace(/[^0-9.-]+/g, ""));
             return !isNaN(recordPrice) && recordPrice >= minPrice;
           });
+          console.log(`Filtrado por precio mínimo ${minPrice}: ${result.length} registros`);
         }
       }
       
@@ -552,14 +657,18 @@ export class MemStorage implements IStorage {
             const recordPrice = parseFloat(record.price.replace(/[^0-9.-]+/g, ""));
             return !isNaN(recordPrice) && recordPrice <= maxPrice;
           });
+          console.log(`Filtrado por precio máximo ${maxPrice}: ${result.length} registros`);
         }
       }
       
       // Filtrar artículos vendidos o no vendidos
       if (filters.includeArchived === false) {
         result = result.filter(record => !record.saleDate);
+        console.log(`Filtrado por no vendidos: ${result.length} registros`);
       }
     }
+    
+    console.log(`Resultado final: ${result.length} registros`);
     
     // Ordenamos por fecha de orden, más reciente primero
     return result.sort((a, b) => {
