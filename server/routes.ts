@@ -259,6 +259,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Descargar archivo original
+  app.get("/api/file-activities/:id/download", async (req, res, next) => {
+    try {
+      const activityId = parseInt(req.params.id);
+      if (isNaN(activityId)) {
+        return res.status(400).json({ message: "ID de actividad inválido" });
+      }
+      
+      const activity = await storage.getFileActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Actividad no encontrada" });
+      }
+      
+      // Determinar la ruta del archivo según el tipo
+      let baseDir;
+      if (activity.fileType === 'Excel') {
+        const config = await storage.getConfig("EXCEL_WATCH_DIR");
+        baseDir = config ? config.value : "./data/excel";
+      } else {
+        const config = await storage.getConfig("PDF_WATCH_DIR");
+        baseDir = config ? config.value : "./data/pdf";
+      }
+      
+      // Construir la ruta completa del archivo
+      const filePath = path.join(baseDir, activity.filename);
+      
+      // Verificar si el archivo existe
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Archivo no encontrado en el sistema" });
+      }
+      
+      // Enviar el archivo como descarga
+      res.download(filePath, activity.filename);
+    } catch (err) {
+      console.error("Error descargando archivo:", err);
+      next(err);
+    }
+  });
+  
+  // Eliminar actividad y datos relacionados
+  app.delete("/api/file-activities/:id", async (req, res, next) => {
+    try {
+      const activityId = parseInt(req.params.id);
+      if (isNaN(activityId)) {
+        return res.status(400).json({ message: "ID de actividad inválido" });
+      }
+      
+      const activity = await storage.getFileActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Actividad no encontrada" });
+      }
+      
+      // Eliminar datos relacionados según el tipo de archivo
+      if (activity.fileType === 'Excel') {
+        await storage.deleteExcelDataByActivityId(activityId);
+      } else if (activity.fileType === 'PDF') {
+        await storage.deletePdfDocumentsByActivityId(activityId);
+      }
+      
+      // Eliminar la actividad en sí
+      const result = await storage.deleteFileActivity(activityId);
+      
+      // Eliminar el archivo físico
+      try {
+        let baseDir;
+        if (activity.fileType === 'Excel') {
+          const config = await storage.getConfig("EXCEL_WATCH_DIR");
+          baseDir = config ? config.value : "./data/excel";
+        } else {
+          const config = await storage.getConfig("PDF_WATCH_DIR");
+          baseDir = config ? config.value : "./data/pdf";
+        }
+        
+        const filePath = path.join(baseDir, activity.filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (fileErr) {
+        console.warn("No se pudo eliminar el archivo físico:", fileErr);
+        // No detener la operación si el archivo no se puede eliminar
+      }
+      
+      res.json({ success: result, message: "Actividad eliminada correctamente" });
+    } catch (err) {
+      console.error("Error eliminando actividad:", err);
+      next(err);
+    }
+  });
+  
   // Excel data routes
   app.get("/api/excel-data", async (req, res, next) => {
     try {

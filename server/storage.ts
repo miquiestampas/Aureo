@@ -1192,6 +1192,48 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
+  async deleteFileActivity(id: number): Promise<boolean> {
+    try {
+      const result = await db
+        .delete(fileActivities)
+        .where(eq(fileActivities.id, id))
+        .returning({ id: fileActivities.id });
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error al eliminar la actividad de archivo ${id}:`, error);
+      return false;
+    }
+  }
+  
+  async deleteExcelDataByActivityId(activityId: number): Promise<boolean> {
+    try {
+      const result = await db
+        .delete(excelData)
+        .where(eq(excelData.fileActivityId, activityId))
+        .returning({ id: excelData.id });
+      
+      return true; // Consideramos exitoso incluso si no hay registros, ya que el objetivo es eliminarlos
+    } catch (error) {
+      console.error(`Error al eliminar datos de Excel por activityId ${activityId}:`, error);
+      return false;
+    }
+  }
+  
+  async deletePdfDocumentsByActivityId(activityId: number): Promise<boolean> {
+    try {
+      const result = await db
+        .delete(pdfDocuments)
+        .where(eq(pdfDocuments.fileActivityId, activityId))
+        .returning({ id: pdfDocuments.id });
+      
+      return true; // Consideramos exitoso incluso si no hay registros, ya que el objetivo es eliminarlos
+    } catch (error) {
+      console.error(`Error al eliminar documentos PDF por activityId ${activityId}:`, error);
+      return false;
+    }
+  }
+  
   async getRecentFileActivities(limit: number): Promise<FileActivity[]> {
     return await db
       .select()

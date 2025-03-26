@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useSocketStore } from "@/lib/socket";
 import { 
@@ -8,6 +8,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Building2,
   FileSpreadsheet,
@@ -16,7 +19,8 @@ import {
   Download,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Trash2
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -70,6 +74,49 @@ export default function DashboardPage() {
       }
     }
   }, [recentEvents, refetchActivities, refetchStatus]);
+  
+  // Toast para mensajes al usuario
+  const { toast } = useToast();
+  
+  // Mutación para eliminar actividad de archivo
+  const deleteActivityMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/file-activities/${id}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error al eliminar el archivo");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Archivo eliminado",
+        description: "El archivo ha sido eliminado correctamente",
+        variant: "default",
+      });
+      // Actualizar datos
+      refetchActivities();
+      refetchStatus();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error al eliminar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Manejador para descargar archivo
+  const handleDownload = (id: number) => {
+    // Redireccionar a la URL de descarga
+    window.open(`/api/file-activities/${id}/download`, '_blank');
+  };
+
+  // Manejador para eliminar archivo
+  const handleDelete = (id: number) => {
+    deleteActivityMutation.mutate(id);
+  };
   
   // Columns for activities table
   const columns: ColumnDef<FileActivity>[] = [
@@ -160,10 +207,45 @@ export default function DashboardPage() {
       header: "",
       cell: ({ row }) => {
         return (
-          <div className="text-right">
-            <Button variant="link" size="sm" className="text-primary hover:text-primary/90">
-              Ver
+          <div className="flex justify-end space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              onClick={() => handleDownload(row.original.id)}
+            >
+              <Download className="h-4 w-4" />
             </Button>
+            
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  disabled={deleteActivityMutation.isPending}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción eliminará permanentemente el archivo <span className="font-medium">{row.original.filename}</span> y todos los datos relacionados.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction 
+                    className="bg-red-600 hover:bg-red-700"
+                    onClick={() => handleDelete(row.original.id)}
+                  >
+                    Eliminar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         );
       }
