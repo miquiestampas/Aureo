@@ -689,14 +689,16 @@ export async function processPdfFile(filePath: string, activityId: number, store
     
     // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
     if (newPath) {
-      // Actualizar también la ruta del documento PDF en la base de datos
-      await storage.updateFileActivity(activityId, { metadata: { movedTo: newPath } });
+      // Actualizar solo la actividad, ya que el documento PDF mantiene su ruta original en la BD
+      await storage.updateFileActivity(activityId, { 
+        metadata: { 
+          movedTo: newPath,
+          processedSuccessfully: true 
+        } 
+      });
       
-      // Actualizar también la referencia en el documento PDF
-      const pdfDocs = await storage.getPdfDocumentsByFileActivity(activityId);
-      if (pdfDocs.length > 0) {
-        await storage.updatePdfDocument(pdfDocs[0].id, { path: newPath });
-      }
+      // No es necesario actualizar el documento en la BD, ya que su ruta es la original
+      // y solo cambia físicamente su ubicación
     }
     
     console.log(`Successfully processed PDF file ${path.basename(filePath)}`);

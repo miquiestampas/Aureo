@@ -300,8 +300,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const searchStones = req.query.searchStones !== 'false';
       const searchEngravings = req.query.searchEngravings !== 'false';
       
-      if (!searchTerms || searchTerms.length < 2) {
-        return res.status(400).json({ error: "Los términos de búsqueda deben tener al menos 2 caracteres" });
+      // Asegurarse de que al menos haya algún criterio para la búsqueda
+      // Si no hay términos de búsqueda, debe haber al menos una fecha, precio o tienda seleccionada
+      if (!searchTerms && !storeCode && !fromDate && !toDate && !priceMin && !priceMax) {
+        return res.status(400).json({ 
+          error: "Debe especificar al menos un criterio de búsqueda: términos, tienda, fechas o precio" 
+        });
       }
       
       // Construct filters object

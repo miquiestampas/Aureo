@@ -1211,43 +1211,93 @@ export class DatabaseStorage implements IStorage {
     return document;
   }
   
-  // Nuevos métodos de ExcelData para búsqueda
-  async searchExcelData(query: string, filters?: any): Promise<ExcelData[]> {
-    const searchQuery = `%${query}%`;
+  // Métodos de ExcelData para búsqueda
+  async searchExcelData(query: string | null, filters?: any): Promise<ExcelData[]> {
     let baseQuery = db
       .select()
       .from(excelData);
-      
-    // Aplicar búsqueda por texto en múltiples campos
-    baseQuery = baseQuery.where(
-      or(
-        like(excelData.customerName, searchQuery),
-        like(excelData.customerContact, searchQuery),
-        like(excelData.orderNumber, searchQuery),
-        like(excelData.itemDetails, searchQuery),
-        like(excelData.metals, searchQuery),
-        like(excelData.engravings, searchQuery),
-        like(excelData.pawnTicket, searchQuery)
-      )
-    );
     
-    // Aplicar filtros adicionales si están presentes
-    if (filters) {
-      if (filters.storeCode) {
-        baseQuery = baseQuery.where(eq(excelData.storeCode, filters.storeCode));
-      }
+    let hasCondition = false;
+    
+    // Aplicar búsqueda por texto si hay query
+    if (query && query.trim().length > 0) {
+      const searchQuery = `%${query}%`;
       
-      if (filters.dateFrom && filters.dateTo) {
-        baseQuery = baseQuery.where(
-          and(
-            gte(excelData.orderDate, filters.dateFrom),
-            lte(excelData.orderDate, filters.dateTo)
-          )
-        );
+      // Determinar en qué campos buscar
+      const fieldsToSearch = [];
+      
+      // Por defecto buscar en todos los campos, a menos que se especifique lo contrario
+      const searchCustomerName = !filters || filters.searchCustomerName !== false;
+      const searchCustomerContact = !filters || filters.searchCustomerContact !== false;
+      const searchItemDetails = !filters || filters.searchItemDetails !== false;
+      const searchMetals = !filters || filters.searchMetals !== false;
+      const searchEngravings = !filters || filters.searchEngravings !== false;
+      const searchStones = !filters || filters.searchStones !== false;
+      
+      // Añadir los campos correspondientes
+      if (searchCustomerName) fieldsToSearch.push(like(excelData.customerName, searchQuery));
+      if (searchCustomerContact) fieldsToSearch.push(like(excelData.customerContact, searchQuery));
+      fieldsToSearch.push(like(excelData.orderNumber, searchQuery));
+      if (searchItemDetails) fieldsToSearch.push(like(excelData.itemDetails, searchQuery));
+      if (searchMetals) fieldsToSearch.push(like(excelData.metals, searchQuery));
+      if (searchEngravings) fieldsToSearch.push(like(excelData.engravings, searchQuery));
+      if (searchStones) fieldsToSearch.push(like(excelData.stones, searchQuery));
+      fieldsToSearch.push(like(excelData.pawnTicket, searchQuery));
+      
+      // Aplicar condición OR con todos los campos
+      if (fieldsToSearch.length > 0) {
+        baseQuery = baseQuery.where(or(...fieldsToSearch));
+        hasCondition = true;
       }
     }
     
-    return await baseQuery.orderBy(desc(excelData.orderDate));
+    // Aplicar filtros adicionales si están presentes
+    if (filters) {
+      // Filtrar por tienda si se especifica
+      if (filters.storeCode && filters.storeCode !== 'all') {
+        baseQuery = baseQuery.where(eq(excelData.storeCode, filters.storeCode));
+        hasCondition = true;
+      }
+      
+      // Filtrar por fechas
+      if (filters.fromDate) {
+        baseQuery = baseQuery.where(gte(excelData.orderDate, new Date(filters.fromDate)));
+        hasCondition = true;
+      }
+      
+      if (filters.toDate) {
+        baseQuery = baseQuery.where(lte(excelData.orderDate, new Date(filters.toDate)));
+        hasCondition = true;
+      }
+      
+      // Filtrar por precio mínimo
+      if (filters.priceMin && !isNaN(parseFloat(filters.priceMin))) {
+        const minPrice = parseFloat(filters.priceMin);
+        // Necesitamos convertir ambos a número para comparar correctamente
+        baseQuery = baseQuery.where(
+          sql`CAST(${excelData.price} AS DECIMAL) >= ${minPrice}`
+        );
+        hasCondition = true;
+      }
+      
+      // Filtrar por precio máximo
+      if (filters.priceMax && !isNaN(parseFloat(filters.priceMax))) {
+        const maxPrice = parseFloat(filters.priceMax);
+        baseQuery = baseQuery.where(
+          sql`CAST(${excelData.price} AS DECIMAL) <= ${maxPrice}`
+        );
+        hasCondition = true;
+      }
+    }
+    
+    // Si no hay condiciones, limitar a 200 resultados recientes para evitar sobrecarga
+    if (!hasCondition) {
+      baseQuery = baseQuery.orderBy(desc(excelData.orderDate)).limit(200);
+    } else {
+      baseQuery = baseQuery.orderBy(desc(excelData.orderDate));
+    }
+    
+    return await baseQuery;
   }
   
   async getExcelDataById(id: number): Promise<ExcelData | undefined> {
