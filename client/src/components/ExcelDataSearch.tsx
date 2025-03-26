@@ -92,13 +92,17 @@ interface ExcelDataSearchProps {
 // Definir el esquema de validación para la búsqueda
 const searchSchema = z.object({
   searchType: z.enum(["General", "Cliente", "Artículo", "Orden"]).default("General"),
-  searchTerms: z.string().min(2, { message: "Los términos de búsqueda deben tener al menos 2 caracteres" }),
+  searchTerms: z.string().optional().refine(val => {
+    // Si no hay términos de búsqueda, debe haber al menos un filtro (tienda, fecha o precio)
+    if (!val || val.length < 1) return true; // Ya verificaremos la condición completa en onSubmit
+    return val.length >= 1;
+  }, { message: "Ingrese al menos 1 carácter o use los filtros de tienda, fecha o precio" }),
   storeCode: z.string().optional(),
   fromDate: z.date().optional(),
   toDate: z.date().optional(),
   priceMin: z.string().optional(),
   priceMax: z.string().optional(),
-  includeArchived: z.boolean().default(false),
+  // Eliminamos la opción de incluir archivados - siempre estarán incluidos
   searchCustomerName: z.boolean().default(true),
   searchCustomerContact: z.boolean().default(true),
   searchItemDetails: z.boolean().default(true),

@@ -170,40 +170,76 @@ function validateDate(dateValue: any): Date {
 
 // Función para procesar los valores de una fila y crear una entrada InsertExcelData
 function createExcelDataFromValues(values: any[], storeCode: string, activityId: number): InsertExcelData {
-  // Procesar fecha de orden con validación
-  const orderDate = validateDate(values[2]);
+  console.log(`Procesando valores para Excel: ${JSON.stringify(values)}`);
   
-  // Procesar fecha de venta con validación
-  let saleDate: Date | null = null;
-  if (values[12]) {
-    try {
-      const date = new Date(values[12]);
-      if (!isNaN(date.getTime())) {
-        saleDate = date;
-      }
-    } catch (error) {
-      console.warn(`Error al procesar fecha de venta: ${values[12]}, usando null`, error);
-    }
-  }
-  
-  // Usar el código de tienda de la celda A1 (values[0]) si está disponible
+  // Columna A: Código de tienda
   const excelStoreCode = values[0]?.toString() || '';
   const finalStoreCode = excelStoreCode || storeCode;
   
+  if (excelStoreCode) {
+    console.log(`Excel file has store code ${excelStoreCode} in cell A2`);
+  }
+  
+  // Columna B: Número de orden
+  const orderNumber = values[1]?.toString() || '';
+  
+  // Columna C: Fecha de orden
+  const orderDate = validateDate(values[2]);
+  
+  // Columna D: Nombre del cliente
+  const customerName = values[3]?.toString() || '';
+  
+  // Columna E: Contacto del cliente (DNI/Pasaporte)
+  const customerContact = values[4]?.toString() || '';
+  
+  // Columna H: Objeto (Detalles del artículo)
+  const itemDetails = values[7]?.toString() || '';
+  
+  // Columna J: Clase de metal
+  const metals = values[9]?.toString() || '';
+  
+  // Columna K: Grabaciones/Número de serie
+  const engravings = values[10]?.toString() || '';
+  
+  // Columna L: Piedras/Kilates
+  const stones = values[11]?.toString() || '';
+  
+  // Quilates, extraemos del mismo campo que piedras
+  const carats = values[11]?.toString() || '';
+  
+  // Columna M: Precio
+  const price = values[12]?.toString() || '';
+  
+  // Columna N: Empeño (Boleta)
+  const pawnTicket = values[13]?.toString() || '';
+  
+  // Columna O: Fecha de venta
+  let saleDate: Date | null = null;
+  if (values[14]) {
+    try {
+      const date = validateDate(values[14]);
+      if (date) {
+        saleDate = date;
+      }
+    } catch (error) {
+      console.warn(`Error al procesar fecha de venta: ${values[14]}, usando null`, error);
+    }
+  }
+  
   return {
-    storeCode: finalStoreCode, // Usar el código de tienda de A1 o el proporcionado si A1 está vacío
-    orderNumber: values[1]?.toString() || '', // Columna B
-    orderDate: orderDate, // Columna C (validada)
-    customerName: values[3]?.toString() || '', // Columna D
-    customerContact: values[4]?.toString() || '', // Columna E
-    itemDetails: values[5]?.toString() || '', // Columna F
-    metals: values[6]?.toString() || '', // Columna G
-    engravings: values[7]?.toString() || '', // Columna H
-    stones: values[8]?.toString() || '', // Columna I
-    carats: values[9]?.toString() || '', // Columna J
-    price: values[10]?.toString() || '', // Columna K
-    pawnTicket: values[11]?.toString() || '', // Columna L
-    saleDate: saleDate, // Columna M (validada)
+    storeCode: finalStoreCode,
+    orderNumber: orderNumber,
+    orderDate: orderDate,
+    customerName: customerName,
+    customerContact: customerContact,
+    itemDetails: itemDetails,
+    metals: metals,
+    engravings: engravings,
+    stones: stones,
+    carats: carats,
+    price: price,
+    pawnTicket: pawnTicket,
+    saleDate: saleDate,
     fileActivityId: activityId
   };
 }
