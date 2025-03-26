@@ -169,76 +169,111 @@ function validateDate(dateValue: any): Date {
 }
 
 // Función para procesar los valores de una fila y crear una entrada InsertExcelData
-// Mapeo de columnas:
+// Mapeo correcto de columnas:
 // A=código tienda, B=número de orden, C=fecha, D=nombre cliente, E=DNI/pasaporte, 
 // F=dirección, G=provincia/país, H=objeto, I=peso, J=clase de metal, 
 // K=grabaciones/nº serie, L=piedras/kilates, M=precio, N=empeño, O=fecha venta
-function createExcelDataFromValues(values: any[], storeCode: string, activityId: number): InsertExcelData {
+function createExcelDataFromValues(values: any[], storeCode: string, activityId: number): InsertExcelData | null {
   console.log(`Procesando valores para Excel: ${JSON.stringify(values)}`);
   
+  // Si los valores son null, undefined o un array vacío, retornar null
+  if (!values || !Array.isArray(values) || values.length < 4) {
+    console.log("Ignorando fila con datos insuficientes");
+    return null;
+  }
+  
   // Columna A: Código de tienda
-  const excelStoreCode = values[0]?.toString() || '';
+  const excelStoreCode = values[0]?.toString().trim() || '';
+  // Si no tenemos código de tienda en la celda ni como parámetro, no podemos procesar la fila
   const finalStoreCode = excelStoreCode || storeCode;
+  if (!finalStoreCode) {
+    console.log("Ignorando fila sin código de tienda");
+    return null;
+  }
   
   if (excelStoreCode) {
     console.log(`Excel file has store code ${excelStoreCode} in cell A2`);
   }
   
   // Columna B: Número de orden
-  const orderNumber = values[1]?.toString() || '';
+  const orderNumber = values[1]?.toString().trim() || '';
+  if (!orderNumber) {
+    console.log("Ignorando fila sin número de orden");
+    return null;
+  }
   
   // Columna C: Fecha de orden
-  const orderDate = validateDate(values[2]);
+  let orderDate;
+  try {
+    orderDate = validateDate(values[2]);
+    if (!values[2] || isNaN(orderDate.getTime())) {
+      console.log("Ignorando fila sin fecha de orden válida");
+      return null;
+    }
+  } catch (error) {
+    console.log("Ignorando fila con fecha de orden inválida");
+    return null;
+  }
   
   // Columna D: Nombre del cliente
-  const customerName = values[3]?.toString() || '';
+  const customerName = values[3]?.toString().trim() || '';
+  if (!customerName) {
+    console.log("Ignorando fila sin nombre del cliente");
+    return null;
+  }
   
   // Columna E: Contacto del cliente (DNI/Pasaporte)
-  const customerContact = values[4]?.toString() || '';
+  const customerContact = values[4]?.toString().trim() || '';
   
   // Columna F y G: Dirección y Provincia (guardamos información combinada en un campo)
   const addressInfo = [
-    values[5]?.toString() || '', // Dirección
-    values[6]?.toString() || ''  // Provincia/país
+    values[5]?.toString().trim() || '', // Dirección
+    values[6]?.toString().trim() || ''  // Provincia/país
   ].filter(Boolean).join(', ');
   
   // Columna H: Objeto (Detalles del artículo)
-  const itemDetails = values[7]?.toString() || '';
+  const itemDetails = values[7]?.toString().trim() || '';
   
   // Columna I: Peso
-  const weight = values[8]?.toString() || '';
+  const weight = values[8]?.toString().trim() || '';
   
   // Columna J: Clase de metal
-  const metals = values[9]?.toString() || '';
+  const metals = values[9]?.toString().trim() || '';
   
   // Columna K: Grabaciones/Número de serie
-  const engravings = values[10]?.toString() || '';
+  const engravings = values[10]?.toString().trim() || '';
   
   // Columna L: Piedras/Kilates
-  const stones = values[11]?.toString() || '';
+  const stones = values[11]?.toString().trim() || '';
   
   // Quilates, extraemos del mismo campo que piedras o procesamos si está separado
-  const carats = stones.match(/(\d+(\.\d+)?)\s*[kK]/) ? 
+  const carats = stones && stones.match(/(\d+(\.\d+)?)\s*[kK]/) ? 
                 stones.match(/(\d+(\.\d+)?)\s*[kK]/)![1] : 
                 '';
   
   // Columna M: Precio
-  const price = values[12]?.toString() || '';
+  const price = values[12]?.toString().trim() || '';
   
   // Columna N: Empeño (Boleta)
-  const pawnTicket = values[13]?.toString() || '';
+  const pawnTicket = values[13]?.toString().trim() || '';
   
   // Columna O: Fecha de venta
   let saleDate: Date | null = null;
   if (values[14]) {
     try {
       const date = validateDate(values[14]);
-      if (date) {
+      if (date && !isNaN(date.getTime())) {
         saleDate = date;
       }
     } catch (error) {
       console.warn(`Error al procesar fecha de venta: ${values[14]}, usando null`, error);
     }
+  }
+  
+  // Verificación final: la fila debe tener al menos los campos obligatorios
+  if (!finalStoreCode || !orderNumber || !orderDate || !customerName) {
+    console.log("Ignorando fila sin datos obligatorios (código tienda, número de orden, fecha, nombre cliente)");
+    return null;
   }
   
   return {
@@ -329,7 +364,10 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         // Extraer valores de las columnas en orden
         const values = Object.values(row);
         console.log("CSV row values:", values);
-        processedRows.push(createExcelDataFromValues(values, storeCode, activityId));
+        const excelData = createExcelDataFromValues(values, storeCode, activityId);
+        if (excelData) {
+          processedRows.push(excelData);
+        }
       });
     } 
     else if (fileExt === '.xls') {
@@ -357,7 +395,10 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         const row = jsonData[i] as any[];
         if (row.length > 0) {
           console.log("XLS row values:", row);
-          processedRows.push(createExcelDataFromValues(row, storeCode, activityId));
+          const excelData = createExcelDataFromValues(row, storeCode, activityId);
+          if (excelData) {
+            processedRows.push(excelData);
+          }
         }
       }
     } 
@@ -384,7 +425,10 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         if (rowNumber === 1) return;
         
         const values = row.values as any[];
-        processedRows.push(createExcelDataFromValues(values, storeCode, activityId));
+        const excelData = createExcelDataFromValues(values, storeCode, activityId);
+        if (excelData) {
+          processedRows.push(excelData);
+        }
       });
     }
     
