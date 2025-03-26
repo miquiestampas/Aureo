@@ -88,7 +88,9 @@ const storeFormSchema = z.object({
   code: z.string().min(2, "El código debe tener al menos 2 caracteres").max(20, "El código debe tener máximo 20 caracteres"),
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   type: z.enum(["Excel", "PDF"]),
-  location: z.string().optional(),
+  location: z.string().optional(), // Campo antiguo (mantenido para compatibilidad)
+  district: z.string().optional(), // Nuevo campo DISTRITO
+  locality: z.string().optional(), // Nuevo campo LOCALIDAD
   active: z.boolean().default(true),
   // Nuevos campos
   address: z.string().optional(),
