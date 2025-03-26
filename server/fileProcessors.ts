@@ -525,35 +525,33 @@ export async function processPdfFile(filePath: string, activityId: number, store
       throw new Error(`File ${filePath} does not exist`);
     }
     
-    // Extraer el nombre del archivo para la detección de tienda
-    const filename = path.basename(filePath);
+    // NOMBRE DEL ARCHIVO = CÓDIGO DE TIENDA
+    // Extraer el nombre base del archivo sin la extensión
+    const originalFilename = path.basename(filePath);
+    const filenameWithoutExt = path.basename(originalFilename, path.extname(originalFilename));
     
-    // Intentar extraer código de tienda del nombre del archivo PDF
-    let pdfStoreCode = '';
+    // Usar el nombre del archivo como código de tienda (sin incluir timestamp o números aleatorios)
+    // Si hay guiones o underscores, usar solo la primera parte
+    let pdfStoreCode = filenameWithoutExt.split(/[-_]/)[0];
     
-    // 1. Buscar por patrón J12345ABCDE (formato común que comienza con J seguido de números y letras)
-    const j_pattern = /\b(J\d{5}[A-Z0-9]{4,5})\b/i;
-    const j_match = filename.match(j_pattern);
-      
-    if (j_match && j_match[1]) {
-      pdfStoreCode = j_match[1];
+    // Eliminar cualquier UNKNOWN_ prefijo si existe
+    if (pdfStoreCode.startsWith('UNKNOWN_')) {
+      pdfStoreCode = pdfStoreCode.substring(8);
     }
-    // 2. Intentar formato general de códigos: LETRA+NÚMEROS o NÚMEROS+LETRA
+    
+    console.log(`Usando nombre de archivo como código de tienda: ${pdfStoreCode}`);
+    
+    // Si el nombre original ya tiene números, usarlo directamente
+    if (pdfStoreCode.match(/\d/)) {
+      // Ya tenemos un código válido
+    } 
+    // Caso de fallback: buscar códigos específicos
     else {
-      const general_pattern = /\b([A-Z]\d{1,6}|J\d{2,6}[a-z]{1,3})\b/i;
-      const general_match = filename.match(general_pattern);
-        
-      if (general_match && general_match[1]) {
-        pdfStoreCode = general_match[1];
-      }
-      // 3. Intentar el formato común de tiendas en el sistema
-      else {
-        const known_stores = ['Montera', 'Central', 'Plaza', 'Norte', 'Sur'];
-        for (const knownStore of known_stores) {
-          if (filename.toLowerCase().includes(knownStore.toLowerCase())) {
-            pdfStoreCode = knownStore;
-            break;
-          }
+      const known_stores = ['Montera', 'Central', 'Plaza', 'Norte', 'Sur'];
+      for (const knownStore of known_stores) {
+        if (originalFilename.toLowerCase().includes(knownStore.toLowerCase())) {
+          pdfStoreCode = knownStore;
+          break;
         }
       }
     }

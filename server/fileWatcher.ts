@@ -259,87 +259,54 @@ async function handleNewExcelFile(filePath: string) {
 async function handleNewPdfFile(filePath: string) {
   try {
     const filename = path.basename(filePath);
+    const filenameWithoutExt = path.basename(filename, path.extname(filename));
     
-    // Buscar todas las tiendas y usar la primera que coincida con el nombre del archivo
-    const allStores = await storage.getStores();
-    let foundStore = null;
+    // NOMBRE DEL ARCHIVO = CÓDIGO DE TIENDA
+    // Extraer el nombre base del archivo sin la extensión y usar como código de tienda
     
-    // Extraer todos los dígitos del nombre del archivo
-    const fileDigits = filename.match(/\d+/g) || [];
-    console.log(`Extracted digits from filename ${filename}:`, fileDigits);
+    // Si hay guiones o underscores, usar solo la primera parte
+    let storeCode = filenameWithoutExt.split(/[-_]/)[0];
     
-    // Buscar coincidencia parcial basada en los dígitos del nombre del archivo
-    if (fileDigits.length > 0) {
+    // Eliminar cualquier UNKNOWN_ prefijo si existe
+    if (storeCode.startsWith('UNKNOWN_')) {
+      storeCode = storeCode.substring(8);
+    }
+    
+    console.log(`Using filename as store code: ${storeCode}`);
+    
+    // Buscar la tienda por código exacto
+    let foundStore = await storage.getStoreByCode(storeCode);
+    
+    // Si no se encuentra la tienda por código, buscar todas las tiendas y usar la primera que coincida
+    if (!foundStore) {
+      console.log(`Store with code ${storeCode} not found, looking for similar matches`);
+      
+      // Buscar todas las tiendas PDF
+      const allStores = await storage.getStores();
       const pdfStores = allStores.filter(store => store.type === 'PDF');
       
-      // Ordenamos las tiendas por longitud de código (más largo primero) para favorecer coincidencias más específicas
-      const sortedStores = pdfStores.sort((a, b) => b.code.length - a.code.length);
+      // Si el nombre tiene números, buscar coincidencia parcial basada en los dígitos
+      const fileDigits = storeCode.match(/\d+/g) || [];
       
-      for (const store of sortedStores) {
-        // Extraer los dígitos del código de la tienda
-        const storeDigits = store.code.match(/\d+/g) || [];
+      if (fileDigits.length > 0) {
+        console.log(`Extracted digits from filename ${filename}:`, fileDigits);
         
-        // Comprobar si alguno de los grupos de dígitos del archivo contiene alguno de los grupos de dígitos de la tienda
-        const matchFound = storeDigits.some(storeDigit => 
-          fileDigits.some(fileDigit => fileDigit.includes(storeDigit) || storeDigit.includes(fileDigit))
-        );
+        // Ordenamos las tiendas por longitud de código (más largo primero)
+        const sortedStores = pdfStores.sort((a, b) => b.code.length - a.code.length);
         
-        if (matchFound) {
-          foundStore = store;
-          console.log(`PDF matched with store by digit comparison: ${store.code}`);
-          break;
-        }
-      }
-    }
-    
-    // Si no se encontró coincidencia por dígitos, intentar coincidencia exacta por código
-    if (!foundStore) {
-      for (const store of allStores) {
-        if (filename.includes(store.code)) {
-          foundStore = store;
-          console.log(`PDF matched with store by exact code: ${store.code}`);
-          break;
-        }
-      }
-    }
-    
-    // Si todavía no se encontró coincidencia, intentar con expresiones regulares
-    if (!foundStore) {
-      // Estrategias para extraer el código de tienda del nombre del archivo
-      let storeCode = '';
-      
-      // 1. Buscar por patrón J12345ABCDE (formato común que comienza con J seguido de números y letras)
-      const j_pattern = /\b(J\d{5}[A-Z0-9]{4,5})\b/i;
-      const j_match = filename.match(j_pattern);
-      
-      if (j_match && j_match[1]) {
-        storeCode = j_match[1];
-      }
-      // 2. Intentar formato general de códigos: LETRA+NÚMEROS o NÚMEROS+LETRA
-      else {
-        const general_pattern = /\b([A-Z]\d{1,6}|J\d{2,6}[a-z]{1,3})\b/i;
-        const general_match = filename.match(general_pattern);
-        
-        if (general_match && general_match[1]) {
-          storeCode = general_match[1];
-        }
-        // 3. Intentar el formato STORECODE_*.pdf
-        else {
-          const formatMatch = filename.match(/^([^_\.]+)_/);
-          if (formatMatch && formatMatch[1]) {
-            storeCode = formatMatch[1];
-          } 
-          // 4. Intentar el formato STORECODE.*.pdf
-          else {
-            const dotMatch = filename.match(/^([^\.]+)\./);
-            if (dotMatch && dotMatch[1]) {
-              storeCode = dotMatch[1];
-            }
-            // 5. Si no se encontró ningún patrón, usar el nombre completo sin extensión como código
-            else {
-              const nameWithoutExtension = path.parse(filename).name;
-              storeCode = nameWithoutExtension;
-            }
+        for (const store of sortedStores) {
+          // Extraer los dígitos del código de la tienda
+          const storeDigits = store.code.match(/\d+/g) || [];
+          
+          // Comprobar si alguno de los grupos de dígitos del archivo contiene alguno de los grupos de dígitos de la tienda
+          const matchFound = storeDigits.some(storeDigit => 
+            fileDigits.some(fileDigit => fileDigit.includes(storeDigit) || storeDigit.includes(fileDigit))
+          );
+          
+          if (matchFound) {
+            foundStore = store;
+            console.log(`PDF matched with store by digit comparison: ${store.code}`);
+            break;
           }
         }
       }
@@ -385,7 +352,8 @@ async function handleNewPdfFile(filePath: string) {
       return;
     }
     
-    const storeCode = foundStore.code;
+    // Actualizar el código de tienda con el código de la tienda encontrada
+    storeCode = foundStore.code;
     console.log(`PDF file ${filename} will be processed for store: ${storeCode}`);
     
     // Crear actividad de archivo
