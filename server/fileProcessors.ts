@@ -1,8 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 import { storage } from './storage';
+import { db } from './db';
 import { emitFileProcessingStatus } from './fileWatcher';
-import { InsertExcelData, InsertPdfDocument, InsertAlert, ExcelData } from '@shared/schema';
+import { InsertExcelData, InsertPdfDocument, InsertAlert, ExcelData, pdfDocuments } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 import { promisify } from 'util';
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
@@ -600,7 +602,12 @@ export async function processPdfFile(filePath: string, activityId: number, store
     const dataBuffer = await fs.promises.readFile(filePath);
     
     // Extract basic info
-    const title = path.basename(filePath, '.pdf');
+    let title = path.basename(filePath, '.pdf');
+    // Eliminar cualquier prefijo UNKNOWN_ si existe
+    if (title.startsWith('UNKNOWN_')) {
+      title = title.substring(8);
+    }
+    
     const fileStats = await fs.promises.stat(filePath);
     const fileSize = fileStats.size;
     
@@ -652,7 +659,7 @@ export async function processPdfFile(filePath: string, activityId: number, store
     
     // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
     if (newPath) {
-      // Actualizar solo la actividad, ya que el documento PDF mantiene su ruta original en la BD
+      // Actualizar la actividad con la nueva ubicación del archivo
       await storage.updateFileActivity(activityId, { 
         metadata: { 
           movedTo: newPath,
@@ -660,8 +667,22 @@ export async function processPdfFile(filePath: string, activityId: number, store
         } 
       });
       
-      // No es necesario actualizar el documento en la BD, ya que su ruta es la original
-      // y solo cambia físicamente su ubicación
+      try {
+        // Buscar el documento PDF recién creado
+        const pdfDocs = await storage.getPdfDocumentsByStore(storeCode);
+        const recentDoc = pdfDocs.find(doc => doc.fileActivityId === activityId);
+        
+        if (recentDoc) {
+          // Actualizar la ruta del documento para que apunte a la nueva ubicación
+          console.log(`Actualizando ruta del documento PDF: ${recentDoc.id} a ${newPath}`);
+          await db.update(pdfDocuments)
+            .set({ path: newPath })
+            .where(eq(pdfDocuments.id, recentDoc.id));
+        }
+      } catch (updateError) {
+        console.error(`Error actualizando ruta de documento PDF:`, updateError);
+        // No fallamos todo el proceso por esto, ya que el archivo ya se procesó correctamente
+      }
     }
     
     console.log(`Successfully processed PDF file ${path.basename(filePath)}`);
