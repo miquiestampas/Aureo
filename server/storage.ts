@@ -1418,41 +1418,70 @@ export class DatabaseStorage implements IStorage {
   
   // Nuevos métodos de ExcelData para búsqueda
   async searchExcelData(query: string, filters?: any): Promise<ExcelData[]> {
-    const searchQuery = `%${query}%`;
+    console.log("DatabaseStorage.searchExcelData - Parámetros:", { query, filters });
     let baseQuery = db
       .select()
       .from(excelData);
       
-    // Aplicar búsqueda por texto en múltiples campos
-    baseQuery = baseQuery.where(
-      or(
-        like(excelData.customerName, searchQuery),
-        like(excelData.customerContact, searchQuery),
-        like(excelData.orderNumber, searchQuery),
-        like(excelData.itemDetails, searchQuery),
-        like(excelData.metals, searchQuery),
-        like(excelData.engravings, searchQuery),
-        like(excelData.pawnTicket, searchQuery)
-      )
-    );
+    // Si hay una consulta general, aplicarla a todos los campos de texto
+    if (query && query.trim() !== '') {
+      const searchQuery = `%${query}%`;
+      baseQuery = baseQuery.where(
+        or(
+          like(excelData.customerName, searchQuery),
+          like(excelData.customerContact, searchQuery),
+          like(excelData.orderNumber, searchQuery),
+          like(excelData.itemDetails, searchQuery),
+          like(excelData.metals, searchQuery),
+          like(excelData.engravings, searchQuery),
+          like(excelData.stones, searchQuery),
+          like(excelData.pawnTicket, searchQuery)
+        )
+      );
+    }
     
     // Aplicar filtros adicionales si están presentes
     if (filters) {
+      // Filtro por tienda
       if (filters.storeCode) {
         baseQuery = baseQuery.where(eq(excelData.storeCode, filters.storeCode));
       }
       
-      if (filters.dateFrom && filters.dateTo) {
-        baseQuery = baseQuery.where(
-          and(
-            gte(excelData.orderDate, filters.dateFrom),
-            lte(excelData.orderDate, filters.dateTo)
-          )
-        );
+      // Filtros de fecha
+      if (filters.fromDate) {
+        baseQuery = baseQuery.where(gte(excelData.orderDate, filters.fromDate));
+      }
+      
+      if (filters.toDate) {
+        baseQuery = baseQuery.where(lte(excelData.orderDate, filters.toDate));
+      }
+      
+      // Filtros específicos por campo
+      if (filters.customerName) {
+        baseQuery = baseQuery.where(like(excelData.customerName, `%${filters.customerName}%`));
+      }
+      
+      if (filters.customerContact) {
+        baseQuery = baseQuery.where(like(excelData.customerContact, `%${filters.customerContact}%`));
+      }
+      
+      if (filters.orderNumber) {
+        baseQuery = baseQuery.where(like(excelData.orderNumber, `%${filters.orderNumber}%`));
+      }
+      
+      if (filters.itemDetails) {
+        baseQuery = baseQuery.where(like(excelData.itemDetails, `%${filters.itemDetails}%`));
+      }
+      
+      if (filters.metals) {
+        baseQuery = baseQuery.where(like(excelData.metals, `%${filters.metals}%`));
       }
     }
     
-    return await baseQuery.orderBy(desc(excelData.orderDate));
+    // Obtener resultados ordenados por fecha de orden (más reciente primero)
+    const results = await baseQuery.orderBy(desc(excelData.orderDate));
+    console.log(`DatabaseStorage.searchExcelData - Resultados: ${results.length}`);
+    return results;
   }
   
   async getExcelDataById(id: number): Promise<ExcelData | undefined> {

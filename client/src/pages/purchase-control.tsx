@@ -211,10 +211,12 @@ export default function PurchaseControlPage() {
 
   // Handle search form submit
   const handleSearch = () => {
-    // Prepare search parameters
-    const params: SearchParams = {
-      query: searchQuery,
-      ...advancedSearch ? {
+    let params: SearchParams;
+    
+    if (advancedSearch) {
+      // Parámetros para búsqueda avanzada
+      params = {
+        query: searchQuery, // Mantener la consulta general también en búsqueda avanzada
         storeCode: searchParams.storeCode === "all" ? undefined : searchParams.storeCode || undefined,
         dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
         dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
@@ -225,15 +227,21 @@ export default function PurchaseControlPage() {
         metals: searchParams.metals || undefined,
         price: searchParams.price || undefined,
         priceOperator: searchParams.priceOperator || undefined,
-        onlyAlerts: searchParams.onlyAlerts || undefined,
-      } : {
+        onlyAlerts: searchParams.onlyAlerts || undefined
+      };
+    } else {
+      // Parámetros para búsqueda simple - solo la consulta
+      params = {
         query: searchQuery
-      }
-    };
+      };
+    }
 
     // Record search in history
-    recordSearchHistory(searchQuery);
+    if (searchQuery.trim()) {
+      recordSearchHistory(searchQuery);
+    }
 
+    console.log("Enviando parámetros de búsqueda:", params);
     // Execute search
     searchMutation.mutate(params);
   };

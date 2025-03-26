@@ -514,7 +514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Excel advanced search route for Purchase Control
   app.post("/api/search/excel-data/advanced", async (req, res, next) => {
     try {
-      console.log("Búsqueda avanzada recibida:", req.body);
+      console.log("Búsqueda recibida:", req.body);
       
       // Extract all filters from the body
       const {
@@ -531,6 +531,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         priceOperator = "=",
         onlyAlerts = false
       } = req.body;
+      
+      // Verificamos si es búsqueda simple (solo tiene la propiedad query)
+      const isSimpleSearch = Object.keys(req.body).length === 1 && query;
+      
+      if (isSimpleSearch) {
+        console.log("Procesando como búsqueda simple con query:", query);
+        // Para búsqueda simple, solo usamos el query sin filtros adicionales
+        const results = await storage.searchExcelData(query, {});
+        
+        // Registrar búsqueda en historial
+        if (req.isAuthenticated() && query.trim()) {
+          try {
+            const searchEntry: any = {
+              userId: req.user!.id,
+              searchType: "General",
+              searchTerms: query,
+              searchDate: new Date(),
+              resultCount: results.length,
+              filters: "{}"
+            };
+            
+            await storage.addSearchHistory(searchEntry);
+          } catch (historyError) {
+            console.error("Error saving search history:", historyError);
+          }
+        }
+        
+        return res.json({
+          results,
+          count: results.length,
+          searchType: "simple"
+        });
+      }
+      
+      // Si llegamos aquí, es una búsqueda avanzada
       
       // Build filters object
       const filters: any = {
