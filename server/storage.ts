@@ -55,6 +55,7 @@ export interface IStorage {
   updateFileActivity(id: number, updates: Partial<FileActivity>): Promise<FileActivity | undefined>;
   getRecentFileActivities(limit: number): Promise<FileActivity[]>;
   getFileActivitiesByStore(storeCode: string): Promise<FileActivity[]>;
+  getPendingStoreAssignmentActivities(): Promise<FileActivity[]>;
   deleteFileActivity(id: number): Promise<boolean>;
   
   // ExcelData methods
@@ -348,6 +349,16 @@ export class MemStorage implements IStorage {
   async getFileActivitiesByStore(storeCode: string): Promise<FileActivity[]> {
     return Array.from(this.fileActivities.values())
       .filter(activity => activity.storeCode === storeCode)
+      .sort((a, b) => {
+        const dateA = new Date(a.processingDate).getTime();
+        const dateB = new Date(b.processingDate).getTime();
+        return dateB - dateA; // Sort in descending order (newest first)
+      });
+  }
+  
+  async getPendingStoreAssignmentActivities(): Promise<FileActivity[]> {
+    return Array.from(this.fileActivities.values())
+      .filter(activity => activity.status === 'PendingStoreAssignment')
       .sort((a, b) => {
         const dateA = new Date(a.processingDate).getTime();
         const dateB = new Date(b.processingDate).getTime();
@@ -1240,6 +1251,14 @@ export class DatabaseStorage implements IStorage {
       .from(fileActivities)
       .orderBy(desc(fileActivities.processingDate))
       .limit(limit);
+  }
+  
+  async getPendingStoreAssignmentActivities(): Promise<FileActivity[]> {
+    return await db
+      .select()
+      .from(fileActivities)
+      .where(eq(fileActivities.status, 'PendingStoreAssignment'))
+      .orderBy(desc(fileActivities.processingDate));
   }
   
   async getFileActivitiesByStore(storeCode: string): Promise<FileActivity[]> {
