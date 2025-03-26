@@ -649,8 +649,8 @@ export async function processPdfFile(filePath: string, activityId: number, store
     await storage.updateFileActivityStatus(activityId, 'Processed');
     emitFileProcessingStatus(activityId, 'Processed');
     
-    // Mover el archivo a la carpeta de procesados
-    const newPath = await moveProcessedFile(filePath, 'Processed');
+    // Mover el archivo a la carpeta de procesados usando el nuevo formato de nombre
+    const newPath = await moveProcessedFile(filePath, 'Processed', storeCode);
     
     // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
     if (newPath) {
