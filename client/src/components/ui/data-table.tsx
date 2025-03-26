@@ -89,7 +89,7 @@ export function DataTable<TData, TValue>({
         ) : searchKey ? (
           <div className="flex items-center">
             <Input
-              placeholder="Search..."
+              placeholder="Buscar..."
               value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
               onChange={(event) =>
                 table.getColumn(searchKey)?.setFilterValue(event.target.value)
@@ -106,7 +106,7 @@ export function DataTable<TData, TValue>({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="ml-auto">
-                  <SlidersHorizontal className="mr-2 h-4 w-4" /> Columns
+                  <SlidersHorizontal className="mr-2 h-4 w-4" /> Columnas
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -171,7 +171,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results.
+                  No hay resultados.
                 </TableCell>
               </TableRow>
             )}
@@ -182,23 +182,23 @@ export function DataTable<TData, TValue>({
       {/* Pagination controls */}
       <div className="flex items-center justify-between space-x-4">
         <div className="text-sm text-muted-foreground">
-          Showing{" "}
+          Mostrando{" "}
           <span className="font-medium">
             {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}
           </span>{" "}
-          to{" "}
+          a{" "}
           <span className="font-medium">
             {Math.min(
               (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
               table.getFilteredRowModel().rows.length
             )}
           </span>{" "}
-          of <span className="font-medium">{table.getFilteredRowModel().rows.length}</span> results
+          de <span className="font-medium">{table.getFilteredRowModel().rows.length}</span> resultados
         </div>
         
         <div className="flex items-center space-x-6">
           <div className="flex items-center space-x-2">
-            <p className="text-sm font-medium">Rows per page</p>
+            <p className="text-sm font-medium">Filas por página</p>
             <select
               className="h-8 w-16 rounded-md border border-input bg-background px-2"
               value={table.getState().pagination.pageSize}
@@ -221,7 +221,7 @@ export function DataTable<TData, TValue>({
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
             >
-              <span className="sr-only">Go to first page</span>
+              <span className="sr-only">Ir a la primera página</span>
               <ChevronLeft className="h-4 w-4" />
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -235,11 +235,11 @@ export function DataTable<TData, TValue>({
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="flex items-center gap-1 text-sm font-medium">
-              Page{" "}
+              Página{" "}
               <span className="font-bold">
                 {table.getState().pagination.pageIndex + 1}
               </span>{" "}
-              of{" "}
+              de{" "}
               <span className="font-bold">{table.getPageCount()}</span>
             </div>
             <Button

@@ -600,6 +600,36 @@ export default function StoreManagementPage() {
                             </FormItem>
                           )}
                         />
+                        
+                        <FormField
+                          control={createForm.control}
+                          name="startDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Fecha de Inicio de Actividad</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <FormField
+                          control={createForm.control}
+                          name="endDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Fecha de Cese (si es inactiva)</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
                       
                       <div className="mt-4">
@@ -876,6 +906,36 @@ export default function StoreManagementPage() {
                             <FormLabel>DNI del Propietario</FormLabel>
                             <FormControl>
                               <Input placeholder="Ej: 12345678A" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="startDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Fecha de Inicio de Actividad</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <FormField
+                        control={editForm.control}
+                        name="endDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Fecha de Cese (si es inactiva)</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
