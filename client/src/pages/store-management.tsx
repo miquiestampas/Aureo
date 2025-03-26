@@ -69,6 +69,8 @@ interface StoreData {
   name: string;
   type: string;
   location: string;
+  district?: string; // Nuevo campo DISTRITO
+  locality?: string; // Nuevo campo LOCALIDAD
   active: boolean;
   // Nuevos campos añadidos
   address?: string;
@@ -129,6 +131,8 @@ export default function StoreManagementPage() {
       name: "",
       type: "Excel",
       location: "",
+      district: "",
+      locality: "",
       active: true,
       address: "",
       phone: "",
@@ -149,6 +153,8 @@ export default function StoreManagementPage() {
       name: "",
       type: "Excel",
       location: "",
+      district: "",
+      locality: "",
       active: true,
       address: "",
       phone: "",
@@ -169,6 +175,8 @@ export default function StoreManagementPage() {
         name: selectedStore.name,
         type: selectedStore.type as "Excel" | "PDF",
         location: selectedStore.location || "",
+        district: selectedStore.district || "",
+        locality: selectedStore.locality || "",
         active: selectedStore.active,
         address: selectedStore.address || "",
         phone: selectedStore.phone || "",
@@ -326,10 +334,20 @@ export default function StoreManagementPage() {
       }
     },
     {
-      accessorKey: "location",
+      id: "ubicacion",
       header: "Ubicación",
       cell: ({ row }) => {
-        return row.original.location || "—";
+        const store = row.original;
+        if (store.district || store.locality) {
+          return (
+            <div>
+              {store.district && <div>{store.district}</div>}
+              {store.locality && <div className="text-gray-500 text-sm">{store.locality}</div>}
+            </div>
+          );
+        } else {
+          return store.location || "—";
+        }
       }
     },
     {
@@ -352,7 +370,7 @@ export default function StoreManagementPage() {
       {
         id: "actions",
         header: "Acciones",
-        cell: ({ row }) => {
+        cell: ({ row }: any) => {
           const store = row.original;
           return (
             <div className="flex space-x-2">
@@ -1097,8 +1115,16 @@ export default function StoreManagementPage() {
                         </span>
                       </div>
                       <div>
-                        <span className="font-medium">Ubicación:</span> 
+                        <span className="font-medium">Ubicación (antigua):</span> 
                         <span className="ml-2">{selectedStore.location || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Distrito:</span> 
+                        <span className="ml-2">{selectedStore.district || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Localidad:</span> 
+                        <span className="ml-2">{selectedStore.locality || "—"}</span>
                       </div>
                       <div>
                         <span className="font-medium">Estado:</span> 
@@ -1155,14 +1181,14 @@ export default function StoreManagementPage() {
                         <span className="ml-2">{selectedStore.phone || "—"}</span>
                       </div>
                       <div>
-                        <span className="font-medium">Email:</span> 
+                        <span className="font-medium">Correo electrónico:</span> 
                         <span className="ml-2">{selectedStore.email || "—"}</span>
                       </div>
                     </div>
                   </div>
                   
                   <div className="border rounded-md p-4">
-                    <h3 className="font-medium mb-3 border-b pb-2">Información Comercial</h3>
+                    <h3 className="font-medium mb-3 border-b pb-2">Información Empresarial</h3>
                     
                     <div className="space-y-2">
                       <div>
@@ -1170,7 +1196,7 @@ export default function StoreManagementPage() {
                         <span className="ml-2">{selectedStore.cif || "—"}</span>
                       </div>
                       <div>
-                        <span className="font-medium">Razón Social:</span> 
+                        <span className="font-medium">Razón social:</span> 
                         <span className="ml-2">{selectedStore.businessName || "—"}</span>
                       </div>
                       <div>
@@ -1178,7 +1204,7 @@ export default function StoreManagementPage() {
                         <span className="ml-2">{selectedStore.ownerName || "—"}</span>
                       </div>
                       <div>
-                        <span className="font-medium">DNI del Propietario:</span> 
+                        <span className="font-medium">DNI Propietario:</span> 
                         <span className="ml-2">{selectedStore.ownerIdNumber || "—"}</span>
                       </div>
                     </div>
@@ -1187,21 +1213,36 @@ export default function StoreManagementPage() {
               </div>
               
               {selectedStore.notes && (
-                <div className="mt-4 border rounded-md p-4">
+                <div className="border rounded-md p-4 mt-4">
                   <h3 className="font-medium mb-3 border-b pb-2">Anotaciones</h3>
-                  <p className="whitespace-pre-line">{selectedStore.notes}</p>
+                  <p className="whitespace-pre-wrap text-sm">{selectedStore.notes}</p>
                 </div>
               )}
               
               <DialogFooter className="mt-6">
-                <Button onClick={() => setIsDetailDialogOpen(false)}>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsDetailDialogOpen(false)}
+                >
                   Cerrar
                 </Button>
+                {canModify && (
+                  <Button 
+                    variant="outline"
+                    className="ml-2"
+                    onClick={() => {
+                      setIsDetailDialogOpen(false);
+                      setIsEditDialogOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Editar Tienda
+                  </Button>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>
         )}
-        
       </div>
     </div>
   );
