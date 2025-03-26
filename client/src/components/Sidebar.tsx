@@ -10,6 +10,8 @@ import {
   Settings,
   LogOut,
   ActivitySquare,
+  Search,
+  Microscope,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -111,6 +113,27 @@ export default function Sidebar() {
             label="Control de Actividad"
             active={location === '/activity-control'}
           />
+
+          {/* Investigación Section */}
+          <div className="mt-6 mb-2">
+            <h3 className="px-4 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              Investigación
+            </h3>
+          </div>
+          
+          <NavItem
+            href="/purchase-control"
+            icon={<Search size={20} />}
+            label="Control de Compras"
+            active={location === '/purchase-control'}
+          />
+
+          {/* Management Section */}
+          <div className="mt-6 mb-2">
+            <h3 className="px-4 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              Administración
+            </h3>
+          </div>
           
           <NavItem
             href="/store-management"

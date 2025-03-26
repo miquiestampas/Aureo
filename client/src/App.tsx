@@ -21,6 +21,7 @@ import StoreManagementPage from "@/pages/store-management";
 import UserManagementPage from "@/pages/user-management";
 import SystemConfigPage from "@/pages/system-config";
 import ActivityControlPage from "@/pages/activity-control";
+import PurchaseControlPage from "@/pages/purchase-control";
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -142,6 +143,15 @@ function Router() {
         component={() => (
           <AppLayout>
             <ActivityControlPage />
+          </AppLayout>
+        )} 
+      />
+      
+      <ProtectedRoute 
+        path="/purchase-control" 
+        component={() => (
+          <AppLayout>
+            <PurchaseControlPage />
           </AppLayout>
         )} 
       />
