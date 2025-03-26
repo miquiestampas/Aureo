@@ -117,15 +117,17 @@ export default function ExcelStoresPage() {
       });
   };
   
-  // Estados para las filas expandibles
-  const [expandedRows, setExpandedRows] = useState<{ [key: number]: boolean }>({});
-  const [storeActivities, setStoreActivities] = useState<{ [key: string]: any[] }>({});
-  const [loadingActivities, setLoadingActivities] = useState<{ [key: string]: boolean }>({});
+  // Estados para la visualización de archivos
+  const [showFileActivityDialog, setShowFileActivityDialog] = useState(false);
+  const [selectedStoreForFiles, setSelectedStoreForFiles] = useState<Store | null>(null);
+  const [storeActivities, setStoreActivities] = useState<any[]>([]);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   
   // Manejar la visualización de archivos de una tienda
   const handleViewStoreFiles = async (store: Store) => {
-    // Marcar como cargando
-    setLoadingActivities(prev => ({ ...prev, [store.code]: true }));
+    // Configurar el estado para mostrar la ventana emergente
+    setSelectedStoreForFiles(store);
+    setIsLoadingActivities(true);
     
     try {
       // Cargar actividades de la tienda
@@ -136,21 +138,17 @@ export default function ExcelStoresPage() {
       }
       
       const data = await response.json();
-      setStoreActivities(prev => ({ ...prev, [store.code]: data }));
-      
-      // Mostrar/ocultar la fila expandida
-      setExpandedRows(prev => ({
-        ...prev,
-        [store.id]: !prev[store.id]
-      }));
+      setStoreActivities(data);
+      setShowFileActivityDialog(true);
     } catch (error) {
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Error al cargar los archivos",
         variant: "destructive",
       });
+      setStoreActivities([]);
     } finally {
-      setLoadingActivities(prev => ({ ...prev, [store.code]: false }));
+      setIsLoadingActivities(false);
     }
   };
   
@@ -188,8 +186,6 @@ export default function ExcelStoresPage() {
       header: "Acciones",
       cell: ({ row }) => {
         const store = row.original;
-        const isExpanded = expandedRows[store.id] || false;
-        const isLoading = loadingActivities[store.code] || false;
         
         return (
           <div className="flex space-x-2">
@@ -210,9 +206,9 @@ export default function ExcelStoresPage() {
               className="h-8 w-8 p-0" 
               onClick={() => handleViewStoreFiles(store)}
               title="Ver archivos"
-              disabled={isLoading}
+              disabled={isLoadingActivities}
             >
-              {isLoading ? (
+              {isLoadingActivities ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-primary" />
               ) : (
                 <FileSpreadsheet className="h-4 w-4" />
@@ -364,124 +360,10 @@ export default function ExcelStoresPage() {
                   columns={storeColumns} 
                   data={filteredStores.filter(store => store.type === "Excel") || []} 
                 />
-                
-                {/* Mostrar actividades de archivos para las tiendas expandidas */}
-                {Object.entries(expandedRows).map(([storeId, expanded]) => {
-                  if (!expanded) return null;
-                  
-                  const store = stores?.find(s => s.id === parseInt(storeId));
-                  if (!store) return null;
-                  
-                  const activities = storeActivities[store.code] || [];
-                  
-                  return (
-                    <div key={storeId} className="mt-4 ml-4 mr-4 bg-gray-50 p-4 rounded-md border">
-                      <h3 className="text-lg font-medium mb-2">Archivos de {store.name} ({store.code})</h3>
-                      
-                      {activities.length === 0 ? (
-                        <p className="text-muted-foreground text-center py-4">No hay archivos disponibles para esta tienda</p>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b">
-                                <th className="text-left py-2 px-2">Nombre del archivo</th>
-                                <th className="text-left py-2 px-2">Fecha</th>
-                                <th className="text-left py-2 px-2">Estado</th>
-                                <th className="text-left py-2 px-2">Acciones</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {activities.map((activity: any) => (
-                                <tr key={activity.id} className="border-b hover:bg-gray-100">
-                                  <td className="py-2 px-2">{activity.filename}</td>
-                                  <td className="py-2 px-2">{new Date(activity.processingDate).toLocaleString()}</td>
-                                  <td className="py-2 px-2">
-                                    <Badge variant={
-                                      activity.status === 'Processed' ? 'default' :
-                                      activity.status === 'Processing' ? 'secondary' :
-                                      activity.status === 'Pending' ? 'outline' : 'destructive'
-                                    }>
-                                      {activity.status === 'Processed' ? 'Procesado' :
-                                      activity.status === 'Processing' ? 'Procesando' :
-                                      activity.status === 'Pending' ? 'Pendiente' : 'Error'}
-                                    </Badge>
-                                  </td>
-                                  <td className="py-2 px-2">
-                                    <div className="flex space-x-2">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-8 w-8 p-0"
-                                        title="Descargar"
-                                        onClick={() => window.open(`/api/file-activities/${activity.id}/download`)}
-                                      >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                          <polyline points="7 10 12 15 17 10"></polyline>
-                                          <line x1="12" y1="15" x2="12" y2="3"></line>
-                                        </svg>
-                                        <span className="sr-only">Descargar</span>
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-8 w-8 p-0"
-                                        title="Eliminar"
-                                        onClick={() => {
-                                          if (confirm(`¿Está seguro que desea eliminar el archivo ${activity.filename}?`)) {
-                                            fetch(`/api/file-activities/${activity.id}`, {
-                                              method: 'DELETE'
-                                            })
-                                            .then(response => {
-                                              if (!response.ok) {
-                                                throw new Error('Error al eliminar el archivo');
-                                              }
-                                              
-                                              // Actualizar la lista eliminando la actividad
-                                              setStoreActivities(prev => ({
-                                                ...prev,
-                                                [store.code]: prev[store.code].filter((item: any) => item.id !== activity.id)
-                                              }));
-                                              
-                                              toast({
-                                                title: "Archivo eliminado",
-                                                description: "El archivo se ha eliminado correctamente",
-                                              });
-                                            })
-                                            .catch(error => {
-                                              toast({
-                                                title: "Error",
-                                                description: error instanceof Error ? error.message : "Error al eliminar el archivo",
-                                                variant: "destructive",
-                                              });
-                                            });
-                                          }
-                                        }}
-                                      >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                                          <path d="M3 6h18"></path>
-                                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                                        </svg>
-                                        <span className="sr-only">Eliminar</span>
-                                      </Button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                      
-                    </div>
-                  );
-                })}
               </>
             )}
             
-            {/* Dialog for Store Data */}
+            {/* Dialog para ver datos de la tienda */}
             <Dialog open={showStoreDataDialog} onOpenChange={setShowStoreDataDialog}>
               <DialogContent className="max-w-5xl">
                 <DialogHeader>
@@ -513,6 +395,126 @@ export default function ExcelStoresPage() {
                 
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setShowStoreDataDialog(false)}>
+                    Cerrar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            
+            {/* Dialog para ver archivos de la tienda */}
+            <Dialog open={showFileActivityDialog} onOpenChange={setShowFileActivityDialog}>
+              <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>
+                    Archivos de la tienda: {selectedStoreForFiles?.name} ({selectedStoreForFiles?.code})
+                  </DialogTitle>
+                  <DialogDescription>
+                    Archivos Excel importados para esta tienda
+                  </DialogDescription>
+                </DialogHeader>
+                
+                {isLoadingActivities ? (
+                  <div className="py-8 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                  </div>
+                ) : storeActivities.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <p className="text-muted-foreground">No hay archivos disponibles para esta tienda</p>
+                  </div>
+                ) : (
+                  <div className="overflow-auto max-h-[60vh]">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-3">Nombre del archivo</th>
+                          <th className="text-left py-3 px-3">Fecha</th>
+                          <th className="text-left py-3 px-3">Estado</th>
+                          <th className="text-left py-3 px-3">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {storeActivities.map((activity: any) => (
+                          <tr key={activity.id} className="border-b hover:bg-gray-100">
+                            <td className="py-3 px-3">{activity.filename}</td>
+                            <td className="py-3 px-3">{new Date(activity.processingDate).toLocaleString()}</td>
+                            <td className="py-3 px-3">
+                              <Badge variant={
+                                activity.status === 'Processed' ? 'default' :
+                                activity.status === 'Processing' ? 'secondary' :
+                                activity.status === 'Pending' ? 'outline' : 'destructive'
+                              }>
+                                {activity.status === 'Processed' ? 'Procesado' :
+                                activity.status === 'Processing' ? 'Procesando' :
+                                activity.status === 'Pending' ? 'Pendiente' : 'Error'}
+                              </Badge>
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="flex space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  title="Descargar"
+                                  onClick={() => window.open(`/api/file-activities/${activity.id}/download`)}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                  </svg>
+                                  <span className="sr-only">Descargar</span>
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  title="Eliminar"
+                                  onClick={() => {
+                                    if (confirm(`¿Está seguro que desea eliminar el archivo ${activity.filename}?`)) {
+                                      fetch(`/api/file-activities/${activity.id}`, {
+                                        method: 'DELETE'
+                                      })
+                                      .then(response => {
+                                        if (!response.ok) {
+                                          throw new Error('Error al eliminar el archivo');
+                                        }
+                                        
+                                        // Actualizar la lista eliminando la actividad
+                                        setStoreActivities(storeActivities.filter((item: any) => item.id !== activity.id));
+                                        
+                                        toast({
+                                          title: "Archivo eliminado",
+                                          description: "El archivo se ha eliminado correctamente",
+                                        });
+                                      })
+                                      .catch(error => {
+                                        toast({
+                                          title: "Error",
+                                          description: error instanceof Error ? error.message : "Error al eliminar el archivo",
+                                          variant: "destructive",
+                                        });
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                  </svg>
+                                  <span className="sr-only">Eliminar</span>
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowFileActivityDialog(false)}>
                     Cerrar
                   </Button>
                 </DialogFooter>

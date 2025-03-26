@@ -442,10 +442,10 @@ export default function PdfStoresPage() {
                       <tr>
                         {storeColumns.map((column) => (
                           <th
-                            key={column.id || String(column.accessorKey)}
+                            key={column.id || column.accessorKey?.toString()}
                             className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                           >
-                            {column.header}
+                            {typeof column.header === 'function' ? column.id : column.header}
                           </th>
                         ))}
                       </tr>
