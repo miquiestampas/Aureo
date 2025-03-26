@@ -1,17 +1,10 @@
-import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useSocketStore } from "@/lib/socket";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { 
   Card, CardContent, CardHeader, CardTitle, CardDescription
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/ui/data-table";
 import {
   Dialog,
@@ -21,55 +14,19 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { 
   FileSpreadsheet, 
-  Upload, 
   Download, 
   Eye, 
-  Table, 
-  Search, 
   UploadCloud, 
-  Info, 
-  X, 
-  CalendarIcon,
-  FilterX,
-  FileText
+  Database as DatabaseIcon,
+  FileDigit
 } from "lucide-react";
 import FileUploadModal from "@/components/FileUploadModal";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { useSocketStore } from "@/lib/socket";
 
 interface Store {
   id: number;
@@ -98,204 +55,103 @@ interface ExcelData {
   fileActivityId: number;
 }
 
-interface ExcelSearchResults {
-  results: ExcelData[];
-  count: number;
-  searchType: string;
+interface FileActivity {
+  id: number;
+  filename: string;
+  storeCode: string;
+  fileType: "Excel" | "PDF";
+  status: "Pending" | "Processing" | "Processed" | "Failed";
+  processingDate: string;
+  processedBy: string;
+  errorMessage?: string;
 }
-
-// Definir el esquema de validación para la búsqueda
-const searchSchema = z.object({
-  searchType: z.enum(["General", "Cliente", "Artículo", "Orden"]).default("General"),
-  searchTerms: z.string().min(2, { message: "Los términos de búsqueda deben tener al menos 2 caracteres" }),
-  storeCode: z.string().optional(),
-  fromDate: z.date().optional(),
-  toDate: z.date().optional(),
-  priceMin: z.string().optional(),
-  priceMax: z.string().optional(),
-  includeArchived: z.boolean().default(false),
-  searchCustomerName: z.boolean().default(true),
-  searchCustomerContact: z.boolean().default(true),
-  searchItemDetails: z.boolean().default(true),
-  searchMetals: z.boolean().default(true),
-  searchStones: z.boolean().default(true),
-  searchEngravings: z.boolean().default(true),
-});
-
-type SearchValues = z.infer<typeof searchSchema>;
 
 export default function ExcelStoresPage() {
   const { toast } = useToast();
-  const { recentEvents } = useSocketStore();
   const [showFileUploadModal, setShowFileUploadModal] = useState(false);
-  const [detailsData, setDetailsData] = useState<ExcelData | null>(null);
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
-  const [searchResults, setSearchResults] = useState<ExcelData[]>([]);
-  const [totalResults, setTotalResults] = useState<number>(0);
-  const [isSearching, setIsSearching] = useState(false);
+  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [showStoreDataDialog, setShowStoreDataDialog] = useState(false);
+  const [storeData, setStoreData] = useState<ExcelData[]>([]);
   
   // Fetch excel stores
-  const { data: stores } = useQuery<Store[]>({
+  const { data: stores, isLoading: isLoadingStores } = useQuery<Store[]>({
     queryKey: ['/api/stores', { type: 'Excel' }],
   });
   
-  // Inicializar el formulario de búsqueda
-  const form = useForm<SearchValues>({
-    resolver: zodResolver(searchSchema),
-    defaultValues: {
-      searchType: "General",
-      searchTerms: "",
-      includeArchived: false,
-      searchCustomerName: true,
-      searchCustomerContact: true,
-      searchItemDetails: true,
-      searchMetals: true,
-      searchStones: true,
-      searchEngravings: true,
-    },
-  });
-  
-  // Mutación para realizar la búsqueda
-  const searchMutation = useMutation({
-    mutationFn: async (values: SearchValues) => {
-      setIsSearching(true);
-      
-      // Construir la URL con los parámetros de búsqueda
-      const params = new URLSearchParams();
-      params.append('searchType', values.searchType);
-      params.append('searchTerms', values.searchTerms);
-      
-      if (values.storeCode && values.storeCode !== 'all') {
-        params.append('storeCode', values.storeCode);
-      }
-      
-      if (values.fromDate) {
-        params.append('fromDate', values.fromDate.toISOString());
-      }
-      
-      if (values.toDate) {
-        params.append('toDate', values.toDate.toISOString());
-      }
-      
-      if (values.priceMin) {
-        params.append('priceMin', values.priceMin);
-      }
-      
-      if (values.priceMax) {
-        params.append('priceMax', values.priceMax);
-      }
-      
-      params.append('includeArchived', values.includeArchived.toString());
-      params.append('searchCustomerName', values.searchCustomerName.toString());
-      params.append('searchCustomerContact', values.searchCustomerContact.toString());
-      params.append('searchItemDetails', values.searchItemDetails.toString());
-      params.append('searchMetals', values.searchMetals.toString());
-      params.append('searchStones', values.searchStones.toString());
-      params.append('searchEngravings', values.searchEngravings.toString());
-      
-      const response = await fetch(`/api/search/excel-data?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Error al realizar la búsqueda");
-      }
-      
-      const data: ExcelSearchResults = await response.json();
-      return data;
-    },
+  // Fetch store data
+  const { isLoading: isLoadingStoreData } = useQuery<ExcelData[]>({
+    queryKey: ['/api/excel-data', { storeCode: selectedStore?.code }],
+    enabled: !!selectedStore,
     onSuccess: (data) => {
-      setSearchResults(data.results);
-      setTotalResults(data.count);
-      setIsSearching(false);
-      
-      if (data.count === 0) {
-        toast({
-          title: "Sin resultados",
-          description: "No se encontraron coincidencias para tu búsqueda.",
-        });
-      } else {
-        toast({
-          title: "Búsqueda completada",
-          description: `Se encontraron ${data.count} resultados.`,
-        });
-      }
+      setStoreData(data);
+      setShowStoreDataDialog(true);
     },
     onError: (error: Error) => {
-      setIsSearching(false);
       toast({
-        title: "Error en la búsqueda",
+        title: "Error al cargar datos",
         description: error.message,
         variant: "destructive",
       });
     }
   });
   
-  const handleResetSearch = () => {
-    form.reset({
-      searchType: "General",
-      searchTerms: "",
-      storeCode: undefined,
-      fromDate: undefined,
-      toDate: undefined,
-      priceMin: undefined,
-      priceMax: undefined,
-      includeArchived: false,
-      searchCustomerName: true,
-      searchCustomerContact: true,
-      searchItemDetails: true,
-      searchMetals: true,
-      searchStones: true,
-      searchEngravings: true,
-    });
-    setSearchResults([]);
-    setTotalResults(0);
+  // Handle view store data
+  const handleViewStoreData = (store: Store) => {
+    setSelectedStore(store);
   };
   
-  const onSubmitSearch = (values: SearchValues) => {
-    searchMutation.mutate(values);
-  };
-  
-  // View details
-  const handleViewDetails = (data: ExcelData) => {
-    setDetailsData(data);
-    setDetailsDialogOpen(true);
-  };
-  
-  // Refetch data when receiving socket events
-  useEffect(() => {
-    if (recentEvents.length > 0) {
-      const lastEvent = recentEvents[0];
-      
-      if (lastEvent.type === 'fileProcessingStatus' && 
-          lastEvent.data.status === 'Processed') {
-        // Si tenemos una búsqueda activa, refrescarla
-        if (searchResults.length > 0 && form.getValues("searchTerms")) {
-          searchMutation.mutate(form.getValues());
-        }
+  // Data columns for stores
+  const storeColumns: ColumnDef<Store>[] = [
+    {
+      accessorKey: "code",
+      header: "Código",
+    },
+    {
+      accessorKey: "name",
+      header: "Nombre",
+    },
+    {
+      accessorKey: "location",
+      header: "Ubicación",
+    },
+    {
+      accessorKey: "active",
+      header: "Estado",
+      cell: ({ row }) => {
+        const active = row.original.active;
+        return (
+          <Badge variant={active ? "default" : "secondary"}>
+            {active ? "Activa" : "Inactiva"}
+          </Badge>
+        );
+      }
+    },
+    {
+      id: "actions",
+      header: "Acciones",
+      cell: ({ row }) => {
+        return (
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8 w-8 p-0" 
+              onClick={() => handleViewStoreData(row.original)}
+            >
+              <DatabaseIcon className="h-4 w-4" />
+              <span className="sr-only">Ver datos</span>
+            </Button>
+          </div>
+        );
       }
     }
-  }, [recentEvents]);
+  ];
   
-  // Data columns
-  const columns: ColumnDef<ExcelData>[] = [
+  // Data columns for store data
+  const dataColumns: ColumnDef<ExcelData>[] = [
     {
       accessorKey: "orderNumber",
       header: "Orden #",
-    },
-    {
-      accessorKey: "storeCode",
-      header: "Tienda",
-      cell: ({ row }) => {
-        const storeCode = row.original.storeCode;
-        const store = stores?.find(s => s.code === storeCode);
-        return store ? `${store.name} (${storeCode})` : storeCode;
-      }
     },
     {
       accessorKey: "orderDate",
@@ -310,6 +166,10 @@ export default function ExcelStoresPage() {
       header: "Cliente",
     },
     {
+      accessorKey: "customerContact",
+      header: "Contacto",
+    },
+    {
       accessorKey: "itemDetails",
       header: "Artículo",
     },
@@ -318,25 +178,135 @@ export default function ExcelStoresPage() {
       header: "Precio",
     },
     {
+      accessorKey: "pawnTicket",
+      header: "Boleta",
+    },
+    {
       id: "actions",
       header: "Acciones",
       cell: ({ row }) => {
         return (
-          <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-8 w-8 p-0" 
-              onClick={() => handleViewDetails(row.original)}
-            >
-              <Eye className="h-4 w-4" />
-              <span className="sr-only">Ver detalles</span>
-            </Button>
-          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8 w-8 p-0"
+            title="Ver detalles" 
+          >
+            <Eye className="h-4 w-4" />
+            <span className="sr-only">Ver detalles</span>
+          </Button>
         );
       }
     }
   ];
+  
+  return (
+    <div className="py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-semibold text-gray-900">Tiendas Excel</h1>
+          
+          <div className="flex space-x-2">
+            <Button 
+              className="bg-primary hover:bg-primary/90"
+              onClick={() => setShowFileUploadModal(true)}
+            >
+              <UploadCloud className="mr-2 h-4 w-4" />
+              Cargar Archivos
+            </Button>
+          </div>
+          
+          {/* Modal de Carga de Archivos */}
+          <FileUploadModal 
+            isOpen={showFileUploadModal}
+            onClose={() => setShowFileUploadModal(false)}
+            storesByType={stores?.filter(store => store.type === "Excel") || []}
+            fileType="Excel"
+          />
+        </div>
+        
+        {/* Listado de tiendas Excel */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <FileSpreadsheet className="mr-2 h-5 w-5" />
+              Tiendas con datos Excel
+            </CardTitle>
+            <CardDescription>
+              Seleccione una tienda para ver sus registros importados. Actualmente hay {stores?.filter(s => s.type === "Excel")?.length || 0} tiendas configuradas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingStores ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-opacity-50 border-t-primary rounded-full"></div>
+                <span className="ml-3 text-gray-500">Cargando tiendas...</span>
+              </div>
+            ) : (
+              <DataTable 
+                columns={storeColumns} 
+                data={stores?.filter(store => store.type === "Excel") || []} 
+                searchKey="name"
+              />
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* Diálogo con datos de la tienda */}
+        <Dialog open={showStoreDataDialog} onOpenChange={setShowStoreDataDialog}>
+          <DialogContent className="max-w-6xl">
+            <DialogHeader>
+              <DialogTitle>
+                Datos de tienda: {selectedStore?.name} ({selectedStore?.code})
+              </DialogTitle>
+              <DialogDescription>
+                Registros importados de la tienda seleccionada
+              </DialogDescription>
+            </DialogHeader>
+            
+            {isLoadingStoreData ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-opacity-50 border-t-primary rounded-full"></div>
+                <span className="ml-3 text-gray-500">Cargando datos...</span>
+              </div>
+            ) : storeData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-6 text-center">
+                <FileDigit className="h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium">No hay datos disponibles</h3>
+                <p className="text-sm text-gray-500 mt-2">
+                  No se encontraron registros para esta tienda. Intente cargar archivos nuevos.
+                </p>
+              </div>
+            ) : (
+              <div className="max-h-[600px] overflow-auto">
+                <DataTable 
+                  columns={dataColumns} 
+                  data={storeData}
+                  searchKey="customerName"
+                  pageSizeOptions={[10, 20, 50, 100]}
+                  showColumnToggle={true}
+                />
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowStoreDataDialog(false)}>
+                Cerrar
+              </Button>
+              <Button 
+                variant="outline"
+                className="ml-2"
+                disabled={storeData.length === 0}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Exportar datos
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
+  );
   
   return (
     <div className="py-6">
