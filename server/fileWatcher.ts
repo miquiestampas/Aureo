@@ -64,32 +64,31 @@ export async function initializeFileWatchers() {
       await pdfWatcher.close();
     }
     
-    // Vigilar los archivos directamente en el directorio raíz, excluyendo subcarpetas específicas
-    console.log(`Configurando watchers para: Excel=${excelDir}, PDF=${pdfDir}`);
+    // Solo vigilar los archivos en la raíz del directorio, no en las subcarpetas
+    const excelRootDir = path.join(excelDir, '*');
+    const pdfRootDir = path.join(pdfDir, '*');
     
     // Asegurarse de que no vigilamos las subcarpetas procesados y errores
-    excelWatcher = chokidar.watch(excelDir, {
+    excelWatcher = chokidar.watch(excelRootDir, {
       ignored: [
-        /(^|[\/\\])\../, // ignore dotfiles
-        path.join(excelDir, 'procesados', '**'),  // ignore files in procesados folder
-        path.join(excelDir, 'errores', '**')      // ignore files in errores folder
+        /(^|[\/\\])\.\./, // ignore dotfiles
+        '**/procesados/**',  // ignore files in procesados folder
+        '**/errores/**'      // ignore files in errores folder
       ],
       persistent: true,
-      depth: 0,  // Solo vigilar archivos en el directorio raíz, no en subdirectorios
       awaitWriteFinish: {
         stabilityThreshold: 2000,
         pollInterval: 100
       }
     });
     
-    pdfWatcher = chokidar.watch(pdfDir, {
+    pdfWatcher = chokidar.watch(pdfRootDir, {
       ignored: [
-        /(^|[\/\\])\../, // ignore dotfiles
-        path.join(pdfDir, 'procesados', '**'),  // ignore files in procesados folder
-        path.join(pdfDir, 'errores', '**')      // ignore files in errores folder
+        /(^|[\/\\])\.\./, // ignore dotfiles
+        '**/procesados/**',  // ignore files in procesados folder
+        '**/errores/**'      // ignore files in errores folder
       ],
       persistent: true,
-      depth: 0,  // Solo vigilar archivos en el directorio raíz, no en subdirectorios
       awaitWriteFinish: {
         stabilityThreshold: 2000,
         pollInterval: 100
