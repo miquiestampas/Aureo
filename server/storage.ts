@@ -1457,14 +1457,14 @@ export class DatabaseStorage implements IStorage {
           const searchTerm = `%${query.trim()}%`;
           
           conditions.push(`(
-            "customerName" ILIKE ${addParam(searchTerm)} OR
-            "customerContact" ILIKE ${addParam(searchTerm)} OR
-            "orderNumber" ILIKE ${addParam(searchTerm)} OR
-            "itemDetails" ILIKE ${addParam(searchTerm)} OR
-            "metals" ILIKE ${addParam(searchTerm)} OR
-            "engravings" ILIKE ${addParam(searchTerm)} OR
-            "stones" ILIKE ${addParam(searchTerm)} OR
-            "pawnTicket" ILIKE ${addParam(searchTerm)}
+            customer_name ILIKE ${addParam(searchTerm)} OR
+            customer_contact ILIKE ${addParam(searchTerm)} OR
+            order_number ILIKE ${addParam(searchTerm)} OR
+            item_details ILIKE ${addParam(searchTerm)} OR
+            metals ILIKE ${addParam(searchTerm)} OR
+            engravings ILIKE ${addParam(searchTerm)} OR
+            stones ILIKE ${addParam(searchTerm)} OR
+            pawn_ticket ILIKE ${addParam(searchTerm)}
           )`);
         }
       }
@@ -1473,66 +1473,66 @@ export class DatabaseStorage implements IStorage {
       if (filters) {
         // Filtro por tienda
         if (filters.storeCode && filters.storeCode !== "all") {
-          conditions.push(`"storeCode" = ${addParam(filters.storeCode)}`);
+          conditions.push(`store_code = ${addParam(filters.storeCode)}`);
         }
         
         // Filtros específicos por campo de texto
         if (filters.customerName) {
-          conditions.push(`"customerName" ILIKE ${addParam(`%${filters.customerName}%`)}`);
+          conditions.push(`customer_name ILIKE ${addParam(`%${filters.customerName}%`)}`);
         }
         
         if (filters.customerContact) {
-          conditions.push(`"customerContact" ILIKE ${addParam(`%${filters.customerContact}%`)}`);
+          conditions.push(`customer_contact ILIKE ${addParam(`%${filters.customerContact}%`)}`);
         }
         
         if (filters.orderNumber) {
-          conditions.push(`"orderNumber" ILIKE ${addParam(`%${filters.orderNumber}%`)}`);
+          conditions.push(`order_number ILIKE ${addParam(`%${filters.orderNumber}%`)}`);
         }
         
         if (filters.itemDetails) {
-          conditions.push(`"itemDetails" ILIKE ${addParam(`%${filters.itemDetails}%`)}`);
+          conditions.push(`item_details ILIKE ${addParam(`%${filters.itemDetails}%`)}`);
         }
         
         if (filters.metals) {
-          conditions.push(`"metals" ILIKE ${addParam(`%${filters.metals}%`)}`);
+          conditions.push(`metals ILIKE ${addParam(`%${filters.metals}%`)}`);
         }
         
         // Filtros de fecha
         if (filters.fromDate) {
-          conditions.push(`"orderDate" >= ${addParam(filters.fromDate)}`);
+          conditions.push(`order_date >= ${addParam(filters.fromDate)}`);
         }
         
         if (filters.toDate) {
-          conditions.push(`"orderDate" <= ${addParam(filters.toDate)}`);
+          conditions.push(`order_date <= ${addParam(filters.toDate)}`);
         }
         
         // Filtros de precio - manejar todos los casos posibles
         if (filters.priceExact && !isNaN(parseFloat(filters.priceExact))) {
           const price = parseFloat(filters.priceExact);
-          conditions.push(`NULLIF("price", '') IS NOT NULL AND TRIM("price") != '' AND CAST("price" AS DECIMAL) = ${addParam(price)}`);
+          conditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) = ${addParam(price)}`);
         } else {
           if (filters.priceMin && !isNaN(parseFloat(filters.priceMin))) {
             const minPrice = parseFloat(filters.priceMin);
             if (filters.priceIncludeEqual) {
-              conditions.push(`NULLIF("price", '') IS NOT NULL AND TRIM("price") != '' AND CAST("price" AS DECIMAL) >= ${addParam(minPrice)}`);
+              conditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) >= ${addParam(minPrice)}`);
             } else {
-              conditions.push(`NULLIF("price", '') IS NOT NULL AND TRIM("price") != '' AND CAST("price" AS DECIMAL) > ${addParam(minPrice)}`);
+              conditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) > ${addParam(minPrice)}`);
             }
           }
           
           if (filters.priceMax && !isNaN(parseFloat(filters.priceMax))) {
             const maxPrice = parseFloat(filters.priceMax);
             if (filters.priceIncludeEqual) {
-              conditions.push(`NULLIF("price", '') IS NOT NULL AND TRIM("price") != '' AND CAST("price" AS DECIMAL) <= ${addParam(maxPrice)}`);
+              conditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) <= ${addParam(maxPrice)}`);
             } else {
-              conditions.push(`NULLIF("price", '') IS NOT NULL AND TRIM("price") != '' AND CAST("price" AS DECIMAL) < ${addParam(maxPrice)}`);
+              conditions.push(`NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) < ${addParam(maxPrice)}`);
             }
           }
         }
       }
       
       // Construir la consulta completa
-      let sqlQuery = 'SELECT * FROM "excel_data"';
+      let sqlQuery = 'SELECT * FROM excel_data';
       
       // Agregar WHERE si hay condiciones
       if (conditions.length > 0) {
@@ -1540,7 +1540,7 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Ordenar por fecha de orden descendente
-      sqlQuery += ' ORDER BY "orderDate" DESC';
+      sqlQuery += ' ORDER BY order_date DESC';
       
       console.log("SQL Query:", sqlQuery);
       console.log("SQL Params:", params);
@@ -1557,20 +1557,20 @@ export class DatabaseStorage implements IStorage {
       const results = result.rows.map(row => {
         return {
           id: row.id,
-          storeCode: row.storeCode,
-          orderNumber: row.orderNumber,
-          orderDate: new Date(row.orderDate),
-          customerName: row.customerName,
-          customerContact: row.customerContact,
-          itemDetails: row.itemDetails,
+          storeCode: row.store_code,
+          orderNumber: row.order_number,
+          orderDate: new Date(row.order_date),
+          customerName: row.customer_name,
+          customerContact: row.customer_contact,
+          itemDetails: row.item_details,
           metals: row.metals,
           engravings: row.engravings,
           stones: row.stones,
           carats: row.carats,
           price: row.price,
-          pawnTicket: row.pawnTicket,
-          saleDate: row.saleDate ? new Date(row.saleDate) : null,
-          fileActivityId: row.fileActivityId
+          pawnTicket: row.pawn_ticket,
+          saleDate: row.sale_date ? new Date(row.sale_date) : null,
+          fileActivityId: row.file_activity_id
         } as ExcelData;
       });
       
