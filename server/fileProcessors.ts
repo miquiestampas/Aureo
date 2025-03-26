@@ -510,44 +510,67 @@ export async function processPdfFile(filePath: string, activityId: number, store
     
     // Extraer el nombre del archivo para la detección de tienda
     const filename = path.basename(filePath);
+    const originalFilename = path.basename(filename, path.extname(filename));
     
     // Intentar extraer código de tienda del nombre del archivo PDF
     let pdfStoreCode = '';
+    let foundInDatabase = false;
+    
+    console.log(`Attempting to extract store code from PDF filename: ${filename}`);
     
     // 1. Buscar por patrón J12345ABCDE (formato común que comienza con J seguido de números y letras)
     const j_pattern = /\b(J\d{5}[A-Z0-9]{4,5})\b/i;
-    const j_match = filename.match(j_pattern);
+    const j_match = originalFilename.match(j_pattern);
       
     if (j_match && j_match[1]) {
       pdfStoreCode = j_match[1];
+      console.log(`Pattern 1 matched: ${pdfStoreCode}`);
     }
     // 2. Intentar formato general de códigos: LETRA+NÚMEROS o NÚMEROS+LETRA
     else {
       const general_pattern = /\b([A-Z]\d{1,6}|J\d{2,6}[a-z]{1,3})\b/i;
-      const general_match = filename.match(general_pattern);
+      const general_match = originalFilename.match(general_pattern);
         
       if (general_match && general_match[1]) {
         pdfStoreCode = general_match[1];
+        console.log(`Pattern 2 matched: ${pdfStoreCode}`);
       }
-      // 3. Intentar el formato común de tiendas en el sistema
+      // 3. Intentar patrones específicos para las tiendas en el sistema
       else {
-        const known_stores = ['Montera', 'Central', 'Plaza', 'Norte', 'Sur'];
-        for (const knownStore of known_stores) {
-          if (filename.toLowerCase().includes(knownStore.toLowerCase())) {
-            pdfStoreCode = knownStore;
+        // Obtener todos los códigos de tienda existentes
+        const allStores = await storage.getStores();
+        const storesCodes = allStores.map(store => store.code);
+        
+        // Buscar si algún código de tienda aparece en el nombre del archivo
+        for (const code of storesCodes) {
+          if (originalFilename.includes(code)) {
+            pdfStoreCode = code;
+            console.log(`Found exact store code in filename: ${pdfStoreCode}`);
             break;
+          }
+        }
+        
+        // Si todavía no hemos encontrado, buscar por nombres comunes
+        if (!pdfStoreCode) {
+          const known_stores = ['Montera', 'Central', 'Plaza', 'Norte', 'Sur'];
+          for (const knownStore of known_stores) {
+            if (originalFilename.toLowerCase().includes(knownStore.toLowerCase())) {
+              pdfStoreCode = knownStore;
+              console.log(`Found known store name in filename: ${pdfStoreCode}`);
+              break;
+            }
           }
         }
       }
     }
     
     // Si hemos detectado un posible código de tienda, verificar que existe en la base de datos
-    // y actualizar la actividad de archivo
     if (pdfStoreCode) {
       const pdfStore = await storage.getStoreByCode(pdfStoreCode);
       
       if (pdfStore) {
         console.log(`Found matching store in database for PDF: ${pdfStore.code}`);
+        foundInDatabase = true;
         
         // Actualizar la actividad del archivo con el código correcto de tienda
         const activity = await storage.getFileActivity(activityId);
@@ -565,17 +588,29 @@ export async function processPdfFile(filePath: string, activityId: number, store
             console.error(`Error updating PDF activity with correct store code:`, updateError);
           }
         }
+      } else {
+        console.log(`Extracted store code '${pdfStoreCode}' not found in database`);
       }
+    } else {
+      console.log(`No store code pattern matched in filename: ${filename}`);
     }
     
-    // Verificar si el código de tienda existe, si no existe usar un código por defecto
-    const store = await storage.getStoreByCode(storeCode);
-    if (!store) {
-      // Si el código de tienda no existe, intentar usar cualquier tienda PDF existente
+    // Si no hemos encontrado una tienda válida, usar una tienda PDF por defecto
+    if (!foundInDatabase) {
+      // Obtener todas las tiendas PDF
       const pdfStores = await storage.getStoresByType('PDF');
       if (pdfStores.length > 0) {
+        // Usar la primera tienda PDF disponible
         storeCode = pdfStores[0].code;
-        console.log(`Store with code ${storeCode} does not exist, using default PDF store: ${storeCode}`);
+        console.log(`Using default PDF store: ${storeCode}`);
+        
+        // Actualizar el registro de actividad
+        try {
+          await storage.updateFileActivity(activityId, { storeCode: storeCode });
+          console.log(`Updated PDF activity with default store code: ${storeCode}`);
+        } catch (updateError) {
+          console.error(`Error updating PDF activity with default store code:`, updateError);
+        }
       } else {
         throw new Error(`No PDF stores exist in the system. Please create at least one PDF store.`);
       }
