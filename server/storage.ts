@@ -1440,11 +1440,16 @@ export class DatabaseStorage implements IStorage {
       
       let sqlConditions: string[] = [];
       
+      // Determinar si es una búsqueda simple (sólo query sin filtros) o avanzada
+      const isSimpleSearch = query && (!filters || Object.keys(filters).length === 0);
+      console.log("Tipo de búsqueda:", isSimpleSearch ? "Simple" : "Avanzada");
+      
       // Procesar la consulta general si existe
       if (query && query.trim() !== '') {
         const searchTermEscaped = escapeLikePattern(query.trim());
         const isNumericQuery = !isNaN(Number(query.trim()));
         
+        // Siempre incluir condiciones de texto
         const textConditions = [
           `customer_name ILIKE ${searchTermEscaped}`,
           `customer_contact ILIKE ${searchTermEscaped}`,
@@ -1463,9 +1468,13 @@ export class DatabaseStorage implements IStorage {
           
           const numericConditions = [
             `order_number = ${exactValue}`,
-            `customer_contact = ${exactValue}`,
-            `(NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) = ${numericValue})`
+            `customer_contact = ${exactValue}`
           ];
+          
+          // Añadir condición de precio sólo si el valor es mayor que cero
+          if (numericValue > 0) {
+            numericConditions.push(`(NULLIF(price, '') IS NOT NULL AND TRIM(price) != '' AND CAST(price AS DECIMAL) = ${numericValue})`);
+          }
           
           sqlConditions.push(`(${textConditions.join(' OR ')} OR ${numericConditions.join(' OR ')})`);
         } else {
