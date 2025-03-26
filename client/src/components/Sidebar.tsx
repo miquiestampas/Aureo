@@ -32,7 +32,7 @@ const NavItem = ({ href, icon, label, active, requiredRoles, userRole }: NavItem
     <Link href={href}>
       <a
         className={cn(
-          "sidebar-item flex items-center px-4 py-3 text-sm font-medium text-white hover:bg-primary-dark/50 rounded-md transition-colors",
+          "sidebar-item flex items-center px-4 py-3 text-sm font-medium text-white hover:bg-yellow-500/20 hover:text-yellow-500 rounded-md transition-colors",
           active && "bg-yellow-500/20 text-yellow-500"
         )}
       >
