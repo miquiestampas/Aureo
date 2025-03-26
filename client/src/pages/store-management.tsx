@@ -161,7 +161,7 @@ export default function StoreManagementPage() {
   const { data: stores, refetch: refetchStores } = useQuery<StoreData[]>({
     queryKey: ['/api/stores'],
   });
-  
+
   // Create store form
   const createForm = useForm<StoreFormValues>({
     resolver: zodResolver(storeFormSchema),
@@ -183,7 +183,7 @@ export default function StoreManagementPage() {
       notes: "",
     },
   });
-  
+
   // Edit store form
   const editForm = useForm<StoreFormValues>({
     resolver: zodResolver(storeFormSchema),
@@ -205,7 +205,7 @@ export default function StoreManagementPage() {
       notes: "",
     },
   });
-  
+
   // Set edit form values when a store is selected
   useEffect(() => {
     if (selectedStore && isEditDialogOpen) {
@@ -230,7 +230,7 @@ export default function StoreManagementPage() {
       });
     }
   }, [selectedStore, isEditDialogOpen, editForm]);
-  
+
   // Create store mutation
   const createMutation = useMutation({
     mutationFn: async (data: StoreFormValues) => {
@@ -254,7 +254,7 @@ export default function StoreManagementPage() {
       });
     },
   });
-  
+
   // Update store mutation
   const updateMutation = useMutation({
     mutationFn: async (data: StoreFormValues & { id: number }) => {
@@ -279,7 +279,7 @@ export default function StoreManagementPage() {
       });
     },
   });
-  
+
   // Delete store mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -302,49 +302,49 @@ export default function StoreManagementPage() {
       });
     },
   });
-  
+
   // Handle create form submission
   const onCreateSubmit = (data: StoreFormValues) => {
     createMutation.mutate(data);
   };
-  
+
   // Handle edit form submission
   const onEditSubmit = (data: StoreFormValues) => {
     if (!selectedStore) return;
-    
+
     updateMutation.mutate({
       id: selectedStore.id,
       ...data,
     });
   };
-  
+
   // Handle delete confirmation
   const confirmDelete = () => {
     if (!selectedStore) return;
     deleteMutation.mutate(selectedStore.id);
   };
-  
+
   // Open edit dialog for a store
   const handleEditStore = (store: StoreData) => {
     setSelectedStore(store);
     setIsEditDialogOpen(true);
   };
-  
+
   // Open delete dialog for a store
   const handleDeleteStore = (store: StoreData) => {
     setSelectedStore(store);
     setIsDeleteDialogOpen(true);
   };
-  
+
   // Open detail dialog for a store
   const handleViewStoreDetails = (store: StoreData) => {
     setSelectedStore(store);
     setIsDetailDialogOpen(true);
   };
-  
+
   // Check if user can edit/delete (only SuperAdmin and Admin)
   const canModify = user?.role === "SuperAdmin" || user?.role === "Admin";
-  
+
   // Data table columns
   const columns: ColumnDef<StoreData>[] = [
     {
@@ -446,7 +446,7 @@ export default function StoreManagementPage() {
       }
     ] : []),
   ];
-  
+
   return (
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
@@ -455,7 +455,7 @@ export default function StoreManagementPage() {
             <h1 className="text-2xl font-semibold text-gray-900">Gestión de Tiendas</h1>
             <p className="text-gray-500 mt-1">Administre sus tiendas de Excel y PDF</p>
           </div>
-          
+
           {canModify && (
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
@@ -464,14 +464,14 @@ export default function StoreManagementPage() {
                   Añadir Nueva Tienda
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-3xl">
                 <DialogHeader>
                   <DialogTitle>Crear Nueva Tienda</DialogTitle>
                   <DialogDescription>
                     Añadir una nueva tienda al sistema.
                   </DialogDescription>
                 </DialogHeader>
-                
+
                 <Form {...createForm}>
                   <form onSubmit={createForm.handleSubmit(onCreateSubmit)} className="space-y-4 py-4">
                     <FormField
@@ -490,7 +490,7 @@ export default function StoreManagementPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={createForm.control}
                       name="name"
@@ -504,7 +504,7 @@ export default function StoreManagementPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={createForm.control}
                       name="type"
@@ -532,7 +532,7 @@ export default function StoreManagementPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={createForm.control}
@@ -561,7 +561,7 @@ export default function StoreManagementPage() {
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={createForm.control}
                         name="district"
@@ -576,7 +576,7 @@ export default function StoreManagementPage() {
                         )}
                       />
                     </div>
-                    
+
                     <FormField
                       control={createForm.control}
                       name="active"
@@ -601,7 +601,7 @@ export default function StoreManagementPage() {
                     {/* Nuevos campos - Información adicional */}
                     <div className="border rounded-md p-4 mt-6">
                       <h3 className="font-medium mb-3">Información Adicional</h3>
-                      
+
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={createForm.control}
@@ -616,7 +616,7 @@ export default function StoreManagementPage() {
                             </FormItem>
                           )}
                         />
-                        
+
                         <FormField
                           control={createForm.control}
                           name="phone"
@@ -631,7 +631,7 @@ export default function StoreManagementPage() {
                           )}
                         />
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4 mt-4">
                         <FormField
                           control={createForm.control}
@@ -646,7 +646,7 @@ export default function StoreManagementPage() {
                             </FormItem>
                           )}
                         />
-                        
+
                         <FormField
                           control={createForm.control}
                           name="cif"
@@ -661,7 +661,7 @@ export default function StoreManagementPage() {
                           )}
                         />
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4 mt-4">
                         <FormField
                           control={createForm.control}
@@ -676,7 +676,7 @@ export default function StoreManagementPage() {
                             </FormItem>
                           )}
                         />
-                        
+
                         <FormField
                           control={createForm.control}
                           name="ownerName"
@@ -691,7 +691,7 @@ export default function StoreManagementPage() {
                           )}
                         />
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4 mt-4">
                         <FormField
                           control={createForm.control}
@@ -706,7 +706,7 @@ export default function StoreManagementPage() {
                             </FormItem>
                           )}
                         />
-                        
+
                         <FormField
                           control={createForm.control}
                           name="startDate"
@@ -721,7 +721,7 @@ export default function StoreManagementPage() {
                           )}
                         />
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4 mt-4">
                         <FormField
                           control={createForm.control}
@@ -737,7 +737,7 @@ export default function StoreManagementPage() {
                           )}
                         />
                       </div>
-                      
+
                       <div className="mt-4">
                         <FormField
                           control={createForm.control}
@@ -758,7 +758,7 @@ export default function StoreManagementPage() {
                         />
                       </div>
                     </div>
-                    
+
                     <DialogFooter>
                       <Button 
                         type="button" 
@@ -780,7 +780,7 @@ export default function StoreManagementPage() {
             </Dialog>
           )}
         </div>
-        
+
         {/* Stores Table */}
         <Card>
           <CardHeader>
@@ -807,18 +807,18 @@ export default function StoreManagementPage() {
             )}
           </CardContent>
         </Card>
-        
+
         {/* Edit Store Dialog */}
         {selectedStore && (
           <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-            <DialogContent>
+            <DialogContent className="max-w-3xl">
               <DialogHeader>
                 <DialogTitle>Editar Tienda</DialogTitle>
                 <DialogDescription>
                   Actualizar la información de la tienda.
                 </DialogDescription>
               </DialogHeader>
-              
+
               <Form {...editForm}>
                 <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-4">
                   <FormField
@@ -834,7 +834,7 @@ export default function StoreManagementPage() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={editForm.control}
                     name="name"
@@ -848,7 +848,7 @@ export default function StoreManagementPage() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={editForm.control}
                     name="type"
@@ -873,7 +873,7 @@ export default function StoreManagementPage() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={editForm.control}
@@ -902,7 +902,7 @@ export default function StoreManagementPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={editForm.control}
                       name="district"
@@ -917,7 +917,7 @@ export default function StoreManagementPage() {
                       )}
                     />
                   </div>
-                  
+
                   <FormField
                     control={editForm.control}
                     name="active"
@@ -942,7 +942,7 @@ export default function StoreManagementPage() {
                   {/* Nuevos campos - Información adicional */}
                   <div className="border rounded-md p-4 mt-6">
                     <h3 className="font-medium mb-3">Información Adicional</h3>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={editForm.control}
@@ -957,7 +957,7 @@ export default function StoreManagementPage() {
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={editForm.control}
                         name="phone"
@@ -972,7 +972,7 @@ export default function StoreManagementPage() {
                         )}
                       />
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <FormField
                         control={editForm.control}
@@ -987,7 +987,7 @@ export default function StoreManagementPage() {
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={editForm.control}
                         name="cif"
@@ -1002,7 +1002,7 @@ export default function StoreManagementPage() {
                         )}
                       />
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <FormField
                         control={editForm.control}
@@ -1017,7 +1017,7 @@ export default function StoreManagementPage() {
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={editForm.control}
                         name="ownerName"
@@ -1032,7 +1032,7 @@ export default function StoreManagementPage() {
                         )}
                       />
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <FormField
                         control={editForm.control}
@@ -1047,7 +1047,7 @@ export default function StoreManagementPage() {
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={editForm.control}
                         name="startDate"
@@ -1062,7 +1062,7 @@ export default function StoreManagementPage() {
                         )}
                       />
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <FormField
                         control={editForm.control}
@@ -1078,7 +1078,7 @@ export default function StoreManagementPage() {
                         )}
                       />
                     </div>
-                    
+
                     <div className="mt-4">
                       <FormField
                         control={editForm.control}
@@ -1099,7 +1099,7 @@ export default function StoreManagementPage() {
                       />
                     </div>
                   </div>
-                  
+
                   <DialogFooter>
                     <Button 
                       type="button" 
@@ -1120,7 +1120,7 @@ export default function StoreManagementPage() {
             </DialogContent>
           </Dialog>
         )}
-        
+
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <AlertDialogContent>
@@ -1156,12 +1156,12 @@ export default function StoreManagementPage() {
                   Información completa de la tienda
                 </DialogDescription>
               </DialogHeader>
-              
+
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div className="border rounded-md p-4">
                     <h3 className="font-medium mb-3 border-b pb-2">Información Básica</h3>
-                    
+
                     <div className="space-y-2">
                       <div>
                         <span className="font-medium">Código:</span> 
@@ -1209,10 +1209,10 @@ export default function StoreManagementPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="border rounded-md p-4">
                     <h3 className="font-medium mb-3 border-b pb-2">Fechas</h3>
-                    
+
                     <div className="space-y-2">
                       <div>
                         <span className="font-medium">Fecha de inicio:</span> 
@@ -1233,11 +1233,11 @@ export default function StoreManagementPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="border rounded-md p-4">
                     <h3 className="font-medium mb-3 border-b pb-2">Información de Contacto</h3>
-                    
+
                     <div className="space-y-2">
                       <div>
                         <span className="font-medium">Dirección:</span> 
@@ -1253,10 +1253,10 @@ export default function StoreManagementPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="border rounded-md p-4">
                     <h3 className="font-medium mb-3 border-b pb-2">Información Empresarial</h3>
-                    
+
                     <div className="space-y-2">
                       <div>
                         <span className="font-medium">CIF:</span> 
@@ -1278,14 +1278,14 @@ export default function StoreManagementPage() {
                   </div>
                 </div>
               </div>
-              
+
               {selectedStore.notes && (
                 <div className="border rounded-md p-4 mt-4">
                   <h3 className="font-medium mb-3 border-b pb-2">Anotaciones</h3>
                   <p className="whitespace-pre-wrap text-sm">{selectedStore.notes}</p>
                 </div>
               )}
-              
+
               <DialogFooter className="mt-6">
                 <Button 
                   variant="outline" 
