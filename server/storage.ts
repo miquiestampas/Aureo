@@ -1416,134 +1416,170 @@ export class DatabaseStorage implements IStorage {
     return document;
   }
   
-  // Nuevos métodos de ExcelData para búsqueda
+  // Métodos de ExcelData para búsqueda
   async searchExcelData(query: string, filters?: any): Promise<ExcelData[]> {
     console.log("DatabaseStorage.searchExcelData - Parámetros:", { query, filters });
     
     try {
-      // Crear la consulta base con Drizzle
-      let baseQuery = db.select().from(excelData);
+      // Si el query es numérico, buscar coincidencias exactas en campos numéricos
+      const isNumericQuery = !isNaN(Number(query)) && query.trim() !== '';
+      
+      // Crear la consulta base con Drizzle usando SQL directa para mayor control
+      // Esto nos permite manejar mejor las búsquedas de texto vs. números
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let index = 1;
+      
+      function addParam(value: any) {
+        params.push(value);
+        return `$${index++}`;
+      }
       
       // Verificar si hay una consulta general
       const hasQuery = query && query.trim() !== '';
       
-      // Aplicar filtros
       if (hasQuery) {
-        // Búsqueda general - utilizamos SQL generado
-        const searchTerm = `%${query.trim()}%`;
-        
-        // Crear una condición combinada para la búsqueda de texto
-        baseQuery = baseQuery.where(
-          sql`(
-            ${excelData.customerName} ILIKE ${searchTerm} OR
-            ${excelData.customerContact} ILIKE ${searchTerm} OR
-            ${excelData.orderNumber} ILIKE ${searchTerm} OR
-            ${excelData.itemDetails} ILIKE ${searchTerm} OR
-            ${excelData.metals} ILIKE ${searchTerm} OR
-            ${excelData.engravings} ILIKE ${searchTerm} OR
-            ${excelData.stones} ILIKE ${searchTerm} OR
-            ${excelData.pawnTicket} ILIKE ${searchTerm}
-          )`
-        );
+        if (isNumericQuery) {
+          // Búsqueda numérica - buscar coincidencias exactas y parciales
+          const numericValue = Number(query.trim());
+          const searchTerm = `%${query.trim()}%`;
+          
+          // Construir condición para búsqueda numérica
+          conditions.push(`(
+            "orderNumber" = ${addParam(query.trim())} OR
+            "orderNumber" ILIKE ${addParam(searchTerm)} OR
+            "customerContact" = ${addParam(query.trim())} OR
+            "customerContact" ILIKE ${addParam(searchTerm)} OR
+            (NULLIF("price", '') IS NOT NULL AND TRIM("price") != '' AND CAST("price" AS DECIMAL) = ${addParam(numericValue)})
+          )`);
+        } else {
+          // Búsqueda de texto - usar ILIKE para todas las columnas de texto
+          const searchTerm = `%${query.trim()}%`;
+          
+          conditions.push(`(
+            "customerName" ILIKE ${addParam(searchTerm)} OR
+            "customerContact" ILIKE ${addParam(searchTerm)} OR
+            "orderNumber" ILIKE ${addParam(searchTerm)} OR
+            "itemDetails" ILIKE ${addParam(searchTerm)} OR
+            "metals" ILIKE ${addParam(searchTerm)} OR
+            "engravings" ILIKE ${addParam(searchTerm)} OR
+            "stones" ILIKE ${addParam(searchTerm)} OR
+            "pawnTicket" ILIKE ${addParam(searchTerm)}
+          )`);
+        }
       }
       
       // Aplicar filtros adicionales si están presentes
       if (filters) {
         // Filtro por tienda
-        if (filters.storeCode) {
-          baseQuery = baseQuery.where(eq(excelData.storeCode, filters.storeCode));
+        if (filters.storeCode && filters.storeCode !== "all") {
+          conditions.push(`"storeCode" = ${addParam(filters.storeCode)}`);
         }
         
-        // Filtros específicos por campo
+        // Filtros específicos por campo de texto
         if (filters.customerName) {
-          baseQuery = baseQuery.where(
-            sql`${excelData.customerName} ILIKE ${`%${filters.customerName}%`}`
-          );
+          conditions.push(`"customerName" ILIKE ${addParam(`%${filters.customerName}%`)}`);
         }
         
         if (filters.customerContact) {
-          baseQuery = baseQuery.where(
-            sql`${excelData.customerContact} ILIKE ${`%${filters.customerContact}%`}`
-          );
+          conditions.push(`"customerContact" ILIKE ${addParam(`%${filters.customerContact}%`)}`);
         }
         
         if (filters.orderNumber) {
-          baseQuery = baseQuery.where(
-            sql`${excelData.orderNumber} ILIKE ${`%${filters.orderNumber}%`}`
-          );
+          conditions.push(`"orderNumber" ILIKE ${addParam(`%${filters.orderNumber}%`)}`);
         }
         
         if (filters.itemDetails) {
-          baseQuery = baseQuery.where(
-            sql`${excelData.itemDetails} ILIKE ${`%${filters.itemDetails}%`}`
-          );
+          conditions.push(`"itemDetails" ILIKE ${addParam(`%${filters.itemDetails}%`)}`);
         }
         
         if (filters.metals) {
-          baseQuery = baseQuery.where(
-            sql`${excelData.metals} ILIKE ${`%${filters.metals}%`}`
-          );
+          conditions.push(`"metals" ILIKE ${addParam(`%${filters.metals}%`)}`);
         }
         
         // Filtros de fecha
         if (filters.fromDate) {
-          baseQuery = baseQuery.where(
-            sql`${excelData.orderDate} >= ${filters.fromDate}`
-          );
+          conditions.push(`"orderDate" >= ${addParam(filters.fromDate)}`);
         }
         
         if (filters.toDate) {
-          baseQuery = baseQuery.where(
-            sql`${excelData.orderDate} <= ${filters.toDate}`
-          );
+          conditions.push(`"orderDate" <= ${addParam(filters.toDate)}`);
         }
         
-        // Filtros de precio
+        // Filtros de precio - manejar todos los casos posibles
         if (filters.priceExact && !isNaN(parseFloat(filters.priceExact))) {
           const price = parseFloat(filters.priceExact);
-          baseQuery = baseQuery.where(
-            sql`CAST(${excelData.price} AS DECIMAL) = ${price}`
-          );
+          conditions.push(`NULLIF("price", '') IS NOT NULL AND TRIM("price") != '' AND CAST("price" AS DECIMAL) = ${addParam(price)}`);
         } else {
           if (filters.priceMin && !isNaN(parseFloat(filters.priceMin))) {
             const minPrice = parseFloat(filters.priceMin);
             if (filters.priceIncludeEqual) {
-              baseQuery = baseQuery.where(
-                sql`CAST(${excelData.price} AS DECIMAL) >= ${minPrice}`
-              );
+              conditions.push(`NULLIF("price", '') IS NOT NULL AND TRIM("price") != '' AND CAST("price" AS DECIMAL) >= ${addParam(minPrice)}`);
             } else {
-              baseQuery = baseQuery.where(
-                sql`CAST(${excelData.price} AS DECIMAL) > ${minPrice}`
-              );
+              conditions.push(`NULLIF("price", '') IS NOT NULL AND TRIM("price") != '' AND CAST("price" AS DECIMAL) > ${addParam(minPrice)}`);
             }
           }
           
           if (filters.priceMax && !isNaN(parseFloat(filters.priceMax))) {
             const maxPrice = parseFloat(filters.priceMax);
             if (filters.priceIncludeEqual) {
-              baseQuery = baseQuery.where(
-                sql`CAST(${excelData.price} AS DECIMAL) <= ${maxPrice}`
-              );
+              conditions.push(`NULLIF("price", '') IS NOT NULL AND TRIM("price") != '' AND CAST("price" AS DECIMAL) <= ${addParam(maxPrice)}`);
             } else {
-              baseQuery = baseQuery.where(
-                sql`CAST(${excelData.price} AS DECIMAL) < ${maxPrice}`
-              );
+              conditions.push(`NULLIF("price", '') IS NOT NULL AND TRIM("price") != '' AND CAST("price" AS DECIMAL) < ${addParam(maxPrice)}`);
             }
           }
         }
       }
       
+      // Construir la consulta completa
+      let sqlQuery = 'SELECT * FROM "excel_data"';
+      
+      // Agregar WHERE si hay condiciones
+      if (conditions.length > 0) {
+        sqlQuery += ` WHERE ${conditions.join(' AND ')}`;
+      }
+      
       // Ordenar por fecha de orden descendente
-      baseQuery = baseQuery.orderBy(desc(excelData.orderDate));
+      sqlQuery += ' ORDER BY "orderDate" DESC';
+      
+      console.log("SQL Query:", sqlQuery);
+      console.log("SQL Params:", params);
       
       // Ejecutar la consulta
-      const results = await baseQuery;
-      console.log(`DatabaseStorage.searchExcelData - Resultados: ${results.length}`);
+      const result = await db.execute(sqlQuery, params);
       
+      if (!result.rows || !Array.isArray(result.rows)) {
+        console.log("No se encontraron resultados o formato de respuesta inesperado");
+        return [];
+      }
+      
+      // Mapear los resultados a objetos ExcelData
+      const results = result.rows.map(row => {
+        return {
+          id: row.id,
+          storeCode: row.storeCode,
+          orderNumber: row.orderNumber,
+          orderDate: new Date(row.orderDate),
+          customerName: row.customerName,
+          customerContact: row.customerContact,
+          itemDetails: row.itemDetails,
+          metals: row.metals,
+          engravings: row.engravings,
+          stones: row.stones,
+          carats: row.carats,
+          price: row.price,
+          pawnTicket: row.pawnTicket,
+          saleDate: row.saleDate ? new Date(row.saleDate) : null,
+          fileActivityId: row.fileActivityId
+        } as ExcelData;
+      });
+      
+      console.log(`DatabaseStorage.searchExcelData - Resultados: ${results.length}`);
       return results;
+      
     } catch (error) {
       console.error("Error en la búsqueda de datos de Excel:", error);
-      return [];
+      throw error; // Propagar el error para que sea manejado apropiadamente
     }
   }
   

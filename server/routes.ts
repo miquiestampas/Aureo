@@ -535,135 +535,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verificamos si es búsqueda simple (solo tiene la propiedad query)
       const isSimpleSearch = Object.keys(req.body).length === 1 && query;
       
-      if (isSimpleSearch) {
-        console.log("Procesando como búsqueda simple con query:", query);
-        // Para búsqueda simple, solo usamos el query sin filtros adicionales
-        const results = await storage.searchExcelData(query, {});
+      // Preparar filtros
+      const filters: any = {};
+      
+      // Agregar filtros solo si no es una búsqueda simple
+      if (!isSimpleSearch) {
+        // Agregar filtros de búsqueda avanzada
+        if (storeCode && storeCode !== "all") filters.storeCode = storeCode;
         
-        // Registrar búsqueda en historial
-        if (req.isAuthenticated() && query.trim()) {
-          try {
-            const searchEntry: any = {
-              userId: req.user!.id,
-              searchType: "General",
-              searchTerms: query,
-              searchDate: new Date(),
-              resultCount: results.length,
-              filters: "{}"
-            };
-            
-            await storage.addSearchHistory(searchEntry);
-          } catch (historyError) {
-            console.error("Error saving search history:", historyError);
+        // Filtros de fecha
+        if (dateFrom) filters.fromDate = new Date(dateFrom);
+        if (dateTo) filters.toDate = new Date(dateTo);
+        
+        // Filtros específicos por campo
+        if (orderNumber) filters.orderNumber = orderNumber;
+        if (customerName) filters.customerName = customerName;
+        if (customerContact) filters.customerContact = customerContact;
+        if (itemDetails) filters.itemDetails = itemDetails;
+        if (metals) filters.metals = metals;
+        
+        // Manejar filtrado de precios con operadores
+        if (price && !isNaN(parseFloat(price))) {
+          const numericPrice = parseFloat(price);
+          switch (priceOperator) {
+            case ">":
+              filters.priceMin = numericPrice;
+              break;
+            case "<":
+              filters.priceMax = numericPrice;
+              break;
+            case ">=":
+              filters.priceMin = numericPrice;
+              filters.priceIncludeEqual = true;
+              break;
+            case "<=":
+              filters.priceMax = numericPrice;
+              filters.priceIncludeEqual = true;
+              break;
+            case "=":
+            default:
+              filters.priceExact = numericPrice;
+              break;
           }
         }
-        
-        return res.json({
-          results,
-          count: results.length,
-          searchType: "simple"
-        });
       }
       
-      // Si llegamos aquí, es una búsqueda avanzada
+      // Ejecutar la búsqueda con los filtros configurados
+      console.log(`Realizando búsqueda ${isSimpleSearch ? 'simple' : 'avanzada'} con:`, { query, filters });
+      let results = await storage.searchExcelData(query, filters);
       
-      // Build filters object
-      const filters: any = {
-        query, 
-        storeCode
-      };
+      console.log(`Búsqueda completada. Encontrados ${results.length} resultados`);
       
-      // Add date filters
-      if (dateFrom) filters.fromDate = new Date(dateFrom);
-      if (dateTo) filters.toDate = new Date(dateTo);
-      
-      // Add specific field filters
-      if (orderNumber) filters.orderNumber = orderNumber;
-      if (customerName) filters.customerName = customerName;
-      if (customerContact) filters.customerContact = customerContact;
-      if (itemDetails) filters.itemDetails = itemDetails;
-      if (metals) filters.metals = metals;
-      
-      // Handle price filtering with operators
-      if (price && !isNaN(parseFloat(price))) {
-        const numericPrice = parseFloat(price);
-        switch (priceOperator) {
-          case ">":
-            filters.priceMin = numericPrice;
-            break;
-          case "<":
-            filters.priceMax = numericPrice;
-            break;
-          case ">=":
-            filters.priceMin = numericPrice;
-            filters.priceIncludeEqual = true;
-            break;
-          case "<=":
-            filters.priceMax = numericPrice;
-            filters.priceIncludeEqual = true;
-            break;
-          case "=":
-          default:
-            filters.priceExact = numericPrice;
-            break;
+      // Si necesitamos filtrar por alertas, obtener alertas para cada registro
+      if (onlyAlerts && !isSimpleSearch) {
+        try {
+          // Obtener todas las alertas
+          const allAlerts = await storage.getAlerts();
+          
+          // Obtener todos los IDs de excelData que tienen alertas
+          const excelDataIdsWithAlerts = new Set(
+            allAlerts.map(alert => alert.excelDataId)
+          );
+          
+          // Filtrar resultados a solo aquellos con alertas
+          results = results.filter(record => excelDataIdsWithAlerts.has(record.id));
+          console.log(`Filtrado por alertas completado. Quedan ${results.length} resultados`);
+        } catch (alertError) {
+          console.error("Error al filtrar por alertas:", alertError);
+          // Continuar con los resultados sin filtrar
         }
       }
       
-      // Perform search
-      let results = await storage.searchExcelData(query, filters);
+      // Para cada resultado, verificar si tiene alertas y agregar una propiedad hasAlerts
+      let resultsWithAlertFlags = results;
       
-      // If we need to filter by alerts, get alerts for each record
-      if (onlyAlerts) {
-        // First get all alerts
+      try {
         const allAlerts = await storage.getAlerts();
-        
-        // Get all excelDataIds that have alerts
-        const excelDataIdsWithAlerts = new Set(
-          allAlerts.map(alert => alert.excelDataId)
-        );
-        
-        // Filter results to only those with alerts
-        results = results.filter(record => excelDataIdsWithAlerts.has(record.id));
+        resultsWithAlertFlags = results.map(record => {
+          const recordAlerts = allAlerts.filter(alert => alert.excelDataId === record.id);
+          return {
+            ...record,
+            hasAlerts: recordAlerts.length > 0
+          };
+        });
+      } catch (alertError) {
+        console.error("Error al obtener alertas para los resultados:", alertError);
+        // En caso de error, continuamos con los resultados originales
+        resultsWithAlertFlags = results.map(record => ({
+          ...record,
+          hasAlerts: false
+        }));
       }
       
-      // For each result, check if it has alerts and add a hasAlerts property
-      const allAlerts = await storage.getAlerts();
-      const resultsWithAlertFlags = results.map(record => {
-        const recordAlerts = allAlerts.filter(alert => alert.excelDataId === record.id);
-        return {
-          ...record,
-          hasAlerts: recordAlerts.length > 0
-        };
-      });
-      
-      // Add search to history if user is authenticated
-      if (req.isAuthenticated()) {
+      // Agregar búsqueda al historial si el usuario está autenticado
+      if (req.isAuthenticated() && query.trim()) {
         try {
-          // Usar "General" como tipo de búsqueda ya que "excel_data_advanced" no está en el enum
+          // Usar "General" como tipo de búsqueda por defecto
           const searchEntry: any = {
             userId: req.user!.id,
-            searchType: "General", // Usamos un tipo dentro del enum: "Cliente" | "Artículo" | "Orden" | "General"
-            searchTerms: query || "Búsqueda avanzada", // Usar searchTerms en lugar de query
+            searchType: "General",
+            searchTerms: query || (isSimpleSearch ? "" : "Búsqueda avanzada"),
             searchDate: new Date(),
             resultCount: results.length,
-            filters: JSON.stringify(filters)
+            filters: isSimpleSearch ? "{}" : JSON.stringify(filters)
           };
           
           await storage.addSearchHistory(searchEntry);
         } catch (historyError) {
-          console.error("Error saving search history:", historyError);
-          // Don't fail the request if history saving fails
+          console.error("Error al guardar historial de búsqueda:", historyError);
         }
       }
       
-      res.json({
+      // Devolver resultados con información sobre alertas
+      return res.json({
         results: resultsWithAlertFlags,
         count: resultsWithAlertFlags.length,
-        searchType: "advanced"
+        searchType: isSimpleSearch ? "simple" : "advanced"
       });
-    } catch (error) {
-      console.error("Advanced search error:", error);
-      res.status(500).json({ error: "Error al realizar la búsqueda avanzada" });
+    } catch (err) {
+      console.error("Error en la búsqueda:", err);
+      res.status(500).json({ 
+        error: "Error al realizar la búsqueda", 
+        message: err instanceof Error ? err.message : "Error desconocido" 
+      });
     }
   });
   
