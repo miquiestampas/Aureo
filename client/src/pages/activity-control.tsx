@@ -228,7 +228,7 @@ export default function ActivityControlPage() {
             {type === "Excel" ? (
               <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" />
             ) : (
-              <FileText className="mr-2 h-4 w-4 text-blue-600" />
+              <FileText className="mr-2 h-4 w-4 text-red-600" />
             )}
             <span>{type}</span>
           </div>
@@ -505,7 +505,7 @@ export default function ActivityControlPage() {
                                 </div>
                               ) : (
                                 <div className="flex items-center">
-                                  <FileText className="mr-2 h-4 w-4 text-blue-600" />
+                                  <FileText className="mr-2 h-4 w-4 text-red-600" />
                                   <span>PDF</span>
                                 </div>
                               )}
