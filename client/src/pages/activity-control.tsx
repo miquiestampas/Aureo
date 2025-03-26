@@ -71,8 +71,8 @@ export default function ActivityControlPage() {
   const [codeFilter, setCodeFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [typeFilter, setTypeFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [stores, setStores] = useState<Store[]>([]);
   const [storeActivities, setStoreActivities] = useState<StoreActivity[]>([]);
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
@@ -156,8 +156,8 @@ export default function ActivityControlPage() {
     const matchesCode = store.code.toLowerCase().includes(codeFilter.toLowerCase());
     const matchesName = store.name.toLowerCase().includes(nameFilter.toLowerCase());
     const matchesLocation = store.location?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false;
-    const matchesType = typeFilter === "" || store.type === typeFilter;
-    const matchesStatus = statusFilter === "" || item.status === statusFilter;
+    const matchesType = typeFilter === "all" || store.type === typeFilter;
+    const matchesStatus = statusFilter === "all" || item.status === statusFilter;
     
     return (
       (codeFilter === "" || matchesCode) && 
@@ -373,7 +373,7 @@ export default function ActivityControlPage() {
                     <SelectValue placeholder="Todos los tipos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos los tipos</SelectItem>
+                    <SelectItem value="all">Todos los tipos</SelectItem>
                     <SelectItem value="Excel">Excel</SelectItem>
                     <SelectItem value="PDF">PDF</SelectItem>
                   </SelectContent>
@@ -389,7 +389,7 @@ export default function ActivityControlPage() {
                     <SelectValue placeholder="Todos los estados" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos los estados</SelectItem>
+                    <SelectItem value="all">Todos los estados</SelectItem>
                     <SelectItem value="active">Activa</SelectItem>
                     <SelectItem value="warning">Retrasada</SelectItem>
                     <SelectItem value="danger">Crítica</SelectItem>
