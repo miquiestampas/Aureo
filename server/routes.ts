@@ -22,7 +22,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Set up file upload middleware
   const upload = setupFileUpload();
-  const uploadMultiple = setupFileUpload();
+  const uploadMultiple = setupFileUpload().array('files', 20); // Permitir hasta 20 archivos a la vez
   
   // User routes
   app.get("/api/users", (req, res, next) => {
@@ -453,10 +453,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // File upload routes
+  // Carga individual de archivos Excel
   app.post("/api/upload/excel", upload.single("file"), async (req, res, next) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
+        return res.status(400).json({ message: "No se ha cargado ningún archivo" });
       }
       
       // Usamos un código de tienda genérico que será reemplazado automáticamente
@@ -470,7 +471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileType: 'Excel',
         status: 'Pending',
         processingDate: new Date(),
-        processedBy: 'Manual Upload',
+        processedBy: 'Carga Manual',
         errorMessage: null,
         metadata: null
       });
@@ -478,11 +479,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process the file in the background
       // El código de tienda será determinado automáticamente desde el archivo
       processExcelFile(req.file.path, activity.id, defaultStoreCode)
-        .catch(err => console.error("Error processing uploaded Excel file:", err));
+        .catch(err => console.error("Error al procesar archivo Excel cargado:", err));
       
       res.status(202).json({
         message: "Archivo cargado exitosamente y en cola para procesamiento",
         fileActivity: activity
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+  
+  // Carga masiva de archivos Excel
+  app.post("/api/upload/excel/batch", uploadMultiple, async (req, res, next) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: "No se ha cargado ningún archivo" });
+      }
+      
+      const defaultStoreCode = "PENDIENTE";
+      const activities = [];
+      
+      // Procesar cada archivo
+      const filePromises = req.files.map(async (file) => {
+        try {
+          // Crear actividad para cada archivo
+          const activity = await storage.createFileActivity({
+            filename: file.originalname,
+            storeCode: defaultStoreCode,
+            fileType: 'Excel',
+            status: 'Pending',
+            processingDate: new Date(),
+            processedBy: 'Carga Masiva',
+            errorMessage: null,
+            metadata: null
+          });
+          
+          activities.push(activity);
+          
+          // Procesar archivo en segundo plano
+          processExcelFile(file.path, activity.id, defaultStoreCode)
+            .catch(err => console.error(`Error al procesar archivo ${file.originalname}:`, err));
+            
+          return { filename: file.originalname, status: 'Encolado' };
+        } catch (err) {
+          console.error(`Error procesando archivo ${file.originalname}:`, err);
+          return { filename: file.originalname, status: 'Error', error: err.message };
+        }
+      });
+      
+      // Esperar a que todos los archivos sean procesados
+      const results = await Promise.all(filePromises);
+      
+      res.status(202).json({
+        message: `${req.files.length} archivos cargados exitosamente y en cola para procesamiento`,
+        files: results,
+        activities: activities
       });
     } catch (err) {
       next(err);
