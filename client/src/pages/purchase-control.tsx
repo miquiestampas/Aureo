@@ -167,7 +167,7 @@ export default function PurchaseControlPage() {
     mutationFn: async (params: SearchParams) => {
       const response = await apiRequest(
         "POST", 
-        "/api/search/excel-data", 
+        "/api/search/excel-data/advanced", 
         params
       );
       return await response.json();

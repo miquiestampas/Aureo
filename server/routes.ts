@@ -511,7 +511,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Excel search route
+  // Excel advanced search route for Purchase Control
+  app.post("/api/search/excel-data/advanced", async (req, res, next) => {
+    try {
+      // Extract all filters from the body
+      const {
+        query = "",
+        storeCode,
+        dateFrom,
+        dateTo,
+        orderNumber,
+        customerName,
+        customerContact,
+        itemDetails,
+        metals,
+        price,
+        priceOperator = "=",
+        onlyAlerts = false
+      } = req.body;
+      
+      // Build filters object
+      const filters: any = {
+        query, 
+        storeCode
+      };
+      
+      // Add date filters
+      if (dateFrom) filters.fromDate = new Date(dateFrom);
+      if (dateTo) filters.toDate = new Date(dateTo);
+      
+      // Add specific field filters
+      if (orderNumber) filters.orderNumber = orderNumber;
+      if (customerName) filters.customerName = customerName;
+      if (customerContact) filters.customerContact = customerContact;
+      if (itemDetails) filters.itemDetails = itemDetails;
+      if (metals) filters.metals = metals;
+      
+      // Handle price filtering with operators
+      if (price && !isNaN(parseFloat(price))) {
+        const numericPrice = parseFloat(price);
+        switch (priceOperator) {
+          case ">":
+            filters.priceMin = numericPrice;
+            break;
+          case "<":
+            filters.priceMax = numericPrice;
+            break;
+          case ">=":
+            filters.priceMin = numericPrice;
+            filters.priceIncludeEqual = true;
+            break;
+          case "<=":
+            filters.priceMax = numericPrice;
+            filters.priceIncludeEqual = true;
+            break;
+          case "=":
+          default:
+            filters.priceExact = numericPrice;
+            break;
+        }
+      }
+      
+      // Perform search
+      let results = await storage.searchExcelData(query, filters);
+      
+      // If we need to filter by alerts, get alerts for each record
+      if (onlyAlerts) {
+        // First get all alerts
+        const allAlerts = await storage.getAlerts();
+        
+        // Get all excelDataIds that have alerts
+        const excelDataIdsWithAlerts = new Set(
+          allAlerts.map(alert => alert.excelDataId)
+        );
+        
+        // Filter results to only those with alerts
+        results = results.filter(record => excelDataIdsWithAlerts.has(record.id));
+      }
+      
+      // For each result, check if it has alerts and add a hasAlerts property
+      const allAlerts = await storage.getAlerts();
+      const resultsWithAlertFlags = results.map(record => {
+        const recordAlerts = allAlerts.filter(alert => alert.excelDataId === record.id);
+        return {
+          ...record,
+          hasAlerts: recordAlerts.length > 0
+        };
+      });
+      
+      // Add search to history if user is authenticated
+      if (req.isAuthenticated()) {
+        try {
+          const searchEntry: InsertSearchHistory = {
+            userId: req.user!.id,
+            query: query || "Búsqueda avanzada",
+            searchType: "excel_data_advanced",
+            searchDate: new Date(),
+            resultCount: results.length,
+            filters: JSON.stringify(filters)
+          };
+          
+          await storage.addSearchHistory(searchEntry);
+        } catch (historyError) {
+          console.error("Error saving search history:", historyError);
+          // Don't fail the request if history saving fails
+        }
+      }
+      
+      res.json({
+        results: resultsWithAlertFlags,
+        count: resultsWithAlertFlags.length,
+        searchType: "advanced"
+      });
+    } catch (error) {
+      console.error("Advanced search error:", error);
+      res.status(500).json({ error: "Error al realizar la búsqueda avanzada" });
+    }
+  });
+  
+  // Original Excel search route
   app.get("/api/search/excel-data", async (req, res, next) => {
     try {
       // Extract query parameters
