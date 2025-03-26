@@ -492,16 +492,27 @@ export default function StoreManagementPage() {
 
   // Handle create form submission
   const onCreateSubmit = (data: StoreFormValues) => {
-    createMutation.mutate(data);
+    // Convertir "_empty" a null o cadena vacía
+    const processedData = {
+      ...data,
+      locality: data.locality === "_empty" ? null : data.locality
+    };
+    createMutation.mutate(processedData);
   };
 
   // Handle edit form submission
   const onEditSubmit = (data: StoreFormValues) => {
     if (!selectedStore) return;
 
+    // Convertir "_empty" a null o cadena vacía
+    const processedData = {
+      ...data,
+      locality: data.locality === "_empty" ? null : data.locality
+    };
+
     updateMutation.mutate({
       id: selectedStore.id,
-      ...data,
+      ...processedData,
     });
   };
 
@@ -737,6 +748,7 @@ export default function StoreManagementPage() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
+                                <SelectItem value="_empty">Sin especificar</SelectItem>
                                 {MADRID_LOCALITIES.map((locality) => (
                                   <SelectItem key={locality} value={locality}>
                                     {locality}
@@ -1274,6 +1286,7 @@ export default function StoreManagementPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
+                              <SelectItem value="_empty">Sin especificar</SelectItem>
                               {MADRID_LOCALITIES.map((locality) => (
                                 <SelectItem key={locality} value={locality}>
                                   {locality}
