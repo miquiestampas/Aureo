@@ -1420,107 +1420,127 @@ export class DatabaseStorage implements IStorage {
   async searchExcelData(query: string, filters?: any): Promise<ExcelData[]> {
     console.log("DatabaseStorage.searchExcelData - Parámetros:", { query, filters });
     
-    // Debido a problemas con el operador ILIKE de PostgreSQL y la forma en que Drizzle maneja las consultas,
-    // utilizaremos SQL directo para asegurarnos de que la búsqueda funcione correctamente con todos los tipos de campos
-    
     try {
-      // Verificar si hay una consulta general o cualquier filtro
+      // Crear la consulta base con Drizzle
+      let baseQuery = db.select().from(excelData);
+      
+      // Verificar si hay una consulta general
       const hasQuery = query && query.trim() !== '';
       
-      if (hasQuery || filters) {
-        // Preparamos la consulta SQL base
-        let sql = `SELECT * FROM excel_data WHERE 1=1`;
+      // Aplicar filtros
+      if (hasQuery) {
+        // Búsqueda general - utilizamos SQL generado
+        const searchTerm = `%${query.trim()}%`;
         
-        // Parámetros para la consulta
-        const params: any[] = [];
-        let paramIndex = 1; // Empezamos desde el primer parámetro
-        
-        // Si hay una consulta general, la aplicamos a todos los campos relevantes
-        if (hasQuery) {
-          const searchTerm = `%${query.trim()}%`;
-          sql += ` AND (
-            customer_name ILIKE $${paramIndex} 
-            OR customer_contact ILIKE $${paramIndex}
-            OR order_number ILIKE $${paramIndex}
-            OR item_details ILIKE $${paramIndex}
-            OR metals ILIKE $${paramIndex}
-            OR engravings ILIKE $${paramIndex}
-            OR stones ILIKE $${paramIndex}
-            OR pawn_ticket ILIKE $${paramIndex}
-          )`;
-          params.push(searchTerm);
-          paramIndex++;
-        }
-        
-        // Aplicar filtros adicionales si están presentes
-        if (filters) {
-          // Filtro por tienda
-          if (filters.storeCode) {
-            sql += ` AND store_code = $${paramIndex}`;
-            params.push(filters.storeCode);
-            paramIndex++;
-          }
-          
-          // Filtros específicos por campo
-          if (filters.customerName) {
-            sql += ` AND customer_name ILIKE $${paramIndex}`;
-            params.push(`%${filters.customerName}%`);
-            paramIndex++;
-          }
-          
-          if (filters.customerContact) {
-            sql += ` AND customer_contact ILIKE $${paramIndex}`;
-            params.push(`%${filters.customerContact}%`);
-            paramIndex++;
-          }
-          
-          if (filters.orderNumber) {
-            sql += ` AND order_number ILIKE $${paramIndex}`;
-            params.push(`%${filters.orderNumber}%`);
-            paramIndex++;
-          }
-          
-          if (filters.itemDetails) {
-            sql += ` AND item_details ILIKE $${paramIndex}`;
-            params.push(`%${filters.itemDetails}%`);
-            paramIndex++;
-          }
-          
-          if (filters.metals) {
-            sql += ` AND metals ILIKE $${paramIndex}`;
-            params.push(`%${filters.metals}%`);
-            paramIndex++;
-          }
-          
-          // Filtros de fecha
-          if (filters.fromDate) {
-            sql += ` AND order_date >= $${paramIndex}`;
-            params.push(filters.fromDate);
-            paramIndex++;
-          }
-          
-          if (filters.toDate) {
-            sql += ` AND order_date <= $${paramIndex}`;
-            params.push(filters.toDate);
-            paramIndex++;
-          }
-        }
-        
-        // Ordenar por fecha de orden descendente
-        sql += ` ORDER BY order_date DESC`;
-        
-        console.log("SQL de búsqueda:", sql);
-        console.log("Parámetros:", params);
-        
-        // Ejecutar la consulta
-        const result = await db.execute(sql, params);
-        console.log(`DatabaseStorage.searchExcelData - Resultados: ${result.rows.length}`);
-        
-        return result.rows as ExcelData[];
-      } else {
-        // Si no hay consulta ni filtros, devolver un array vacío
-        return [];
+        // Crear una condición combinada para la búsqueda de texto
+        baseQuery = baseQuery.where(
+          sql`(
+            ${excelData.customerName} ILIKE ${searchTerm} OR
+            ${excelData.customerContact} ILIKE ${searchTerm} OR
+            ${excelData.orderNumber} ILIKE ${searchTerm} OR
+            ${excelData.itemDetails} ILIKE ${searchTerm} OR
+            ${excelData.metals} ILIKE ${searchTerm} OR
+            ${excelData.engravings} ILIKE ${searchTerm} OR
+            ${excelData.stones} ILIKE ${searchTerm} OR
+            ${excelData.pawnTicket} ILIKE ${searchTerm}
+          )`
+        );
       }
+      
+      // Aplicar filtros adicionales si están presentes
+      if (filters) {
+        // Filtro por tienda
+        if (filters.storeCode) {
+          baseQuery = baseQuery.where(eq(excelData.storeCode, filters.storeCode));
+        }
+        
+        // Filtros específicos por campo
+        if (filters.customerName) {
+          baseQuery = baseQuery.where(
+            sql`${excelData.customerName} ILIKE ${`%${filters.customerName}%`}`
+          );
+        }
+        
+        if (filters.customerContact) {
+          baseQuery = baseQuery.where(
+            sql`${excelData.customerContact} ILIKE ${`%${filters.customerContact}%`}`
+          );
+        }
+        
+        if (filters.orderNumber) {
+          baseQuery = baseQuery.where(
+            sql`${excelData.orderNumber} ILIKE ${`%${filters.orderNumber}%`}`
+          );
+        }
+        
+        if (filters.itemDetails) {
+          baseQuery = baseQuery.where(
+            sql`${excelData.itemDetails} ILIKE ${`%${filters.itemDetails}%`}`
+          );
+        }
+        
+        if (filters.metals) {
+          baseQuery = baseQuery.where(
+            sql`${excelData.metals} ILIKE ${`%${filters.metals}%`}`
+          );
+        }
+        
+        // Filtros de fecha
+        if (filters.fromDate) {
+          baseQuery = baseQuery.where(
+            sql`${excelData.orderDate} >= ${filters.fromDate}`
+          );
+        }
+        
+        if (filters.toDate) {
+          baseQuery = baseQuery.where(
+            sql`${excelData.orderDate} <= ${filters.toDate}`
+          );
+        }
+        
+        // Filtros de precio
+        if (filters.priceExact && !isNaN(parseFloat(filters.priceExact))) {
+          const price = parseFloat(filters.priceExact);
+          baseQuery = baseQuery.where(
+            sql`CAST(${excelData.price} AS DECIMAL) = ${price}`
+          );
+        } else {
+          if (filters.priceMin && !isNaN(parseFloat(filters.priceMin))) {
+            const minPrice = parseFloat(filters.priceMin);
+            if (filters.priceIncludeEqual) {
+              baseQuery = baseQuery.where(
+                sql`CAST(${excelData.price} AS DECIMAL) >= ${minPrice}`
+              );
+            } else {
+              baseQuery = baseQuery.where(
+                sql`CAST(${excelData.price} AS DECIMAL) > ${minPrice}`
+              );
+            }
+          }
+          
+          if (filters.priceMax && !isNaN(parseFloat(filters.priceMax))) {
+            const maxPrice = parseFloat(filters.priceMax);
+            if (filters.priceIncludeEqual) {
+              baseQuery = baseQuery.where(
+                sql`CAST(${excelData.price} AS DECIMAL) <= ${maxPrice}`
+              );
+            } else {
+              baseQuery = baseQuery.where(
+                sql`CAST(${excelData.price} AS DECIMAL) < ${maxPrice}`
+              );
+            }
+          }
+        }
+      }
+      
+      // Ordenar por fecha de orden descendente
+      baseQuery = baseQuery.orderBy(desc(excelData.orderDate));
+      
+      // Ejecutar la consulta
+      const results = await baseQuery;
+      console.log(`DatabaseStorage.searchExcelData - Resultados: ${results.length}`);
+      
+      return results;
     } catch (error) {
       console.error("Error en la búsqueda de datos de Excel:", error);
       return [];
