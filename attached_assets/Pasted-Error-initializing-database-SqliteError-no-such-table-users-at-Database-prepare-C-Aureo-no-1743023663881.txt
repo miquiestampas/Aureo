@@ -1,0 +1,40 @@
+Error initializing database: SqliteError: no such table: users
+    at Database.prepare (C:\Aureo\node_modules\better-sqlite3\lib\methods\wrappers.js:5:21)
+    at BetterSQLiteSession.prepareQuery (C:\Aureo\node_modules\src\better-sqlite3\session.ts:50:28)
+    at BetterSQLiteSession.prepareOneTimeQuery (C:\Aureo\node_modules\src\sqlite-core\session.ts:135:15)
+    at SQLiteSelectBase._prepare (C:\Aureo\node_modules\src\sqlite-core\query-builders\select.ts:865:85)
+    at SQLiteSelectBase.all (C:\Aureo\node_modules\src\sqlite-core\query-builders\select.ts:884:15)
+    at SQLiteSelectBase.execute (C:\Aureo\node_modules\src\sqlite-core\query-builders\select.ts:896:15)
+    at SQLiteSelectBase.then (C:\Aureo\node_modules\src\query-promise.ts:31:15) {
+  code: 'SQLITE_ERROR'
+}
+Error initializing file watchers: SqliteError: no such table: system_configs
+    at Database.prepare (C:\Aureo\node_modules\better-sqlite3\lib\methods\wrappers.js:5:21)
+    at BetterSQLiteSession.prepareQuery (C:\Aureo\node_modules\src\better-sqlite3\session.ts:50:28)
+    at BetterSQLiteSession.prepareOneTimeQuery (C:\Aureo\node_modules\src\sqlite-core\session.ts:135:15)
+    at SQLiteSelectBase._prepare (C:\Aureo\node_modules\src\sqlite-core\query-builders\select.ts:865:85)
+    at SQLiteSelectBase.all (C:\Aureo\node_modules\src\sqlite-core\query-builders\select.ts:884:15)
+    at SQLiteSelectBase.execute (C:\Aureo\node_modules\src\sqlite-core\query-builders\select.ts:896:15)
+    at SQLiteSelectBase.then (C:\Aureo\node_modules\src\query-promise.ts:31:15) {
+  code: 'SQLITE_ERROR'
+}
+node:events:496
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen ENOTSUP: operation not supported on socket 0.0.0.0:5000
+    at Server.setupListenHandle [as _listen2] (node:net:1915:21)
+    at listenInCluster (node:net:1994:12)
+    at node:net:2203:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1973:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'ENOTSUP',
+  errno: -4049,
+  syscall: 'listen',
+  address: '0.0.0.0',
+  port: 5000
+}
+
+Node.js v22.14.0
