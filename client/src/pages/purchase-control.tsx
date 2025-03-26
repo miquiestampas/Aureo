@@ -215,7 +215,7 @@ export default function PurchaseControlPage() {
     const params: SearchParams = {
       query: searchQuery,
       ...advancedSearch ? {
-        storeCode: searchParams.storeCode || undefined,
+        storeCode: searchParams.storeCode === "all" ? undefined : searchParams.storeCode || undefined,
         dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
         dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
         orderNumber: searchParams.orderNumber || undefined,
@@ -363,7 +363,7 @@ export default function PurchaseControlPage() {
                   <div>
                     <Label htmlFor="store-filter">Tienda</Label>
                     <Select
-                      value={searchParams.storeCode || ""}
+                      value={searchParams.storeCode || "all"}
                       onValueChange={(value) =>
                         setSearchParams({ ...searchParams, storeCode: value })
                       }
@@ -372,7 +372,7 @@ export default function PurchaseControlPage() {
                         <SelectValue placeholder="Todas las tiendas" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todas las tiendas</SelectItem>
+                        <SelectItem value="all">Todas las tiendas</SelectItem>
                         {excelStores.map((store) => (
                           <SelectItem key={store.id} value={store.code}>
                             {store.name} ({store.code})
@@ -589,7 +589,7 @@ export default function PurchaseControlPage() {
                     onClick={() => {
                       setSearchParams({
                         query: "",
-                        storeCode: "",
+                        storeCode: "all",
                         customerName: "",
                         customerContact: "",
                         itemDetails: "",
