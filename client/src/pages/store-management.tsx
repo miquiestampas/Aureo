@@ -536,13 +536,27 @@ export default function StoreManagementPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={createForm.control}
-                        name="district"
+                        name="locality"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Distrito</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Ej: Madrid Centro" {...field} />
-                            </FormControl>
+                            <FormLabel>Localidad</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              value={field.value || ""}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccione localidad" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {MADRID_LOCALITIES.map((locality) => (
+                                  <SelectItem key={locality} value={locality}>
+                                    {locality}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -550,12 +564,12 @@ export default function StoreManagementPage() {
                       
                       <FormField
                         control={createForm.control}
-                        name="locality"
+                        name="district"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Localidad</FormLabel>
+                            <FormLabel>Distrito</FormLabel>
                             <FormControl>
-                              <Input placeholder="Ej: Chamberí" {...field} />
+                              <Input placeholder="Ej: Madrid Centro" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -863,13 +877,27 @@ export default function StoreManagementPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={editForm.control}
-                      name="district"
+                      name="locality"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Distrito</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Ej: Madrid Centro" {...field} />
-                          </FormControl>
+                          <FormLabel>Localidad</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value || ""}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccione localidad" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {MADRID_LOCALITIES.map((locality) => (
+                                <SelectItem key={locality} value={locality}>
+                                  {locality}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -877,12 +905,12 @@ export default function StoreManagementPage() {
                     
                     <FormField
                       control={editForm.control}
-                      name="locality"
+                      name="district"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Localidad</FormLabel>
+                          <FormLabel>Distrito</FormLabel>
                           <FormControl>
-                            <Input placeholder="Ej: Chamberí" {...field} />
+                            <Input placeholder="Ej: Madrid Centro" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
