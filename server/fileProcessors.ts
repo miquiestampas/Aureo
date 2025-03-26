@@ -12,72 +12,103 @@ import csvParser from 'csv-parser';
 async function moveProcessedFile(filePath: string, status: 'Processed' | 'Failed') {
   try {
     // Extraer información del archivo
-    const fileName = path.basename(filePath);
+    const originalFileName = path.basename(filePath);
+    const originalDir = path.dirname(filePath);
     
     // Determinar si es un archivo Excel o PDF basado en la extensión
-    const extension = path.extname(filePath).toLowerCase();
+    const extension = path.extname(originalFileName).toLowerCase();
     const isExcel = ['.xlsx', '.xls', '.csv'].includes(extension);
     const fileType = isExcel ? 'excel' : 'pdf';
     
-    // Construir rutas absolutas fijas para las carpetas de destino
-    let targetDir;
-    if (status === 'Processed') {
-      targetDir = path.resolve('./data', fileType, 'procesados');
+    // Asegurar que el nombre del archivo no sea demasiado largo
+    const fileExtension = path.extname(originalFileName);
+    const fileNameWithoutExt = path.basename(originalFileName, fileExtension);
+    
+    // Acortar nombre si es necesario
+    let shortFileName;
+    if (fileNameWithoutExt.length > 50) {
+      shortFileName = `${fileNameWithoutExt.substring(0, 40)}_${Date.now().toString().substring(8)}${fileExtension}`;
     } else {
-      targetDir = path.resolve('./data', fileType, 'errores');
+      shortFileName = originalFileName;
     }
     
-    // Asegurar que el directorio de destino exista
+    // Carpetas de destino con rutas básicas
+    const destFolder = status === 'Processed' ? 'procesados' : 'errores';
+    
+    // Construir la ruta final con rutas absolutas, empezando desde data/excel o data/pdf
+    const rootDir = path.resolve('./data');
+    const typeDir = path.join(rootDir, fileType);
+    const targetDir = path.join(typeDir, destFolder);
+    const targetPath = path.join(targetDir, shortFileName);
+    
+    // Asegurar que los directorios existan
     if (!fs.existsSync(targetDir)) {
       await fs.promises.mkdir(targetDir, { recursive: true });
     }
     
-    // Limitar el largo del nombre de archivo si es necesario
-    // Reducir el nombre del archivo si es demasiado largo para evitar ENAMETOOLONG
-    let baseFileName = fileName;
-    const fileExtension = path.extname(fileName);
-    const fileNameWithoutExt = path.basename(fileName, fileExtension);
-    
-    // Si el nombre del archivo es demasiado largo, acortarlo
-    if (fileNameWithoutExt.length > 50) {
-      baseFileName = `${fileNameWithoutExt.substring(0, 50)}${fileExtension}`;
+    // Verificar que el archivo origen exista
+    if (!fs.existsSync(filePath)) {
+      console.error(`No se puede mover ${filePath} porque no existe`);
+      return null;
     }
     
-    // Si existe un archivo con el mismo nombre, añadir timestamp para hacerlo único
-    // pero de manera controlada para evitar nombres excesivamente largos
-    let finalFileName = baseFileName;
-    let targetPath = path.join(targetDir, finalFileName);
-    
-    if (fs.existsSync(targetPath)) {
-      const timestamp = new Date().getTime();
-      finalFileName = `${path.basename(baseFileName, fileExtension)}_${timestamp}${fileExtension}`;
-      targetPath = path.join(targetDir, finalFileName);
-    }
-    
-    // Mover el archivo (usar try-catch específico para evitar fallos silenciosos)
     try {
-      await fs.promises.copyFile(filePath, targetPath);
-      await fs.promises.unlink(filePath);
-      console.log(`Archivo ${fileName} movido a ${targetPath}`);
-      return targetPath;
-    } catch (copyError) {
-      // Si hay un error específico de nombre demasiado largo, intentar con un nombre más corto
-      if (copyError.code === 'ENAMETOOLONG') {
-        const shortTimestamp = Date.now().toString().substring(6); // Solo últimos 7 dígitos
-        const veryShortName = `file_${shortTimestamp}${fileExtension}`;
-        const shortTargetPath = path.join(targetDir, veryShortName);
+      // Si ya existe un archivo con el mismo nombre en el destino, añadir timestamp
+      if (fs.existsSync(targetPath)) {
+        const timestamp = Date.now().toString().substring(8); // usar solo los últimos 5 dígitos
+        const newFileName = `${fileNameWithoutExt}_${timestamp}${fileExtension}`;
+        const newTargetPath = path.join(targetDir, newFileName);
         
-        await fs.promises.copyFile(filePath, shortTargetPath);
-        await fs.promises.unlink(filePath);
-        console.log(`Archivo renombrado y movido a ${shortTargetPath} (nombre original demasiado largo)`);
-        return shortTargetPath;
+        // Intento final de copia
+        await fs.promises.copyFile(filePath, newTargetPath);
+        
+        // Eliminar el archivo original solo si la copia fue exitosa
+        try {
+          await fs.promises.unlink(filePath);
+        } catch (unlinkError) {
+          console.error(`No se pudo eliminar el archivo original ${filePath}:`, unlinkError);
+          // Continuar a pesar del error - al menos tenemos la copia
+        }
+        
+        console.log(`✅ Archivo ${originalFileName} movido a ${newTargetPath}`);
+        return newTargetPath;
       } else {
-        throw copyError; // Re-lanzar para manejo general de errores
+        // Copia directa si no hay colisión de nombres
+        await fs.promises.copyFile(filePath, targetPath);
+        
+        // Eliminar el archivo original solo si la copia fue exitosa
+        try {
+          await fs.promises.unlink(filePath);
+        } catch (unlinkError) {
+          console.error(`No se pudo eliminar el archivo original ${filePath}:`, unlinkError);
+          // Continuar a pesar del error - al menos tenemos la copia
+        }
+        
+        console.log(`✅ Archivo ${originalFileName} movido a ${targetPath}`);
+        return targetPath;
+      }
+    } catch (copyError) {
+      // En caso de error de nombre demasiado largo, usar un nombre muy corto
+      if (copyError.code === 'ENAMETOOLONG') {
+        const shortName = `file_${Date.now().toString().substring(8)}${fileExtension}`;
+        const emergencyPath = path.join(targetDir, shortName);
+        
+        await fs.promises.copyFile(filePath, emergencyPath);
+        
+        try {
+          await fs.promises.unlink(filePath);
+        } catch (unlinkError) {
+          console.error(`No se pudo eliminar el archivo original ${filePath}:`, unlinkError);
+        }
+        
+        console.log(`⚠️ Archivo renombrado y movido a ${emergencyPath} (nombre original demasiado largo)`);
+        return emergencyPath;
+      } else {
+        throw copyError;
       }
     }
   } catch (error) {
-    console.error(`Error al mover el archivo ${filePath}:`, error);
-    // No eliminar el archivo original en caso de error
+    console.error(`❌ Error al mover el archivo ${filePath}:`, error);
     return null;
   }
 }
