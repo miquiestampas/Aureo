@@ -55,17 +55,20 @@ export interface IStorage {
   updateFileActivity(id: number, updates: Partial<FileActivity>): Promise<FileActivity | undefined>;
   getRecentFileActivities(limit: number): Promise<FileActivity[]>;
   getFileActivitiesByStore(storeCode: string): Promise<FileActivity[]>;
+  deleteFileActivity(id: number): Promise<boolean>;
   
   // ExcelData methods
   createExcelData(data: InsertExcelData): Promise<ExcelData>;
   getExcelDataByStore(storeCode: string): Promise<ExcelData[]>;
   searchExcelData(query: string, filters?: any): Promise<ExcelData[]>;
   getExcelDataById(id: number): Promise<ExcelData | undefined>;
+  deleteExcelDataByActivityId(activityId: number): Promise<boolean>;
   
   // PdfDocument methods
   createPdfDocument(doc: InsertPdfDocument): Promise<PdfDocument>;
   getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]>;
   getPdfDocument(id: number): Promise<PdfDocument | undefined>;
+  deletePdfDocumentsByActivityId(activityId: number): Promise<boolean>;
   
   // Watchlist Person methods
   createWatchlistPerson(person: InsertWatchlistPerson): Promise<WatchlistPerson>;
@@ -390,6 +393,36 @@ export class MemStorage implements IStorage {
   
   async getPdfDocument(id: number): Promise<PdfDocument | undefined> {
     return this.pdfDocuments.get(id);
+  }
+  
+  async deleteFileActivity(id: number): Promise<boolean> {
+    return this.fileActivities.delete(id);
+  }
+  
+  async deleteExcelDataByActivityId(activityId: number): Promise<boolean> {
+    // Buscar todos los registros de Excel con ese activityId
+    const excelRecordsToDelete = Array.from(this.excelData.values())
+      .filter(data => data.fileActivityId === activityId);
+    
+    // Eliminar cada registro encontrado
+    for (const record of excelRecordsToDelete) {
+      this.excelData.delete(record.id);
+    }
+    
+    return true;
+  }
+  
+  async deletePdfDocumentsByActivityId(activityId: number): Promise<boolean> {
+    // Buscar todos los documentos PDF con ese activityId
+    const pdfDocsToDelete = Array.from(this.pdfDocuments.values())
+      .filter(doc => doc.fileActivityId === activityId);
+    
+    // Eliminar cada documento encontrado
+    for (const doc of pdfDocsToDelete) {
+      this.pdfDocuments.delete(doc.id);
+    }
+    
+    return true;
   }
   
   // Implementación de nuevos métodos para cumplir con la interfaz
