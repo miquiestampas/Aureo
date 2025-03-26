@@ -169,6 +169,10 @@ function validateDate(dateValue: any): Date {
 }
 
 // Función para procesar los valores de una fila y crear una entrada InsertExcelData
+// Mapeo de columnas:
+// A=código tienda, B=número de orden, C=fecha, D=nombre cliente, E=DNI/pasaporte, 
+// F=dirección, G=provincia/país, H=objeto, I=peso, J=clase de metal, 
+// K=grabaciones/nº serie, L=piedras/kilates, M=precio, N=empeño, O=fecha venta
 function createExcelDataFromValues(values: any[], storeCode: string, activityId: number): InsertExcelData {
   console.log(`Procesando valores para Excel: ${JSON.stringify(values)}`);
   
@@ -192,8 +196,17 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
   // Columna E: Contacto del cliente (DNI/Pasaporte)
   const customerContact = values[4]?.toString() || '';
   
+  // Columna F y G: Dirección y Provincia (guardamos información combinada en un campo)
+  const addressInfo = [
+    values[5]?.toString() || '', // Dirección
+    values[6]?.toString() || ''  // Provincia/país
+  ].filter(Boolean).join(', ');
+  
   // Columna H: Objeto (Detalles del artículo)
   const itemDetails = values[7]?.toString() || '';
+  
+  // Columna I: Peso
+  const weight = values[8]?.toString() || '';
   
   // Columna J: Clase de metal
   const metals = values[9]?.toString() || '';
@@ -204,8 +217,10 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
   // Columna L: Piedras/Kilates
   const stones = values[11]?.toString() || '';
   
-  // Quilates, extraemos del mismo campo que piedras
-  const carats = values[11]?.toString() || '';
+  // Quilates, extraemos del mismo campo que piedras o procesamos si está separado
+  const carats = stones.match(/(\d+(\.\d+)?)\s*[kK]/) ? 
+                stones.match(/(\d+(\.\d+)?)\s*[kK]/)![1] : 
+                '';
   
   // Columna M: Precio
   const price = values[12]?.toString() || '';
@@ -251,10 +266,20 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     await storage.updateFileActivityStatus(activityId, 'Processing');
     emitFileProcessingStatus(activityId, 'Processing');
     
-    // Check if the default store exists
-    const defaultStore = await storage.getStoreByCode(storeCode);
+    // Verificar si la tienda por defecto existe
+    let defaultStore = await storage.getStoreByCode(storeCode);
+    
+    // Si la tienda por defecto no existe, buscar alguna tienda Excel disponible
     if (!defaultStore) {
-      throw new Error(`Default store with code ${storeCode} does not exist`);
+      console.log(`Default store with code ${storeCode} does not exist, trying to find an Excel store...`);
+      const excelStores = await storage.getStoresByType('Excel');
+      if (excelStores.length > 0) {
+        defaultStore = excelStores[0];
+        storeCode = defaultStore.code;
+        console.log(`Using existing Excel store as default: ${storeCode}`);
+      } else {
+        throw new Error(`No Excel stores exist in the system. Please create at least one Excel store.`);
+      }
     }
     
     // Verify file exists and is readable

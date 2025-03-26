@@ -60,8 +60,9 @@ export default function FileUploadModal({ isOpen, onClose, storesByType, fileTyp
         // Single file upload
         formData.append("file", selectedFiles[0]);
         
-        // Usamos código de tienda PENDIENTE por defecto, se actualizará en el servidor tras detectarlo del archivo
-        formData.append("storeCode", "PENDIENTE");
+        // Usamos un código de tienda vacío o la tienda seleccionada
+        // El servidor se encargará de detectar la tienda adecuada del archivo
+        formData.append("storeCode", "");
         
         const response = await fetch(`/api/upload/${fileType.toLowerCase()}`, {
           method: "POST",
@@ -82,8 +83,8 @@ export default function FileUploadModal({ isOpen, onClose, storesByType, fileTyp
           formData.append("files", file);
         });
         
-        // Usamos código de tienda PENDIENTE por defecto, se actualizará en el servidor tras detectarlo del archivo
-        formData.append("storeCode", "PENDIENTE");
+        // Usamos un código de tienda vacío, el servidor detectará automáticamente la tienda adecuada
+        formData.append("storeCode", "");
         
         const response = await fetch(`/api/upload/${fileType.toLowerCase()}/batch`, {
           method: "POST",

@@ -497,7 +497,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No se ha cargado ningún archivo" });
       }
       
-      const defaultStoreCode = "PENDIENTE";
+      // Usamos un código de tienda vacío, el servidor detectará automáticamente la tienda adecuada
+      const defaultStoreCode = "";
       const activities = [];
       
       // Procesar cada archivo
@@ -506,7 +507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Crear actividad para cada archivo
           const activity = await storage.createFileActivity({
             filename: file.originalname,
-            storeCode: defaultStoreCode,
+            storeCode: defaultStoreCode, // Se actualizará durante el procesamiento
             fileType: 'Excel',
             status: 'Pending',
             processingDate: new Date(),
@@ -517,7 +518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           activities.push(activity);
           
-          // Procesar archivo en segundo plano
+          // Procesar archivo en segundo plano - La tienda se detectará automáticamente
           processExcelFile(file.path, activity.id, defaultStoreCode)
             .catch(err => console.error(`Error al procesar archivo ${file.originalname}:`, err));
             
@@ -547,9 +548,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No file uploaded" });
       }
       
-      // Usamos un código de tienda genérico que será reemplazado automáticamente
+      // Usamos un código de tienda vacío, que será reemplazado automáticamente
       // durante el procesamiento del archivo basado en su nombre
-      const defaultStoreCode = "PENDIENTE";
+      const defaultStoreCode = "";
       
       // Si se proporciona un código de tienda explícitamente, lo usamos
       const storeCode = req.body.storeCode || defaultStoreCode;
