@@ -547,10 +547,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No file uploaded" });
       }
       
-      const storeCode = req.body.storeCode;
-      if (!storeCode) {
-        return res.status(400).json({ message: "Store code is required" });
-      }
+      // Usamos un código de tienda genérico que será reemplazado automáticamente
+      // durante el procesamiento del archivo basado en su nombre
+      const defaultStoreCode = "PENDIENTE";
+      
+      // Si se proporciona un código de tienda explícitamente, lo usamos
+      const storeCode = req.body.storeCode || defaultStoreCode;
       
       // Create file activity entry
       const activity = await storage.createFileActivity({
@@ -559,7 +561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileType: 'PDF',
         status: 'Pending',
         processingDate: new Date(),
-        processedBy: 'Manual Upload',
+        processedBy: 'Carga Manual',
         errorMessage: null,
         metadata: null
       });
@@ -571,6 +573,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(202).json({
         message: "File uploaded successfully and queued for processing",
         fileActivity: activity
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+  
+  // Carga masiva de archivos PDF
+  app.post("/api/upload/pdf/batch", uploadMultiple, async (req, res, next) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: "No se ha cargado ningún archivo" });
+      }
+      
+      const defaultStoreCode = "PENDIENTE";
+      // Si se proporciona un código de tienda explícitamente, lo usamos
+      const storeCode = req.body.storeCode || defaultStoreCode;
+      const activities = [];
+      
+      // Procesar cada archivo
+      const filePromises = req.files.map(async (file) => {
+        try {
+          // Crear actividad para cada archivo
+          const activity = await storage.createFileActivity({
+            filename: file.originalname,
+            storeCode, // Usamos el código de tienda proporcionado o el predeterminado
+            fileType: 'PDF',
+            status: 'Pending',
+            processingDate: new Date(),
+            processedBy: 'Carga Masiva',
+            errorMessage: null,
+            metadata: null
+          });
+          
+          activities.push(activity);
+          
+          // Procesar archivo en segundo plano
+          processPdfFile(file.path, activity.id, storeCode)
+            .catch(err => console.error(`Error al procesar archivo ${file.originalname}:`, err));
+            
+          return { filename: file.originalname, status: 'Encolado' };
+        } catch (err) {
+          console.error(`Error procesando archivo ${file.originalname}:`, err);
+          return { filename: file.originalname, status: 'Error', error: err.message };
+        }
+      });
+      
+      // Esperar a que todos los archivos sean procesados
+      const results = await Promise.all(filePromises);
+      
+      res.status(202).json({
+        message: `${req.files.length} archivos PDF cargados exitosamente y en cola para procesamiento`,
+        files: results,
+        activities: activities
       });
     } catch (err) {
       next(err);
