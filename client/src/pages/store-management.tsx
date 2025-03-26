@@ -376,8 +376,8 @@ export default function StoreManagementPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Store Management</h1>
-            <p className="text-gray-500 mt-1">Manage your Excel and PDF stores</p>
+            <h1 className="text-2xl font-semibold text-gray-900">Gestión de Tiendas</h1>
+            <p className="text-gray-500 mt-1">Administre sus tiendas de Excel y PDF</p>
           </div>
           
           {canModify && (
@@ -385,14 +385,14 @@ export default function StoreManagementPage() {
               <DialogTrigger asChild>
                 <Button className="bg-primary hover:bg-primary/90">
                   <PlusCircle className="mr-2 h-4 w-4" />
-                  Add New Store
+                  Añadir Nueva Tienda
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Create New Store</DialogTitle>
+                  <DialogTitle>Crear Nueva Tienda</DialogTitle>
                   <DialogDescription>
-                    Add a new store to the system.
+                    Añadir una nueva tienda al sistema.
                   </DialogDescription>
                 </DialogHeader>
                 
@@ -403,12 +403,12 @@ export default function StoreManagementPage() {
                       name="code"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Store Code</FormLabel>
+                          <FormLabel>Código de Tienda</FormLabel>
                           <FormControl>
-                            <Input placeholder="E.g., ST001" {...field} />
+                            <Input placeholder="Ej: ST001" {...field} />
                           </FormControl>
                           <FormDescription>
-                            A unique identifier for the store
+                            Un identificador único para la tienda
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -420,9 +420,9 @@ export default function StoreManagementPage() {
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Store Name</FormLabel>
+                          <FormLabel>Nombre de Tienda</FormLabel>
                           <FormControl>
-                            <Input placeholder="E.g., Main Street Store" {...field} />
+                            <Input placeholder="Ej: Tienda Principal" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -650,7 +650,7 @@ export default function StoreManagementPage() {
           <CardHeader>
             <div className="flex items-center">
               <Store className="h-5 w-5 mr-2 text-primary" />
-              <CardTitle>All Stores</CardTitle>
+              <CardTitle>Todas las Tiendas</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -663,9 +663,9 @@ export default function StoreManagementPage() {
             ) : (
               <div className="flex flex-col items-center justify-center py-12">
                 <Store className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">No stores found</h3>
+                <h3 className="text-lg font-medium">No se encontraron tiendas</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Create a new store to get started.
+                  Cree una nueva tienda para comenzar.
                 </p>
               </div>
             )}
@@ -677,9 +677,9 @@ export default function StoreManagementPage() {
           <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Edit Store</DialogTitle>
+                <DialogTitle>Editar Tienda</DialogTitle>
                 <DialogDescription>
-                  Update the store information.
+                  Actualizar la información de la tienda.
                 </DialogDescription>
               </DialogHeader>
               
