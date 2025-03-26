@@ -125,7 +125,6 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
     defaultValues: {
       searchType: "General",
       searchTerms: "",
-      includeArchived: false,
       searchCustomerName: true,
       searchCustomerContact: true,
       searchItemDetails: true,
@@ -141,7 +140,7 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       // Construir la URL con los parámetros de búsqueda
       const params = new URLSearchParams();
       params.append('searchType', values.searchType);
-      params.append('searchTerms', values.searchTerms);
+      params.append('searchTerms', values.searchTerms || '');
       
       if (values.storeCode && values.storeCode !== 'all') {
         params.append('storeCode', values.storeCode);
@@ -163,7 +162,8 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
         params.append('priceMax', values.priceMax);
       }
       
-      params.append('includeArchived', values.includeArchived.toString());
+      // Los registros archivados siempre se incluyen por defecto
+      params.append('includeArchived', 'true');
       params.append('searchCustomerName', values.searchCustomerName.toString());
       params.append('searchCustomerContact', values.searchCustomerContact.toString());
       params.append('searchItemDetails', values.searchItemDetails.toString());
@@ -276,7 +276,6 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       toDate: undefined,
       priceMin: undefined,
       priceMax: undefined,
-      includeArchived: false,
       searchCustomerName: true,
       searchCustomerContact: true,
       searchItemDetails: true,
@@ -533,28 +532,8 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
                     </div>
                     
                     <div className="space-y-2">
-                      <FormLabel>Opciones adicionales</FormLabel>
+                      <FormLabel>Opciones de búsqueda</FormLabel>
                       <div className="space-y-2">
-                        <FormField
-                          control={form.control}
-                          name="includeArchived"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                              <div className="space-y-0.5">
-                                <FormLabel>Incluir artículos vendidos</FormLabel>
-                                <FormDescription>
-                                  Mostrar también resultados de artículos ya vendidos
-                                </FormDescription>
-                              </div>
-                              <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
                       </div>
                     </div>
                   </div>
