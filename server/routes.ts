@@ -259,6 +259,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Endpoint para obtener archivos pendientes de asignación de tienda
+  app.get("/api/pending-store-assignments", async (req, res, next) => {
+    try {
+      const pendingActivities = await storage.getPendingStoreAssignmentActivities();
+      res.json(pendingActivities);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Endpoint para asignar una tienda a un archivo pendiente
+  app.post("/api/file-activities/:id/assign-store", async (req, res, next) => {
+    try {
+      const activityId = parseInt(req.params.id);
+      const { storeCode, createNewStore } = req.body;
+      
+      // Verificar que el ID de actividad es válido
+      const activity = await storage.getFileActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Actividad de archivo no encontrada" });
+      }
+      
+      // Verificar que la actividad está en estado pendiente de asignación
+      if (activity.status !== 'PendingStoreAssignment') {
+        return res.status(400).json({ 
+          message: "Esta actividad no está pendiente de asignación de tienda" 
+        });
+      }
+      
+      let targetStoreCode = storeCode;
+      
+      // Si se indicó crear una nueva tienda
+      if (createNewStore === true) {
+        // Usar el código detectado o el proporcionado
+        const newStoreCode = storeCode || activity.detectedStoreCode;
+        
+        if (!newStoreCode) {
+          return res.status(400).json({ 
+            message: "Se requiere un código de tienda para crear una nueva tienda" 
+          });
+        }
+        
+        // Verificar que no exista una tienda con ese código
+        const existingStore = await storage.getStoreByCode(newStoreCode);
+        if (existingStore) {
+          return res.status(400).json({ 
+            message: `Ya existe una tienda con el código ${newStoreCode}` 
+          });
+        }
+        
+        // Crear la nueva tienda
+        const newStore = await storage.createStore({
+          code: newStoreCode,
+          name: `Tienda ${newStoreCode}`,
+          type: activity.fileType,
+          location: "",
+          active: true
+        });
+        
+        targetStoreCode = newStore.code;
+      } else {
+        // Verificar que la tienda existe
+        const store = await storage.getStoreByCode(storeCode);
+        if (!store) {
+          return res.status(404).json({ message: "Tienda no encontrada" });
+        }
+        
+        // Verificar que el tipo de tienda coincide con el tipo de archivo
+        if (store.type !== activity.fileType) {
+          return res.status(400).json({ 
+            message: `Esta tienda es de tipo ${store.type} pero el archivo es ${activity.fileType}` 
+          });
+        }
+      }
+      
+      // Actualizar la actividad con el nuevo código de tienda y cambiar su estado a Pending
+      const updatedActivity = await storage.updateFileActivity(activityId, {
+        storeCode: targetStoreCode,
+        status: 'Pending'
+      });
+      
+      // Volver a procesar el archivo ahora que tiene una tienda asignada
+      const filePath = path.join(
+        activity.fileType === 'Excel' ? './uploads/excel' : './uploads/pdf',
+        activity.filename
+      );
+      
+      if (activity.fileType === 'Excel') {
+        // Para Excel, procesar el archivo
+        processExcelFile(filePath, activityId, targetStoreCode)
+          .catch(err => console.error(`Error al procesar Excel después de asignar tienda:`, err));
+      } else {
+        // Para PDF, procesar el archivo
+        processPdfFile(filePath, activityId, targetStoreCode)
+          .catch(err => console.error(`Error al procesar PDF después de asignar tienda:`, err));
+      }
+      
+      res.json(updatedActivity);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
   // Descargar archivo original
   app.get("/api/file-activities/:id/download", async (req, res, next) => {
     try {

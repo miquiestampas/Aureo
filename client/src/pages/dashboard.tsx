@@ -20,7 +20,8 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Trash2
+  Trash2,
+  AlertCircle
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -41,10 +42,11 @@ interface FileActivity {
   filename: string;
   storeCode: string;
   fileType: "Excel" | "PDF";
-  status: "Pending" | "Processing" | "Processed" | "Failed";
+  status: "Pending" | "Processing" | "Processed" | "Failed" | "PendingStoreAssignment";
   processingDate: string;
   processedBy: string;
   errorMessage?: string;
+  detectedStoreCode?: string;
 }
 
 export default function DashboardPage() {
@@ -63,6 +65,12 @@ export default function DashboardPage() {
     refetchInterval: 15000, // Refetch every 15 seconds
   });
   
+  // Fetch files pending store assignment
+  const { data: pendingAssignments, refetch: refetchPendingAssignments } = useQuery<FileActivity[]>({
+    queryKey: ['/api/pending-store-assignments'],
+    refetchInterval: 15000, // Refetch every 15 seconds
+  });
+  
   // Refetch data when receiving socket events
   useEffect(() => {
     if (recentEvents.length > 0) {
@@ -71,9 +79,10 @@ export default function DashboardPage() {
       if (lastEvent.type === 'fileDetected' || lastEvent.type === 'fileProcessingStatus') {
         refetchActivities();
         refetchStatus();
+        refetchPendingAssignments();
       }
     }
-  }, [recentEvents, refetchActivities, refetchStatus]);
+  }, [recentEvents, refetchActivities, refetchStatus, refetchPendingAssignments]);
   
   // Toast para mensajes al usuario
   const { toast } = useToast();
@@ -184,6 +193,12 @@ export default function DashboardPage() {
             return (
               <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100">
                 <XCircle className="h-3 w-3 mr-1" /> Fallido
+              </Badge>
+            );
+          case "PendingStoreAssignment":
+            return (
+              <Badge variant="outline" className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+                <AlertCircle className="h-3 w-3 mr-1" /> Asignación pendiente
               </Badge>
             );
           default:
