@@ -483,9 +483,9 @@ export default function DashboardPage() {
             </CardContent>
             <CardFooter className="bg-gray-50 px-6 py-3">
               <Link href="/store-management">
-                <a className="text-sm font-medium text-primary hover:text-primary/90">
+                <div className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer">
                   Ver todas las tiendas
-                </a>
+                </div>
               </Link>
             </CardFooter>
           </Card>
@@ -509,9 +509,9 @@ export default function DashboardPage() {
             </CardContent>
             <CardFooter className="bg-gray-50 px-6 py-3">
               <Link href="/excel-stores">
-                <a className="text-sm font-medium text-primary hover:text-primary/90">
+                <div className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer">
                   Ver archivos recientes
-                </a>
+                </div>
               </Link>
             </CardFooter>
           </Card>
@@ -535,9 +535,9 @@ export default function DashboardPage() {
             </CardContent>
             <CardFooter className="bg-gray-50 px-6 py-3">
               <Link href="/excel-stores">
-                <a className="text-sm font-medium text-primary hover:text-primary/90">
+                <div className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer">
                   Ver tiendas Excel
-                </a>
+                </div>
               </Link>
             </CardFooter>
           </Card>
@@ -561,9 +561,9 @@ export default function DashboardPage() {
             </CardContent>
             <CardFooter className="bg-gray-50 px-6 py-3">
               <Link href="/pdf-stores">
-                <a className="text-sm font-medium text-primary hover:text-primary/90">
+                <div className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer">
                   Ver tiendas PDF
-                </a>
+                </div>
               </Link>
             </CardFooter>
           </Card>
