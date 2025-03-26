@@ -303,16 +303,57 @@ export default function ExcelStoresPage() {
           />
         </div>
         
+        {/* Búsqueda de tiendas */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Buscar Tiendas</CardTitle>
+            <CardDescription>Filtrar tiendas por código, nombre o ubicación</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="code-filter">Código</Label>
+                <Input
+                  id="code-filter"
+                  placeholder="Filtrar por código..."
+                  value={codeFilter}
+                  onChange={(e) => setCodeFilter(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="name-filter">Nombre</Label>
+                <Input
+                  id="name-filter"
+                  placeholder="Filtrar por nombre..."
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="location-filter">Ubicación</Label>
+                <Input
+                  id="location-filter"
+                  placeholder="Filtrar por ubicación..."
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
         {/* Listado de tiendas Excel */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <FileSpreadsheet className="mr-2 h-5 w-5" />
-              Tiendas con datos Excel
-            </CardTitle>
-            <CardDescription>
-              Seleccione una tienda para ver sus registros importados. Actualmente hay {stores?.filter(s => s.type === "Excel")?.length || 0} tiendas configuradas.
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center">
+                <FileSpreadsheet className="mr-2 h-5 w-5" />
+                Tiendas con datos Excel
+              </CardTitle>
+              <CardDescription>
+                Seleccione una tienda para ver sus registros importados. Actualmente hay {filteredStores.filter(s => s.type === "Excel")?.length || 0} tiendas configuradas.
+              </CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
             {isLoadingStores ? (
@@ -321,56 +362,10 @@ export default function ExcelStoresPage() {
               </div>
             ) : (
               <>
-                {/* Búsqueda de tiendas */}
-                <div className="mb-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Buscar Tiendas</CardTitle>
-                      <CardDescription>Filtrar tiendas por código, nombre o ubicación</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="code-filter">Código</Label>
-                          <Input
-                            id="code-filter"
-                            placeholder="Filtrar por código..."
-                            value={codeFilter}
-                            onChange={(e) => setCodeFilter(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="name-filter">Nombre</Label>
-                          <Input
-                            id="name-filter"
-                            placeholder="Filtrar por nombre..."
-                            value={nameFilter}
-                            onChange={(e) => setNameFilter(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="location-filter">Ubicación</Label>
-                          <Input
-                            id="location-filter"
-                            placeholder="Filtrar por ubicación..."
-                            value={locationFilter}
-                            onChange={(e) => setLocationFilter(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-                
                 {/* Tabla de tiendas */}
                 <DataTable 
                   columns={storeColumns} 
                   data={filteredStores.filter(store => store.type === "Excel") || []} 
-                  searchFields={[
-                    { key: "code", placeholder: "Buscar por código..." },
-                    { key: "name", placeholder: "Buscar por nombre..." },
-                    { key: "location", placeholder: "Buscar por ubicación..." }
-                  ]}
                 />
                 
                 {/* Mostrar actividades de archivos para las tiendas expandidas */}
