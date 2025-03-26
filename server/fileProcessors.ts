@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 import csvParser from 'csv-parser';
 
 // Función para mover archivos después del procesamiento
-async function moveProcessedFile(filePath: string, status: 'Processed' | 'Failed', storeCode: string = 'UNKNOWN') {
+async function moveProcessedFile(filePath: string, status: 'Processed' | 'Failed', storeCode: string = 'UNKNOWN', fileActivityId?: number) {
   try {
     // Extraer información del archivo
     const originalFileName = path.basename(filePath);
@@ -20,6 +20,7 @@ async function moveProcessedFile(filePath: string, status: 'Processed' | 'Failed
     const extension = path.extname(originalFileName).toLowerCase();
     const isExcel = ['.xlsx', '.xls', '.csv'].includes(extension);
     const fileType = isExcel ? 'excel' : 'pdf';
+    const isPdf = !isExcel;
     
     // Carpetas de destino con rutas básicas
     const destFolder = status === 'Processed' ? 'procesados' : 'errores';
@@ -69,6 +70,27 @@ async function moveProcessedFile(filePath: string, status: 'Processed' | 'Failed
       }
       
       console.log(`✅ Archivo ${originalFileName} movido a ${targetPath}`);
+      
+      // Si es un archivo PDF, necesitamos actualizar la ruta en la base de datos
+      if (isPdf && fileActivityId) {
+        try {
+          // Buscar el documento PDF asociado a esta actividad
+          const [pdfDoc] = await db
+            .select()
+            .from(pdfDocuments)
+            .where(eq(pdfDocuments.fileActivityId, fileActivityId));
+          
+          if (pdfDoc) {
+            console.log(`Actualizando ruta del documento PDF ${pdfDoc.id} a ${targetPath}`);
+            // Actualizar la ruta del documento
+            await storage.updatePdfDocumentPath(pdfDoc.id, targetPath);
+          }
+        } catch (dbError) {
+          console.error(`Error al actualizar ruta del documento PDF:`, dbError);
+          // A pesar del error, continuamos con el proceso ya que al menos el archivo fue movido
+        }
+      }
+      
       return targetPath;
     } catch (copyError) {
       console.error(`Error al mover archivo ${filePath}:`, copyError);
@@ -655,7 +677,8 @@ export async function processPdfFile(filePath: string, activityId: number, store
     emitFileProcessingStatus(activityId, 'Processed');
     
     // Mover el archivo a la carpeta de procesados usando el nuevo formato de nombre
-    const newPath = await moveProcessedFile(filePath, 'Processed', storeCode);
+    // Pasamos el activityId para que actualice la ruta del PDF en la base de datos
+    const newPath = await moveProcessedFile(filePath, 'Processed', storeCode, activityId);
     
     // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
     if (newPath) {
@@ -667,6 +690,9 @@ export async function processPdfFile(filePath: string, activityId: number, store
         } 
       });
       
+      // Ya no necesitamos este código porque updatePdfDocumentPath se llama desde moveProcessedFile
+      // pero lo dejamos comentado por si acaso hay que depurar algo
+      /*
       try {
         // Buscar el documento PDF recién creado
         const pdfDocs = await storage.getPdfDocumentsByStore(storeCode);
@@ -683,6 +709,7 @@ export async function processPdfFile(filePath: string, activityId: number, store
         console.error(`Error actualizando ruta de documento PDF:`, updateError);
         // No fallamos todo el proceso por esto, ya que el archivo ya se procesó correctamente
       }
+      */
     }
     
     console.log(`Successfully processed PDF file ${path.basename(filePath)}`);
