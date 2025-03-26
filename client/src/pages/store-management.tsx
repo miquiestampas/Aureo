@@ -245,7 +245,7 @@ export default function StoreManagementPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to delete store",
+        title: "Error al eliminar tienda",
         description: error.message,
         variant: "destructive",
       });
