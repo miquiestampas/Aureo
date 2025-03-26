@@ -22,6 +22,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Set up file upload middleware
   const upload = setupFileUpload();
+  const uploadMultiple = setupFileUpload();
   
   // User routes
   app.get("/api/users", (req, res, next) => {
@@ -458,15 +459,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No file uploaded" });
       }
       
-      const storeCode = req.body.storeCode;
-      if (!storeCode) {
-        return res.status(400).json({ message: "Store code is required" });
-      }
+      // Usamos un código de tienda genérico que será reemplazado automáticamente
+      // durante el procesamiento del archivo basado en su contenido
+      const defaultStoreCode = "PENDIENTE";
       
       // Create file activity entry
       const activity = await storage.createFileActivity({
         filename: req.file.originalname,
-        storeCode,
+        storeCode: defaultStoreCode,
         fileType: 'Excel',
         status: 'Pending',
         processingDate: new Date(),
@@ -476,11 +476,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Process the file in the background
-      processExcelFile(req.file.path, activity.id, storeCode)
+      // El código de tienda será determinado automáticamente desde el archivo
+      processExcelFile(req.file.path, activity.id, defaultStoreCode)
         .catch(err => console.error("Error processing uploaded Excel file:", err));
       
       res.status(202).json({
-        message: "File uploaded successfully and queued for processing",
+        message: "Archivo cargado exitosamente y en cola para procesamiento",
         fileActivity: activity
       });
     } catch (err) {
