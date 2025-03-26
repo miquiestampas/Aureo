@@ -69,15 +69,37 @@ interface StoreData {
   type: string;
   location: string;
   active: boolean;
+  // Nuevos campos añadidos
+  address?: string;
+  phone?: string;
+  email?: string;
+  cif?: string;
+  businessName?: string;
+  ownerName?: string;
+  ownerIdNumber?: string;
+  startDate?: string | Date;
+  endDate?: string | Date;
+  notes?: string;
 }
 
 // Form schema for creating/editing a store
 const storeFormSchema = z.object({
-  code: z.string().min(2, "Store code must be at least 2 characters").max(20, "Store code must be at most 20 characters"),
-  name: z.string().min(2, "Store name must be at least 2 characters"),
+  code: z.string().min(2, "El código debe tener al menos 2 caracteres").max(20, "El código debe tener máximo 20 caracteres"),
+  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   type: z.enum(["Excel", "PDF"]),
   location: z.string().optional(),
   active: z.boolean().default(true),
+  // Nuevos campos
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email("Formato de correo inválido").optional(),
+  cif: z.string().optional(),
+  businessName: z.string().optional(),
+  ownerName: z.string().optional(),
+  ownerIdNumber: z.string().optional(),
+  startDate: z.string().optional().or(z.date().optional()),
+  endDate: z.string().optional().or(z.date().optional()),
+  notes: z.string().optional(),
 });
 
 type StoreFormValues = z.infer<typeof storeFormSchema>;
@@ -104,6 +126,14 @@ export default function StoreManagementPage() {
       type: "Excel",
       location: "",
       active: true,
+      address: "",
+      phone: "",
+      email: "",
+      cif: "",
+      businessName: "",
+      ownerName: "",
+      ownerIdNumber: "",
+      notes: "",
     },
   });
   
@@ -116,6 +146,14 @@ export default function StoreManagementPage() {
       type: "Excel",
       location: "",
       active: true,
+      address: "",
+      phone: "",
+      email: "",
+      cif: "",
+      businessName: "",
+      ownerName: "",
+      ownerIdNumber: "",
+      notes: "",
     },
   });
   
@@ -128,6 +166,16 @@ export default function StoreManagementPage() {
         type: selectedStore.type as "Excel" | "PDF",
         location: selectedStore.location || "",
         active: selectedStore.active,
+        address: selectedStore.address || "",
+        phone: selectedStore.phone || "",
+        email: selectedStore.email || "",
+        cif: selectedStore.cif || "",
+        businessName: selectedStore.businessName || "",
+        ownerName: selectedStore.ownerName || "",
+        ownerIdNumber: selectedStore.ownerIdNumber || "",
+        startDate: selectedStore.startDate ? selectedStore.startDate : "",
+        endDate: selectedStore.endDate ? selectedStore.endDate : "",
+        notes: selectedStore.notes || "",
       });
     }
   }, [selectedStore, isEditDialogOpen, editForm]);
@@ -429,9 +477,9 @@ export default function StoreManagementPage() {
                       render={({ field }) => (
                         <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                           <div className="space-y-0.5">
-                            <FormLabel className="text-base">Active Status</FormLabel>
+                            <FormLabel className="text-base">Estado Activo</FormLabel>
                             <FormDescription>
-                              Active stores will process new files
+                              Las tiendas activas procesarán nuevos archivos
                             </FormDescription>
                           </div>
                           <FormControl>
@@ -443,6 +491,137 @@ export default function StoreManagementPage() {
                         </FormItem>
                       )}
                     />
+
+                    {/* Nuevos campos - Información adicional */}
+                    <div className="border rounded-md p-4 mt-6">
+                      <h3 className="font-medium mb-3">Información Adicional</h3>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={createForm.control}
+                          name="address"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Dirección</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ej: Calle Principal 123" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={createForm.control}
+                          name="phone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Teléfono</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ej: 912 345 678" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <FormField
+                          control={createForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Correo Electrónico</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ej: tienda@ejemplo.com" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={createForm.control}
+                          name="cif"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>CIF</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ej: B12345678" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <FormField
+                          control={createForm.control}
+                          name="businessName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Razón Social</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ej: Empresa S.L." {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={createForm.control}
+                          name="ownerName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nombre del Propietario</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ej: Juan Pérez" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <FormField
+                          control={createForm.control}
+                          name="ownerIdNumber"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>DNI del Propietario</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ej: 12345678A" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="mt-4">
+                        <FormField
+                          control={createForm.control}
+                          name="notes"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Anotaciones</FormLabel>
+                              <FormControl>
+                                <textarea 
+                                  className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" 
+                                  placeholder="Información adicional relevante..."
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
                     
                     <DialogFooter>
                       <Button 
@@ -450,13 +629,13 @@ export default function StoreManagementPage() {
                         variant="outline" 
                         onClick={() => setIsCreateDialogOpen(false)}
                       >
-                        Cancel
+                        Cancelar
                       </Button>
                       <Button 
                         type="submit"
                         disabled={createMutation.isPending}
                       >
-                        {createMutation.isPending ? "Creating..." : "Create Store"}
+                        {createMutation.isPending ? "Creando..." : "Crear Tienda"}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -579,9 +758,9 @@ export default function StoreManagementPage() {
                     render={({ field }) => (
                       <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                         <div className="space-y-0.5">
-                          <FormLabel className="text-base">Active Status</FormLabel>
+                          <FormLabel className="text-base">Estado Activo</FormLabel>
                           <FormDescription>
-                            Active stores will process new files
+                            Las tiendas activas procesarán nuevos archivos
                           </FormDescription>
                         </div>
                         <FormControl>
@@ -593,6 +772,137 @@ export default function StoreManagementPage() {
                       </FormItem>
                     )}
                   />
+
+                  {/* Nuevos campos - Información adicional */}
+                  <div className="border rounded-md p-4 mt-6">
+                    <h3 className="font-medium mb-3">Información Adicional</h3>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={editForm.control}
+                        name="address"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Dirección</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ej: Calle Principal 123" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Teléfono</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ej: 912 345 678" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <FormField
+                        control={editForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Correo Electrónico</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ej: tienda@ejemplo.com" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="cif"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>CIF</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ej: B12345678" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <FormField
+                        control={editForm.control}
+                        name="businessName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Razón Social</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ej: Empresa S.L." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={editForm.control}
+                        name="ownerName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nombre del Propietario</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ej: Juan Pérez" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <FormField
+                        control={editForm.control}
+                        name="ownerIdNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>DNI del Propietario</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ej: 12345678A" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="mt-4">
+                      <FormField
+                        control={editForm.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Anotaciones</FormLabel>
+                            <FormControl>
+                              <textarea 
+                                className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" 
+                                placeholder="Información adicional relevante..."
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
                   
                   <DialogFooter>
                     <Button 
@@ -600,13 +910,13 @@ export default function StoreManagementPage() {
                       variant="outline" 
                       onClick={() => setIsEditDialogOpen(false)}
                     >
-                      Cancel
+                      Cancelar
                     </Button>
                     <Button 
                       type="submit"
                       disabled={updateMutation.isPending}
                     >
-                      {updateMutation.isPending ? "Updating..." : "Update Store"}
+                      {updateMutation.isPending ? "Actualizando..." : "Actualizar Tienda"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -619,19 +929,19 @@ export default function StoreManagementPage() {
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action will permanently delete the store "{selectedStore?.name}". 
-                This action cannot be undone.
+                Esta acción eliminará permanentemente la tienda "{selectedStore?.name}". 
+                Esta acción no se puede deshacer.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction 
                 onClick={confirmDelete}
                 className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
               >
-                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
