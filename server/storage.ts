@@ -66,6 +66,7 @@ export interface IStorage {
   createPdfDocument(doc: InsertPdfDocument): Promise<PdfDocument>;
   getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]>;
   getPdfDocument(id: number): Promise<PdfDocument | undefined>;
+  updatePdfDocumentPath(id: number, newPath: string): Promise<PdfDocument | undefined>;
   
   // Watchlist Person methods
   createWatchlistPerson(person: InsertWatchlistPerson): Promise<WatchlistPerson>;
@@ -390,6 +391,15 @@ export class MemStorage implements IStorage {
   
   async getPdfDocument(id: number): Promise<PdfDocument | undefined> {
     return this.pdfDocuments.get(id);
+  }
+  
+  async updatePdfDocumentPath(id: number, newPath: string): Promise<PdfDocument | undefined> {
+    const doc = this.pdfDocuments.get(id);
+    if (!doc) return undefined;
+    
+    const updatedDoc = { ...doc, path: newPath };
+    this.pdfDocuments.set(id, updatedDoc);
+    return updatedDoc;
   }
   
   // Implementación de nuevos métodos para cumplir con la interfaz
@@ -1209,6 +1219,20 @@ export class DatabaseStorage implements IStorage {
       .from(pdfDocuments)
       .where(eq(pdfDocuments.id, id));
     return document;
+  }
+  
+  async updatePdfDocumentPath(id: number, newPath: string): Promise<PdfDocument | undefined> {
+    try {
+      console.log(`Updating PDF document ${id} path to ${newPath}`);
+      const [updated] = await db.update(pdfDocuments)
+        .set({ path: newPath })
+        .where(eq(pdfDocuments.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error(`Error updating PDF document path:`, error);
+      return undefined;
+    }
   }
   
   // Métodos de ExcelData para búsqueda
