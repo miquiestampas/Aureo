@@ -292,15 +292,15 @@ export default function StoreManagementPage() {
   const columns: ColumnDef<StoreData>[] = [
     {
       accessorKey: "code",
-      header: "Store Code",
+      header: "Código",
     },
     {
       accessorKey: "name",
-      header: "Store Name",
+      header: "Nombre",
     },
     {
       accessorKey: "type",
-      header: "Type",
+      header: "Tipo",
       cell: ({ row }) => {
         const type = row.original.type;
         return (
@@ -317,14 +317,14 @@ export default function StoreManagementPage() {
     },
     {
       accessorKey: "location",
-      header: "Location",
+      header: "Ubicación",
       cell: ({ row }) => {
         return row.original.location || "—";
       }
     },
     {
       accessorKey: "active",
-      header: "Status",
+      header: "Estado",
       cell: ({ row }) => {
         const isActive = row.original.active;
         return isActive ? (
@@ -434,23 +434,23 @@ export default function StoreManagementPage() {
                       name="type"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Store Type</FormLabel>
+                          <FormLabel>Tipo de Tienda</FormLabel>
                           <Select 
                             onValueChange={field.onChange} 
                             defaultValue={field.value}
                           >
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select store type" />
+                                <SelectValue placeholder="Seleccione tipo de tienda" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="Excel">Excel Store</SelectItem>
-                              <SelectItem value="PDF">PDF Store</SelectItem>
+                              <SelectItem value="Excel">Tienda Excel</SelectItem>
+                              <SelectItem value="PDF">Tienda PDF</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormDescription>
-                            Determines how the store's data is processed
+                            Determina cómo se procesan los datos de la tienda
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -462,9 +462,9 @@ export default function StoreManagementPage() {
                       name="location"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Location (Optional)</FormLabel>
+                          <FormLabel>Ubicación (Opcional)</FormLabel>
                           <FormControl>
-                            <Input placeholder="E.g., Downtown" {...field} />
+                            <Input placeholder="Ej: Centro Ciudad" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -690,9 +690,9 @@ export default function StoreManagementPage() {
                     name="code"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Store Code</FormLabel>
+                        <FormLabel>Código de Tienda</FormLabel>
                         <FormControl>
-                          <Input placeholder="E.g., ST001" {...field} />
+                          <Input placeholder="Ej: ST001" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -704,9 +704,9 @@ export default function StoreManagementPage() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Store Name</FormLabel>
+                        <FormLabel>Nombre de Tienda</FormLabel>
                         <FormControl>
-                          <Input placeholder="E.g., Main Street Store" {...field} />
+                          <Input placeholder="Ej: Tienda Principal" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -718,19 +718,19 @@ export default function StoreManagementPage() {
                     name="type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Store Type</FormLabel>
+                        <FormLabel>Tipo de Tienda</FormLabel>
                         <Select 
                           onValueChange={field.onChange} 
                           defaultValue={field.value}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select store type" />
+                              <SelectValue placeholder="Seleccione tipo de tienda" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Excel">Excel Store</SelectItem>
-                            <SelectItem value="PDF">PDF Store</SelectItem>
+                            <SelectItem value="Excel">Tienda Excel</SelectItem>
+                            <SelectItem value="PDF">Tienda PDF</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -743,9 +743,9 @@ export default function StoreManagementPage() {
                     name="location"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Location (Optional)</FormLabel>
+                        <FormLabel>Ubicación (Opcional)</FormLabel>
                         <FormControl>
-                          <Input placeholder="E.g., Downtown" {...field} />
+                          <Input placeholder="Ej: Centro Ciudad" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
