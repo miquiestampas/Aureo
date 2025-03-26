@@ -632,7 +632,20 @@ export default function DashboardPage() {
               <div className="p-6">
                 <div className="space-y-4">
                   {pendingAssignments.map((file) => (
-                    <StoreAssignmentCard key={file.id} file={file} onAssigned={() => refetchPendingAssignments()} />
+                    <StoreAssignmentCard 
+                      key={file.id} 
+                      file={file} 
+                      onAssigned={() => {
+                        refetchPendingAssignments();
+                        refetchActivities();
+                        refetchStatus();
+                        toast({
+                          title: "Archivo procesado",
+                          description: "El archivo ha sido asignado y procesado correctamente",
+                          variant: "default",
+                        });
+                      }} 
+                    />
                   ))}
                 </div>
               </div>
