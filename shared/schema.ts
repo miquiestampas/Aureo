@@ -29,6 +29,17 @@ export const stores = pgTable("stores", {
   type: text("type", { enum: ["Excel", "PDF"] }).notNull(),
   location: text("location"),
   active: boolean("active").notNull().default(true),
+  // Nuevos campos
+  address: text("address"),
+  phone: text("phone"),
+  email: text("email"),
+  cif: text("cif"), // CIF (Código de Identificación Fiscal)
+  businessName: text("business_name"), // Razón social
+  ownerName: text("owner_name"), // Nombre del propietario
+  ownerIdNumber: text("owner_id_number"), // DNI del propietario
+  startDate: date("start_date"), // Fecha inicio actividad
+  endDate: date("end_date"), // Fecha cese para las no activas
+  notes: text("notes"), // Anotaciones adicionales
 });
 
 export const insertStoreSchema = createInsertSchema(stores).pick({
@@ -37,6 +48,16 @@ export const insertStoreSchema = createInsertSchema(stores).pick({
   type: true,
   location: true,
   active: true,
+  address: true,
+  phone: true,
+  email: true,
+  cif: true,
+  businessName: true,
+  ownerName: true,
+  ownerIdNumber: true,
+  startDate: true,
+  endDate: true,
+  notes: true,
 });
 
 export type InsertStore = z.infer<typeof insertStoreSchema>;
