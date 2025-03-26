@@ -32,14 +32,14 @@ async function moveProcessedFile(filePath: string, status: 'Processed' | 'Failed
     const dateFormat = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
     
     // Generar el nuevo nombre del archivo según las especificaciones
-    // Formato: codigodetienda_fechadeprocesamiento.pdf
-    const newFileName = `${storeCode}_${dateFormat}${extension}`;
+    // Formato: STORECODE-READDATE.pdf (con guión)
+    const newFileName = `${storeCode}-${dateFormat}${extension}`;
     let targetPath = path.join(targetDir, newFileName);
     
     // Si ya existe un archivo con el mismo nombre, añadir un número secuencial
     let counter = 1;
     while (fs.existsSync(targetPath)) {
-      targetPath = path.join(targetDir, `${storeCode}_${dateFormat}_${counter}${extension}`);
+      targetPath = path.join(targetDir, `${storeCode}-${dateFormat}-${counter}${extension}`);
       counter++;
     }
     
