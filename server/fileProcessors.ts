@@ -463,6 +463,14 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     await storage.updateFileActivityStatus(activityId, 'Processed');
     emitFileProcessingStatus(activityId, 'Processed');
     
+    // Mover el archivo a la carpeta de procesados
+    const newPath = await moveProcessedFile(filePath, 'Processed');
+    
+    // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
+    if (newPath) {
+      await storage.updateFileActivity(activityId, { metadata: { movedTo: newPath } });
+    }
+    
     console.log(`Archivo procesado correctamente: ${path.basename(filePath)} con ${processedRows.length} registros`);
     
   } catch (error) {
@@ -472,6 +480,14 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido durante el procesamiento';
     await storage.updateFileActivityStatus(activityId, 'Failed', errorMessage);
     emitFileProcessingStatus(activityId, 'Failed', errorMessage);
+    
+    // Mover el archivo a la carpeta de errores
+    const newPath = await moveProcessedFile(filePath, 'Failed');
+    
+    // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
+    if (newPath) {
+      await storage.updateFileActivity(activityId, { metadata: { movedTo: newPath } });
+    }
   }
 }
 
@@ -611,6 +627,21 @@ export async function processPdfFile(filePath: string, activityId: number, store
     await storage.updateFileActivityStatus(activityId, 'Processed');
     emitFileProcessingStatus(activityId, 'Processed');
     
+    // Mover el archivo a la carpeta de procesados
+    const newPath = await moveProcessedFile(filePath, 'Processed');
+    
+    // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
+    if (newPath) {
+      // Actualizar también la ruta del documento PDF en la base de datos
+      await storage.updateFileActivity(activityId, { metadata: { movedTo: newPath } });
+      
+      // Actualizar también la referencia en el documento PDF
+      const pdfDocs = await storage.getPdfDocumentsByFileActivity(activityId);
+      if (pdfDocs.length > 0) {
+        await storage.updatePdfDocument(pdfDocs[0].id, { path: newPath });
+      }
+    }
+    
     console.log(`Successfully processed PDF file ${path.basename(filePath)}`);
     
   } catch (error) {
@@ -620,5 +651,13 @@ export async function processPdfFile(filePath: string, activityId: number, store
     const errorMessage = error instanceof Error ? error.message : 'Unknown error during processing';
     await storage.updateFileActivityStatus(activityId, 'Failed', errorMessage);
     emitFileProcessingStatus(activityId, 'Failed', errorMessage);
+    
+    // Mover el archivo a la carpeta de errores
+    const newPath = await moveProcessedFile(filePath, 'Failed');
+    
+    // Actualizar la actividad con la nueva ruta del archivo si fue movido exitosamente
+    if (newPath) {
+      await storage.updateFileActivity(activityId, { metadata: { movedTo: newPath } });
+    }
   }
 }
