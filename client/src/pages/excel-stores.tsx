@@ -25,11 +25,14 @@ import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
+// Definición del tipo específico para Store
+type StoreType = "Excel" | "PDF";
+
 interface Store {
   id: number;
   code: string;
   name: string;
-  type: string;
+  type: StoreType;
   location: string;
   active: boolean;
 }
@@ -275,7 +278,7 @@ export default function ExcelStoresPage() {
           <FileUploadModal 
             isOpen={showFileUploadModal}
             onClose={() => setShowFileUploadModal(false)}
-            storesByType={stores?.filter(store => store.type === "Excel") || []}
+            storesByType={(stores?.filter(store => store.type === "Excel") || []) as any[]}
             fileType="Excel"
           />
         </div>
@@ -371,6 +374,36 @@ export default function ExcelStoresPage() {
                                         size="sm"
                                         className="h-8 w-8 p-0"
                                         title="Eliminar"
+                                        onClick={() => {
+                                          if (confirm(`¿Está seguro que desea eliminar el archivo ${activity.filename}?`)) {
+                                            fetch(`/api/file-activities/${activity.id}`, {
+                                              method: 'DELETE'
+                                            })
+                                            .then(response => {
+                                              if (!response.ok) {
+                                                throw new Error('Error al eliminar el archivo');
+                                              }
+                                              
+                                              // Actualizar la lista eliminando la actividad
+                                              setStoreActivities(prev => ({
+                                                ...prev,
+                                                [store.code]: prev[store.code].filter((item: any) => item.id !== activity.id)
+                                              }));
+                                              
+                                              toast({
+                                                title: "Archivo eliminado",
+                                                description: "El archivo se ha eliminado correctamente",
+                                              });
+                                            })
+                                            .catch(error => {
+                                              toast({
+                                                title: "Error",
+                                                description: error instanceof Error ? error.message : "Error al eliminar el archivo",
+                                                variant: "destructive",
+                                              });
+                                            });
+                                          }
+                                        }}
                                       >
                                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                                           <path d="M3 6h18"></path>
