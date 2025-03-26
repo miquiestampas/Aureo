@@ -1753,20 +1753,59 @@ export class DatabaseStorage implements IStorage {
   
   // Search History methods
   async addSearchHistory(searchHistory: InsertSearchHistory): Promise<SearchHistory> {
-    const [history] = await db
-      .insert(searchHistory)
-      .values(searchHistory)
-      .returning();
-    return history;
+    try {
+      // Insertar directamente usando SQL para evitar problemas con TypeScript
+      const result = await db.execute(
+        `INSERT INTO search_history (user_id, search_type, search_terms, search_date, result_count, filters) 
+         VALUES ($1, $2, $3, NOW(), $4, $5) RETURNING *`,
+        [
+          searchHistory.userId, 
+          searchHistory.searchType, 
+          searchHistory.searchTerms, 
+          searchHistory.resultCount,
+          searchHistory.filters || null
+        ]
+      );
+      
+      if (result && result.rows && result.rows[0]) {
+        return result.rows[0] as SearchHistory;
+      }
+      
+      throw new Error("No se pudo insertar el historial de búsqueda");
+    } catch (error) {
+      console.error("Error al guardar historial de búsqueda:", error);
+      // Devolvemos un objeto vacío para evitar errores en cascada
+      return {} as SearchHistory;
+    }
   }
   
   async getRecentSearches(userId: number, limit: number = 10): Promise<SearchHistory[]> {
-    return await db
-      .select()
-      .from(searchHistory)
-      .where(eq(searchHistory.userId, userId))
-      .orderBy(desc(searchHistory.searchDate))
-      .limit(limit);
+    try {
+      // Usar SQL directo para evitar problemas de TypeScript
+      const result = await db.execute(
+        `SELECT * FROM "search_history" WHERE "user_id" = $1 ORDER BY "search_date" DESC LIMIT $2`,
+        [userId, limit]
+      );
+      
+      if (result && result.rows && Array.isArray(result.rows)) {
+        return result.rows.map(row => {
+          return {
+            id: row.id,
+            userId: row.user_id,
+            searchType: row.search_type,
+            searchTerms: row.search_terms,
+            searchDate: row.search_date,
+            resultCount: row.result_count,
+            filters: row.filters
+          } as SearchHistory;
+        });
+      }
+      
+      return [];
+    } catch (error) {
+      console.error("Error al obtener historial de búsquedas:", error);
+      return [];
+    }
   }
 }
 

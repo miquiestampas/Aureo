@@ -310,6 +310,18 @@ export default function DashboardPage() {
   // Columns for activities table
   const columns: ColumnDef<FileActivity>[] = [
     {
+      accessorKey: "filename",
+      header: "Archivo",
+      cell: ({ row }) => {
+        const filename = row.original.filename;
+        return (
+          <div>
+            <div className="text-sm font-medium text-gray-900">{filename}</div>
+          </div>
+        );
+      }
+    },
+    {
       accessorKey: "storeCode",
       header: "Tienda",
       cell: ({ row }) => {
