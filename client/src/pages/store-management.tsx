@@ -188,8 +188,8 @@ export default function StoreManagementPage() {
     },
     onSuccess: () => {
       toast({
-        title: "Store created",
-        description: "The store has been created successfully.",
+        title: "Tienda creada",
+        description: "La tienda ha sido creada correctamente.",
       });
       setIsCreateDialogOpen(false);
       createForm.reset();
@@ -197,7 +197,7 @@ export default function StoreManagementPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to create store",
+        title: "Error al crear tienda",
         description: error.message,
         variant: "destructive",
       });
@@ -213,8 +213,8 @@ export default function StoreManagementPage() {
     },
     onSuccess: () => {
       toast({
-        title: "Store updated",
-        description: "The store has been updated successfully.",
+        title: "Tienda actualizada",
+        description: "La tienda ha sido actualizada correctamente.",
       });
       setIsEditDialogOpen(false);
       setSelectedStore(null);
@@ -222,7 +222,7 @@ export default function StoreManagementPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to update store",
+        title: "Error al actualizar tienda",
         description: error.message,
         variant: "destructive",
       });
@@ -236,8 +236,8 @@ export default function StoreManagementPage() {
     },
     onSuccess: () => {
       toast({
-        title: "Store deleted",
-        description: "The store has been deleted successfully.",
+        title: "Tienda eliminada",
+        description: "La tienda ha sido eliminada correctamente.",
       });
       setIsDeleteDialogOpen(false);
       setSelectedStore(null);
@@ -329,11 +329,11 @@ export default function StoreManagementPage() {
         const isActive = row.original.active;
         return isActive ? (
           <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">
-            <CheckCircle className="h-3 w-3 mr-1" /> Active
+            <CheckCircle className="h-3 w-3 mr-1" /> Activa
           </Badge>
         ) : (
           <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100">
-            <XCircle className="h-3 w-3 mr-1" /> Inactive
+            <XCircle className="h-3 w-3 mr-1" /> Inactiva
           </Badge>
         );
       }
@@ -341,7 +341,7 @@ export default function StoreManagementPage() {
     ...(canModify ? [
       {
         id: "actions",
-        header: "Actions",
+        header: "Acciones",
         cell: ({ row }) => {
           const store = row.original;
           return (
@@ -353,7 +353,7 @@ export default function StoreManagementPage() {
                 onClick={() => handleEditStore(store)}
               >
                 <Pencil className="h-4 w-4" />
-                <span className="sr-only">Edit</span>
+                <span className="sr-only">Editar</span>
               </Button>
               <Button 
                 variant="outline" 
@@ -362,7 +362,7 @@ export default function StoreManagementPage() {
                 onClick={() => handleDeleteStore(store)}
               >
                 <Trash2 className="h-4 w-4" />
-                <span className="sr-only">Delete</span>
+                <span className="sr-only">Eliminar</span>
               </Button>
             </div>
           );
