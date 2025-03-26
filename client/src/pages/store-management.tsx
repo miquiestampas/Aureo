@@ -474,19 +474,35 @@ export default function StoreManagementPage() {
                       )}
                     />
                     
-                    <FormField
-                      control={createForm.control}
-                      name="location"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Ubicación (Opcional)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Ej: Centro Ciudad" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={createForm.control}
+                        name="district"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Distrito</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ej: Madrid Centro" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={createForm.control}
+                        name="locality"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Localidad</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Ej: Chamberí" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     
                     <FormField
                       control={createForm.control}
@@ -785,19 +801,35 @@ export default function StoreManagementPage() {
                     )}
                   />
                   
-                  <FormField
-                    control={editForm.control}
-                    name="location"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Ubicación (Opcional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ej: Centro Ciudad" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={editForm.control}
+                      name="district"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Distrito</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ej: Madrid Centro" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editForm.control}
+                      name="locality"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Localidad</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ej: Chamberí" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   
                   <FormField
                     control={editForm.control}
