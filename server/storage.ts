@@ -1132,6 +1132,33 @@ export class DatabaseStorage implements IStorage {
     return updatedActivity;
   }
   
+  async updateFileActivity(
+    id: number,
+    updates: Partial<FileActivity>
+  ): Promise<FileActivity | undefined> {
+    // Implementación del método para actualizar una actividad de archivo
+    try {
+      // Verificar que la actividad existe
+      const activity = await this.getFileActivity(id);
+      if (!activity) {
+        console.warn(`No se encontró la actividad de archivo con ID ${id}`);
+        return undefined;
+      }
+      
+      // Actualizar la actividad con los nuevos valores
+      const [updatedActivity] = await db
+        .update(fileActivities)
+        .set(updates)
+        .where(eq(fileActivities.id, id))
+        .returning();
+      
+      return updatedActivity;
+    } catch (error) {
+      console.error(`Error al actualizar la actividad de archivo ${id}:`, error);
+      return undefined;
+    }
+  }
+  
   async getRecentFileActivities(limit: number): Promise<FileActivity[]> {
     return await db
       .select()
