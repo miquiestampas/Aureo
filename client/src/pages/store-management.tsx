@@ -1272,7 +1272,7 @@ export default function StoreManagementPage() {
         {/* Edit Store Dialog */}
         {selectedStore && (
           <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-            <DialogContent className="max-w-3xl">
+            <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Editar Tienda</DialogTitle>
                 <DialogDescription>
@@ -1281,7 +1281,7 @@ export default function StoreManagementPage() {
               </DialogHeader>
 
               <Form {...editForm}>
-                <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-4">
+                <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="grid grid-cols-2 gap-4 py-4">
                   <FormField
                     control={editForm.control}
                     name="code"
