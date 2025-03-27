@@ -345,10 +345,13 @@ def search_excel_data():
             def is_numeric_string(value):
                 return re.match(r'^[0-9]+(\.[0-9]+)?$', value) is not None
             
-            # Usar CASE WHEN para manejar valores numéricos y no numéricos
+            # Usar CASE WHEN para manejar valores numéricos y no numéricos en SQLite
+            # SQLite no tiene REGEXP nativo, usamos LIKE para una aproximación
             price_condition = f"""
             CASE 
-                WHEN e.price REGEXP '^[0-9]+(\\.[0-9]+)?$' THEN 
+                WHEN (e.price GLOB '*[0-9]*' AND 
+                     e.price NOT GLOB '*[a-zA-Z]*' AND 
+                     (e.price GLOB '*.*' OR e.price NOT GLOB '*.*')) THEN 
                     CAST(e.price AS REAL) {price_operator} :price_value
                 ELSE 0
             END

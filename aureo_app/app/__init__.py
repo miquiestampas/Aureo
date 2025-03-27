@@ -29,9 +29,15 @@ def create_app():
     
     with app.app_context():
         # Importar componentes
-        from .models import User
+        from .models import User, init_db
         from .auth import auth_bp
         from .routes import main_bp
+        
+        # Verificar y crear la base de datos SQLite
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        if not os.path.exists(db_path) or os.path.getsize(db_path) == 0:
+            init_db()
+            print(f"Base de datos SQLite creada en: {db_path}")
         
         # Configurar login manager
         @login_manager.user_loader

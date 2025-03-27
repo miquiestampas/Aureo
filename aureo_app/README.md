@@ -1,82 +1,108 @@
-# Áureo - Sistema de Gestión
+# Áureo - Sistema de Gestión de Compras
 
-## Descripción
+Áureo es un sistema para gestionar información de compras en joyerías, procesando datos de archivos Excel y PDF de forma automatizada.
 
-Áureo es un sistema de gestión para tiendas que permite el seguimiento y control de compras a través de dos sistemas paralelos: Excel y PDF. El sistema incluye alertas automáticas para objetos y personas de interés, búsqueda avanzada y un sistema de vigilancia de archivos.
-
-## Requisitos
+## Requisitos del Sistema
 
 - Python 3.8 o superior
-- SQLite (incluido con Python)
-- Navegador web moderno (Chrome, Firefox, Edge, etc.)
+- Aproximadamente 150 MB de espacio en disco
+- 4 GB de RAM (recomendado)
+- Windows 10 o superior
 
 ## Instalación
 
-1. Extraiga el archivo ZIP en el directorio deseado.
+1. Descomprime este directorio en la ubicación deseada en tu servidor Windows
+2. Abre una terminal (cmd o PowerShell) en el directorio descomprimido
+3. Instala las dependencias requeridas:
 
-2. Instale las dependencias necesarias:
-
-```bash
+```
 pip install -r requirements.txt
 ```
 
-3. Ejecute la aplicación:
+## Configuración Inicial
 
-```bash
-cd aureo_app
-python run.py
+Al iniciar por primera vez, la aplicación:
+
+1. Creará automáticamente la estructura de directorios necesaria
+2. Inicializará una base de datos SQLite vacía con todos los esquemas requeridos
+3. Creará un usuario SuperAdmin por defecto con nombre de usuario `117020`
+
+Para configurar la contraseña del SuperAdmin, ejecuta:
+
+```
+python reset_admin.py
 ```
 
-4. Acceda a la aplicación desde un navegador:
-   - URL local: http://localhost:5000
-   - URL de red: http://IP_DEL_SERVIDOR:5000
+## Uso de la Aplicación
 
-## Estructura del Proyecto
+### Inicio Rápido
+
+Para iniciar la aplicación:
+
+```
+python start.py
+```
+
+Esto realizará todas las comprobaciones necesarias e iniciará el servidor Flask.
+Por defecto, la aplicación estará disponible en http://localhost:5000.
+
+### Scripts de Utilidad
+
+- `reset_admin.py`: Restablece la contraseña del administrador (SuperAdmin)
+- `db_update.py`: Actualiza la estructura de la base de datos si es necesario
+- `make_dist.py`: Crea un archivo zip de distribución limpio para implementación
+
+### Vigilancia Automática de Archivos
+
+La aplicación puede monitorear automáticamente carpetas específicas para procesar:
+
+- Archivos Excel: `./data/excel_watch/`
+- Archivos PDF: `./data/pdf_watch/`
+
+Esta funcionalidad puede activarse/desactivarse a través de la interfaz de administración.
+
+## Estructura de Directorios
 
 - `/app`: Código principal de la aplicación Flask
-- `/data`: Directorios de vigilancia para archivos
-  - `/excel_watch`: Directorio para detección automática de archivos Excel
-  - `/pdf_watch`: Directorio para detección automática de archivos PDF
-- `/uploads`: Directorio donde se almacenan los archivos procesados
-  - `/excel`: Archivos Excel procesados
-  - `/pdf`: Archivos PDF procesados
-- `config.py`: Configuración general
-- `run.py`: Script principal para ejecutar la aplicación
-- `datos.sqlite`: Base de datos SQLite donde se almacena toda la información
+- `/data`: Directorios de vigilancia para Excel y PDF
+- `/uploads`: Archivos subidos manualmente por los usuarios
+- `/flask_session`: Datos de sesión (generados automáticamente)
 
-## Usuarios y Acceso
+## Resolución de Problemas
 
-Al ejecutar por primera vez, se crea automáticamente un usuario administrador:
+### Base de Datos
 
-- **Usuario**: 117020
-- **Contraseña**: password123
+Si encuentras errores relacionados con la base de datos, intenta:
 
-**IMPORTANTE**: Cambie esta contraseña inmediatamente después del primer inicio de sesión.
+1. Hacer una copia de seguridad de `datos.sqlite` si contiene información importante
+2. Ejecutar `python db_update.py` para actualizar la estructura de la base de datos
 
-## Configuración
+### Usuario Administrador
 
-### Vigilancia de Archivos
+Si has olvidado la contraseña del administrador:
 
-Para activar la vigilancia automática de archivos:
+```
+python reset_admin.py
+```
 
-1. Acceda como administrador.
-2. Vaya a Configuración del Sistema.
-3. Active la opción "FILE_WATCHING_ACTIVE".
+### Archivos No Procesados
 
-Los archivos detectados se procesarán según su tipo (Excel o PDF) y se asignarán a la tienda correspondiente si el código de tienda está incluido en el nombre del archivo.
+- Verifica que los directorios de vigilancia existan y tengan permisos de escritura
+- Asegúrate de que la vigilancia de archivos esté activada en la configuración
+- Verifica que los archivos Excel y PDF sigan el formato esperado
 
-### Asignación Automática de Tiendas
+## Desarrolladores
 
-Para activar la asignación automática de tiendas cuando no se detecta el código en el nombre del archivo:
+Para modificar el código fuente:
 
-1. Acceda como administrador.
-2. Vaya a Configuración del Sistema.
-3. Active la opción "AUTO_STORE_DETECTION".
+1. El backend utiliza Flask con SQLAlchemy para el ORM
+2. El frontend está construido con React y se sirve como archivos estáticos
+3. Para reconstruir el frontend, utiliza el script:
 
-## Registros
+```
+python build_frontend.py
+```
 
-Los registros de la aplicación se muestran en la consola donde se ejecuta el script `run.py`. Estas salidas son útiles para diagnosticar problemas.
+## Licencia
 
-## Soporte
-
-Si necesita ayuda adicional o encuentra algún problema, contacte al administrador del sistema.
+Este software es propiedad del cliente y está protegido por leyes de propiedad intelectual. Su uso, modificación y distribución está restringida según los términos acordados.

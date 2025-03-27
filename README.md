@@ -35,7 +35,7 @@ El proyecto está dividido en dos componentes principales:
 
 La aplicación Flask es completamente independiente y puede ejecutarse en cualquier servidor Windows con Python 3.8 o superior.
 
-1. Descomprima el archivo `aureo_app.zip` en el directorio deseado
+1. Descomprima el archivo `aureo-[version].zip` en el directorio deseado
 2. Instale las dependencias:
    ```
    pip install -r requirements.txt
@@ -45,7 +45,18 @@ La aplicación Flask es completamente independiente y puede ejecutarse en cualqu
    python start.py
    ```
 
-Para más detalles, consulte el README dentro del directorio `aureo_app`.
+Para más detalles, consulte el README dentro del directorio `aureo_app`
+
+#### Crear un archivo de distribución
+
+Para generar un archivo zip listo para distribución en producción:
+
+```
+cd aureo_app
+python make_dist.py
+```
+
+Esto generará un archivo `aureo-[version].zip` con todos los archivos necesarios y sin incluir datos temporales o de desarrollo.
 
 #### Desarrollo del Frontend
 
@@ -85,6 +96,20 @@ Esta función puede habilitarse o deshabilitarse desde la configuración del sis
 ### Base de Datos
 
 La aplicación utiliza SQLite por defecto, lo que simplifica la instalación y el mantenimiento. Los datos se almacenan en el archivo `aureo_app/datos.sqlite`.
+
+#### Actualización de la Base de Datos
+
+Si necesita actualizar la estructura de la base de datos después de modificar los modelos, utilice el script `db_update.py`:
+
+```
+cd aureo_app
+python db_update.py
+```
+
+Este script:
+1. Verifica si la estructura actual coincide con la estructura esperada
+2. Crea una copia de seguridad de la base de datos actual
+3. Actualiza la estructura preservando los datos de usuario
 
 ## Licencia
 

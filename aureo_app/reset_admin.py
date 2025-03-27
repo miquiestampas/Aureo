@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 from werkzeug.security import generate_password_hash
 from getpass import getpass
 import sqlite3
@@ -25,8 +26,26 @@ def reset_admin_password():
             print("Error: Las contraseñas no coinciden.")
             return False
         
+        # Verificar longitud mínima
         if len(password) < 8:
             print("Error: La contraseña debe tener al menos 8 caracteres.")
+            return False
+            
+        # Verificar complejidad de la contraseña
+        if not re.search(r"[A-Z]", password):
+            print("Error: La contraseña debe contener al menos una letra mayúscula.")
+            return False
+            
+        if not re.search(r"[a-z]", password):
+            print("Error: La contraseña debe contener al menos una letra minúscula.")
+            return False
+            
+        if not re.search(r"[0-9]", password):
+            print("Error: La contraseña debe contener al menos un número.")
+            return False
+            
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+            print("Error: La contraseña debe contener al menos un carácter especial.")
             return False
         
         # Generar hash de la contraseña

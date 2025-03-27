@@ -1,21 +1,15 @@
 from app import create_app, db
-from app.models import init_db
 from app.file_watcher import init_watchers
 import os
 import argparse
-from werkzeug.security import generate_password_hash
 
 app = create_app()
 
 # Ejecutar antes del primer request
 @app.before_first_request
 def before_first_request():
-    # Inicializar la base de datos si no existe
-    if not os.path.exists(os.path.join(os.path.dirname(__file__), 'datos.sqlite')):
-        with app.app_context():
-            init_db()
-    
     # Inicializar vigilantes de archivos
+    # La base de datos ya se inicializa en create_app()
     init_watchers()
 
 def parse_arguments():
@@ -37,10 +31,7 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(os.path.dirname(__file__), 'data', 'excel_watch'), exist_ok=True)
     os.makedirs(os.path.join(os.path.dirname(__file__), 'data', 'pdf_watch'), exist_ok=True)
     
-    # Inicializar base de datos si no existe
-    if not os.path.exists(os.path.join(os.path.dirname(__file__), 'datos.sqlite')):
-        with app.app_context():
-            init_db()
+    # La base de datos se inicializa automáticamente en create_app()
     
     # Determinar modo de depuración
     debug_mode = args.debug or os.environ.get('FLASK_DEBUG', '').lower() == 'true'
