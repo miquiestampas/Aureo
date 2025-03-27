@@ -1281,10 +1281,11 @@ export default function StoreManagementPage() {
               </DialogHeader>
 
               <Form {...editForm}>
-                <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="grid grid-cols-2 gap-4 py-4">
-                  <FormField
-                    control={editForm.control}
-                    name="code"
+                <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="grid grid-cols-2 gap-6 py-4">
+                  <div className="space-y-4">
+                    <FormField
+                      control={editForm.control}
+                      name="code"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Código de Tienda</FormLabel>
@@ -1413,14 +1414,19 @@ export default function StoreManagementPage() {
                     control={editForm.control}
                     name="active"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between space-x-2">
-                        <div className="space-y-0.5">
-                          <FormLabel>Estado</FormLabel>
+                      <FormItem className="flex flex-row items-start space-x-3 p-2 border rounded-md">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Estado Activo</FormLabel>
                           <FormDescription>
                             Activo o Inactivo
                           </FormDescription>
                         </div>
-                        <FormControl>
                           <Switch
                             checked={field.value}
                             onCheckedChange={field.onChange}
