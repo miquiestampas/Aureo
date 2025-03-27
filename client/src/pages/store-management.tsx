@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -198,6 +199,7 @@ type StoreFormValues = z.infer<typeof storeFormSchema>;
 export default function StoreManagementPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useLocation()[1];
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -530,10 +532,10 @@ export default function StoreManagementPage() {
 
   // Handle create form submission
   const onCreateSubmit = (data: StoreFormValues) => {
-    // Convertir "_empty" a null o cadena vacía
+    // Convertir "_empty" a cadena vacía
     const processedData = {
       ...data,
-      locality: data.locality === "_empty" ? null : data.locality
+      locality: data.locality === "_empty" ? "" : data.locality
     };
     createMutation.mutate(processedData);
   };
@@ -542,10 +544,10 @@ export default function StoreManagementPage() {
   const onEditSubmit = (data: StoreFormValues) => {
     if (!selectedStore) return;
 
-    // Convertir "_empty" a null o cadena vacía
+    // Convertir "_empty" a cadena vacía
     const processedData = {
       ...data,
-      locality: data.locality === "_empty" ? null : data.locality
+      locality: data.locality === "_empty" ? "" : data.locality
     };
 
     updateMutation.mutate({
@@ -576,6 +578,15 @@ export default function StoreManagementPage() {
   const handleViewStoreDetails = (store: StoreData) => {
     setSelectedStore(store);
     setIsDetailDialogOpen(true);
+  };
+  
+  // Navigate to store records
+  const handleViewStoreRecords = (store: StoreData) => {
+    if (store.type === "Excel") {
+      navigate(`/excel-stores?storeCode=${store.code}`);
+    } else if (store.type === "PDF") {
+      navigate(`/pdf-stores?storeCode=${store.code}`);
+    }
   };
 
   // Check if user can edit/delete (only SuperAdmin and Admin)
@@ -654,6 +665,7 @@ export default function StoreManagementPage() {
                 size="sm" 
                 className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600" 
                 onClick={() => handleViewStoreDetails(store)}
+                title="Ver Detalles"
               >
                 <Info className="h-4 w-4" />
                 <span className="sr-only">Ver Detalles</span>
@@ -661,8 +673,19 @@ export default function StoreManagementPage() {
               <Button 
                 variant="outline" 
                 size="sm" 
+                className="h-8 w-8 p-0 text-green-500 hover:text-green-600" 
+                onClick={() => handleViewStoreRecords(store)}
+                title="Ver Registros"
+              >
+                <FileText className="h-4 w-4" />
+                <span className="sr-only">Ver Registros</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
                 className="h-8 w-8 p-0" 
                 onClick={() => handleEditStore(store)}
+                title="Editar"
               >
                 <Pencil className="h-4 w-4" />
                 <span className="sr-only">Editar</span>
@@ -672,6 +695,7 @@ export default function StoreManagementPage() {
                 size="sm" 
                 className="h-8 w-8 p-0 text-red-500 hover:text-red-600" 
                 onClick={() => handleDeleteStore(store)}
+                title="Eliminar"
               >
                 <Trash2 className="h-4 w-4" />
                 <span className="sr-only">Eliminar</span>

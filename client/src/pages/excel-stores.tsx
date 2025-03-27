@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -71,6 +71,10 @@ export default function ExcelStoresPage() {
   const [nameFilter, setNameFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   
+  // Obtener parámetros de la URL
+  const searchParams = new URLSearchParams(window.location.search);
+  const storeCodeParam = searchParams.get('storeCode');
+  
   // Fetch excel stores
   const { data: stores = [], isLoading: isLoadingStores } = useQuery<Store[]>({
     queryKey: ['/api/stores', { type: 'Excel' }],
@@ -123,6 +127,16 @@ export default function ExcelStoresPage() {
         });
       });
   };
+  
+  // Cargar datos automáticamente si se especifica una tienda en la URL
+  useEffect(() => {
+    if (storeCodeParam && stores.length > 0) {
+      const storeToLoad = stores.find(store => store.code === storeCodeParam);
+      if (storeToLoad) {
+        handleViewStoreFiles(storeToLoad);
+      }
+    }
+  }, [storeCodeParam, stores]);
   
   // Estados para la visualización de archivos
   const [showFileActivityDialog, setShowFileActivityDialog] = useState(false);

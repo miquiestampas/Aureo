@@ -85,6 +85,10 @@ export default function PdfStoresPage() {
   const [codeFilter, setCodeFilter] = useState('');
   const [nameFilter, setNameFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
+  
+  // Obtener parámetros de la URL
+  const searchParams = new URLSearchParams(window.location.search);
+  const storeCodeParam = searchParams.get('storeCode');
 
   // Fetch PDF stores
   const { data: stores = [] } = useQuery<Store[]>({
@@ -134,6 +138,16 @@ export default function PdfStoresPage() {
       }
     }
   }, [recentEvents]);
+  
+  // Cargar documentos automáticamente si se especifica una tienda en la URL
+  useEffect(() => {
+    if (storeCodeParam && stores.length > 0) {
+      const storeToLoad = stores.find(store => store.code === storeCodeParam);
+      if (storeToLoad) {
+        handleViewStoreData(storeToLoad);
+      }
+    }
+  }, [storeCodeParam, stores]);
   
   // Columns for the store table
   const storeColumns: ColumnDef<Store>[] = [
@@ -460,14 +474,11 @@ export default function PdfStoresPage() {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        {storeColumns.map((column) => (
-                          <th
-                            key={column.id || column.accessorKey?.toString()}
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                          >
-                            {typeof column.header === 'function' ? column.id : column.header}
-                          </th>
-                        ))}
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
