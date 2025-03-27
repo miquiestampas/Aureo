@@ -115,6 +115,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -206,6 +212,14 @@ export default function StoreManagementPage() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState<StoreData | null>(null);
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const [isRecordsDialogOpen, setIsRecordsDialogOpen] = useState(false);
+  
+  // Estados para la visualización de registros y archivos
+  const [storeData, setStoreData] = useState<any[]>([]);
+  const [storeActivities, setStoreActivities] = useState<any[]>([]);
+  const [isLoadingStoreData, setIsLoadingStoreData] = useState(false);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [activeTab, setActiveTab] = useState("data"); // "data" or "files"
 
   // Filtros
   const [codeFilter, setCodeFilter] = useState("");
@@ -580,12 +594,73 @@ export default function StoreManagementPage() {
     setIsDetailDialogOpen(true);
   };
   
-  // Navigate to store records
-  const handleViewStoreRecords = (store: StoreData) => {
+  // Cargar datos de tienda en un diálogo
+  const handleViewStoreRecords = async (store: StoreData) => {
+    setSelectedStore(store);
+    setActiveTab("data"); // Por defecto mostrar la pestaña de datos
+    setIsRecordsDialogOpen(true);
+    
+    // Cargar datos según el tipo de tienda
     if (store.type === "Excel") {
-      navigate(`/excel-stores?storeCode=${store.code}`);
+      // Cargar datos de Excel
+      setIsLoadingStoreData(true);
+      try {
+        const response = await fetch(`/api/excel-data?storeCode=${store.code}`);
+        if (!response.ok) {
+          throw new Error("Error al cargar los datos de la tienda");
+        }
+        const data = await response.json();
+        setStoreData(data);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Error al cargar los datos de la tienda",
+          variant: "destructive",
+        });
+        setStoreData([]);
+      } finally {
+        setIsLoadingStoreData(false);
+      }
     } else if (store.type === "PDF") {
-      navigate(`/pdf-stores?storeCode=${store.code}`);
+      // Cargar datos de PDF
+      setIsLoadingStoreData(true);
+      try {
+        const response = await fetch(`/api/pdf-documents?storeCode=${store.code}`);
+        if (!response.ok) {
+          throw new Error("Error al cargar los documentos de la tienda");
+        }
+        const data = await response.json();
+        setStoreData(data);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Error al cargar los documentos de la tienda",
+          variant: "destructive",
+        });
+        setStoreData([]);
+      } finally {
+        setIsLoadingStoreData(false);
+      }
+    }
+    
+    // Cargar actividades de archivos para ambos tipos de tienda
+    setIsLoadingActivities(true);
+    try {
+      const response = await fetch(`/api/file-activities?storeCode=${store.code}`);
+      if (!response.ok) {
+        throw new Error("Error al cargar las actividades de archivos");
+      }
+      const data = await response.json();
+      setStoreActivities(data);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error al cargar las actividades de archivos",
+        variant: "destructive",
+      });
+      setStoreActivities([]);
+    } finally {
+      setIsLoadingActivities(false);
     }
   };
 
@@ -1829,6 +1904,196 @@ export default function StoreManagementPage() {
           </Dialog>
         )}
       </div>
+      
+      {/* Diálogo para ver registros de tienda */}
+      <Dialog open={isRecordsDialogOpen} onOpenChange={setIsRecordsDialogOpen}>
+        <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>
+              Registros de tienda: {selectedStore?.name} ({selectedStore?.code})
+            </DialogTitle>
+            <DialogDescription>
+              {selectedStore?.type === "Excel" ? 
+                "Datos importados de archivos Excel" : 
+                "Documentos PDF importados"}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Tabs defaultValue="data" value={activeTab} onValueChange={setActiveTab} className="mt-2">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="data">
+                {selectedStore?.type === "Excel" ? "Datos" : "Documentos"}
+              </TabsTrigger>
+              <TabsTrigger value="files">Archivos Procesados</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="data" className="overflow-auto max-h-[50vh]">
+              {isLoadingStoreData ? (
+                <div className="py-8 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+              ) : storeData.length === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-muted-foreground">
+                    No hay {selectedStore?.type === "Excel" ? "datos" : "documentos"} disponibles para esta tienda
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        {selectedStore?.type === "Excel" ? (
+                          <>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orden #</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Artículo</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
+                          </>
+                        ) : (
+                          <>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tamaño</th>
+                          </>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {storeData.map((item: any) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          {selectedStore?.type === "Excel" ? (
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.orderNumber}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(item.orderDate).toLocaleDateString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.customerName}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.customerContact}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.itemDetails}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.price}</td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.title}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.documentType}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(item.uploadDate).toLocaleDateString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {Math.round(item.fileSize / 1024)} KB
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="files" className="overflow-auto max-h-[50vh]">
+              {isLoadingActivities ? (
+                <div className="py-8 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+              ) : storeActivities.length === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-muted-foreground">No hay archivos disponibles para esta tienda</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Archivo</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {storeActivities.map((activity: any) => (
+                        <tr key={activity.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {activity.filename}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <Badge 
+                              variant={
+                                activity.status === "Processed" ? "default" : 
+                                activity.status === "Failed" ? "destructive" : 
+                                "secondary"
+                              }
+                            >
+                              {activity.status === "Processed" ? "Procesado" : 
+                               activity.status === "Processing" ? "Procesando" :
+                               activity.status === "Failed" ? "Error" : activity.status}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(activity.processingDate).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <div className="flex space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                title="Descargar"
+                                onClick={() => {
+                                  fetch(`/api/file-activities/${activity.id}/download`)
+                                    .then(response => {
+                                      if (!response.ok) {
+                                        throw new Error('Error al descargar el archivo');
+                                      }
+                                      return response.blob();
+                                    })
+                                    .then(blob => {
+                                      const url = window.URL.createObjectURL(blob);
+                                      const a = document.createElement('a');
+                                      a.style.display = 'none';
+                                      a.href = url;
+                                      a.download = activity.filename;
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      window.URL.revokeObjectURL(url);
+                                      document.body.removeChild(a);
+                                    })
+                                    .catch(error => {
+                                      toast({
+                                        title: "Error",
+                                        description: error instanceof Error ? error.message : "Error al descargar el archivo",
+                                        variant: "destructive",
+                                      });
+                                    });
+                                }}
+                              >
+                                <Download className="h-4 w-4" />
+                                <span className="sr-only">Descargar</span>
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRecordsDialogOpen(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
