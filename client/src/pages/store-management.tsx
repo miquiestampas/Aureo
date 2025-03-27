@@ -1413,11 +1413,11 @@ export default function StoreManagementPage() {
                     control={editForm.control}
                     name="active"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <FormItem className="flex flex-row items-center justify-between space-x-2">
                         <div className="space-y-0.5">
-                          <FormLabel className="text-base">Estado Activo</FormLabel>
+                          <FormLabel>Estado</FormLabel>
                           <FormDescription>
-                            Las tiendas activas procesarán nuevos archivos
+                            Activo o Inactivo
                           </FormDescription>
                         </div>
                         <FormControl>
