@@ -1676,7 +1676,7 @@ export default function StoreManagementPage() {
                         </span>
                       </div>
                       <div>
-                        <span className="font-medium">Ubicación (antigua):</span> 
+                        <span className="font-medium">Ubicación:</span> 
                         <span className="ml-2">{selectedStore.location || "—"}</span>
                       </div>
                       <div>
