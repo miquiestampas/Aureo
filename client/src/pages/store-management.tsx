@@ -804,9 +804,38 @@ export default function StoreManagementPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Distrito</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Ej: Madrid Centro" {...field} />
-                            </FormControl>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              value={field.value || ""}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccione distrito" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="_empty">Sin especificar</SelectItem>
+                                <SelectItem value="Arganzuela">Arganzuela</SelectItem>
+                                <SelectItem value="Barajas">Barajas</SelectItem>
+                                <SelectItem value="Carabanchel">Carabanchel</SelectItem>
+                                <SelectItem value="Centro">Centro</SelectItem>
+                                <SelectItem value="Chamartín">Chamartín</SelectItem>
+                                <SelectItem value="Chamberí">Chamberí</SelectItem>
+                                <SelectItem value="Ciudad Lineal">Ciudad Lineal</SelectItem>
+                                <SelectItem value="Fuencarral-El Pardo">Fuencarral-El Pardo</SelectItem>
+                                <SelectItem value="Hortaleza">Hortaleza</SelectItem>
+                                <SelectItem value="Latina">Latina</SelectItem>
+                                <SelectItem value="Moncloa-Aravaca">Moncloa-Aravaca</SelectItem>
+                                <SelectItem value="Moratalaz">Moratalaz</SelectItem>
+                                <SelectItem value="Puente de Vallecas">Puente de Vallecas</SelectItem>
+                                <SelectItem value="Retiro">Retiro</SelectItem>
+                                <SelectItem value="Salamanca">Salamanca</SelectItem>
+                                <SelectItem value="San Blas-Vicálvaro">San Blas-Vicálvaro</SelectItem>
+                                <SelectItem value="Tetuán">Tetuán</SelectItem>
+                                <SelectItem value="Usera-Villaverde">Usera-Villaverde</SelectItem>
+                                <SelectItem value="Villa de Vallecas">Villa de Vallecas</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1342,9 +1371,38 @@ export default function StoreManagementPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Distrito</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Ej: Madrid Centro" {...field} />
-                          </FormControl>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value || ""}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccione distrito" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="_empty">Sin especificar</SelectItem>
+                              <SelectItem value="Arganzuela">Arganzuela</SelectItem>
+                              <SelectItem value="Barajas">Barajas</SelectItem>
+                              <SelectItem value="Carabanchel">Carabanchel</SelectItem>
+                              <SelectItem value="Centro">Centro</SelectItem>
+                              <SelectItem value="Chamartín">Chamartín</SelectItem>
+                              <SelectItem value="Chamberí">Chamberí</SelectItem>
+                              <SelectItem value="Ciudad Lineal">Ciudad Lineal</SelectItem>
+                              <SelectItem value="Fuencarral-El Pardo">Fuencarral-El Pardo</SelectItem>
+                              <SelectItem value="Hortaleza">Hortaleza</SelectItem>
+                              <SelectItem value="Latina">Latina</SelectItem>
+                              <SelectItem value="Moncloa-Aravaca">Moncloa-Aravaca</SelectItem>
+                              <SelectItem value="Moratalaz">Moratalaz</SelectItem>
+                              <SelectItem value="Puente de Vallecas">Puente de Vallecas</SelectItem>
+                              <SelectItem value="Retiro">Retiro</SelectItem>
+                              <SelectItem value="Salamanca">Salamanca</SelectItem>
+                              <SelectItem value="San Blas-Vicálvaro">San Blas-Vicálvaro</SelectItem>
+                              <SelectItem value="Tetuán">Tetuán</SelectItem>
+                              <SelectItem value="Usera-Villaverde">Usera-Villaverde</SelectItem>
+                              <SelectItem value="Villa de Vallecas">Villa de Vallecas</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
