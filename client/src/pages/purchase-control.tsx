@@ -143,8 +143,8 @@ export default function PurchaseControlPage() {
     metals: "",
   });
   const [advancedSearch, setAdvancedSearch] = useState(false);
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(subMonths(new Date(), 3));
-  const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedRecord, setSelectedRecord] = useState<ExcelData | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [sortConfig, setSortConfig] = useState<{
@@ -212,7 +212,7 @@ export default function PurchaseControlPage() {
   // Handle search form submit
   const handleSearch = () => {
     let params: SearchParams;
-    
+
     if (advancedSearch) {
       // Parámetros para búsqueda avanzada
       params = {
@@ -249,7 +249,7 @@ export default function PurchaseControlPage() {
   // Record search to history
   const recordSearchHistory = async (query: string) => {
     if (!query.trim()) return;
-    
+
     try {
       await apiRequest("POST", "/api/search-history", {
         query,
@@ -273,16 +273,16 @@ export default function PurchaseControlPage() {
   // Get sorted results
   const getSortedResults = () => {
     if (!searchMutation.data?.results) return [];
-    
+
     return [...searchMutation.data.results].sort((a, b) => {
       const aValue = a[sortConfig.key];
       const bValue = b[sortConfig.key];
-      
+
       // Handle null or undefined values
       if (!aValue && !bValue) return 0;
       if (!aValue) return 1;
       if (!bValue) return -1;
-      
+
       // Handle string comparison
       if (typeof aValue === 'string' && typeof bValue === 'string') {
         if (sortConfig.direction === 'asc') {
@@ -291,14 +291,14 @@ export default function PurchaseControlPage() {
           return bValue.localeCompare(aValue);
         }
       }
-      
+
       // Handle date comparison
       if (sortConfig.key === 'orderDate' || sortConfig.key === 'saleDate') {
         const dateA = aValue ? new Date(aValue).getTime() : 0;
         const dateB = bValue ? new Date(bValue).getTime() : 0;
         return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
       }
-      
+
       return 0;
     });
   };
@@ -603,8 +603,8 @@ export default function PurchaseControlPage() {
                         itemDetails: "",
                         metals: "",
                       });
-                      setDateFrom(subMonths(new Date(), 3));
-                      setDateTo(new Date());
+                      setDateFrom(undefined);
+                      setDateTo(undefined);
                     }}
                   >
                     <X className="h-4 w-4 mr-2" />
@@ -845,13 +845,13 @@ export default function PurchaseControlPage() {
                 {alerts.length > 0 && (
                   <>
                     <Separator />
-                    
+
                     <div className="space-y-2">
                       <div className="flex items-center">
                         <AlertTriangle className="h-5 w-5 mr-2 text-orange-500" />
                         <Label className="text-base font-medium">Alertas ({alerts.length})</Label>
                       </div>
-                      
+
                       <div className="bg-orange-50 border border-orange-100 rounded-md p-3 space-y-3">
                         {alerts.map(alert => (
                           <div key={alert.id} className="border-b border-orange-100 pb-2 last:border-b-0 last:pb-0">
@@ -880,7 +880,7 @@ export default function PurchaseControlPage() {
                                  alert.status === 'reviewed' ? 'Revisada' : 'Escalada'}
                               </Badge>
                             </div>
-                            
+
                             {alert.reviewNotes && (
                               <div className="mt-1 text-xs bg-white p-1 rounded">
                                 <span className="font-medium">Notas: </span>
@@ -899,7 +899,7 @@ export default function PurchaseControlPage() {
                     <X className="h-4 w-4 mr-2" />
                     Cerrar
                   </Button>
-                  
+
                   <div className="space-x-2">
                     <Button variant="outline" size="sm">
                       <Printer className="h-4 w-4 mr-2" />
