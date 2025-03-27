@@ -1427,6 +1427,8 @@ export default function StoreManagementPage() {
                             Activo o Inactivo
                           </FormDescription>
                         </div>
+                        </FormControl>
+                        <FormControl>
                           <Switch
                             checked={field.value}
                             onCheckedChange={field.onChange}
