@@ -502,6 +502,32 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       await checkWatchlistMatches(savedData);
     }
     
+    // Mover el archivo a la carpeta "procesados"
+    try {
+      // Obtener la configuración del directorio de Excel
+      const excelDirConfig = await storage.getConfig('EXCEL_WATCH_DIR');
+      if (excelDirConfig) {
+        const excelDir = excelDirConfig.value;
+        const procesadosDir = path.join(excelDir, 'procesados');
+        
+        // Asegurarse de que la carpeta existe
+        if (!fs.existsSync(procesadosDir)) {
+          await fs.promises.mkdir(procesadosDir, { recursive: true });
+        }
+        
+        // Crear la ruta del nuevo archivo
+        const fileName = path.basename(filePath);
+        const destPath = path.join(procesadosDir, fileName);
+        
+        // Mover el archivo
+        await fs.promises.rename(filePath, destPath);
+        console.log(`Archivo movido a ${destPath}`);
+      }
+    } catch (moveError) {
+      console.error(`Error al mover el archivo a la carpeta 'procesados':`, moveError);
+      // No fallar el proceso completo si no se puede mover el archivo
+    }
+
     // Actualizar la actividad del archivo a Processed
     await storage.updateFileActivityStatus(activityId, 'Processed');
     emitFileProcessingStatus(activityId, 'Processed');
@@ -715,6 +741,36 @@ export async function processPdfFile(filePath: string, activityId: number, store
     };
     
     await storage.createPdfDocument(pdfDocument);
+    
+    // Mover el archivo a la carpeta "procesados", manteniendo su nombre original
+    try {
+      // Obtener la configuración del directorio de PDF
+      const pdfDirConfig = await storage.getConfig('PDF_WATCH_DIR');
+      if (pdfDirConfig) {
+        const pdfDir = pdfDirConfig.value;
+        const procesadosDir = path.join(pdfDir, 'procesados');
+        
+        // Asegurarse de que la carpeta existe
+        if (!fs.existsSync(procesadosDir)) {
+          await fs.promises.mkdir(procesadosDir, { recursive: true });
+        }
+        
+        // Crear la ruta del nuevo archivo (conservando el nombre original)
+        const fileName = path.basename(filePath);
+        const destPath = path.join(procesadosDir, fileName);
+        
+        // Mover el archivo
+        await fs.promises.rename(filePath, destPath);
+        
+        // Actualizar la ruta del documento en la base de datos
+        await storage.updatePdfDocumentPath(pdfDocument.fileActivityId, destPath);
+        
+        console.log(`Archivo PDF movido a ${destPath}`);
+      }
+    } catch (moveError) {
+      console.error(`Error al mover el archivo PDF a la carpeta 'procesados':`, moveError);
+      // No fallar el proceso completo si no se puede mover el archivo
+    }
     
     // Update file activity to Processed
     await storage.updateFileActivityStatus(activityId, 'Processed');

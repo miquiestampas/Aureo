@@ -69,6 +69,7 @@ export interface IStorage {
   createPdfDocument(doc: InsertPdfDocument): Promise<PdfDocument>;
   getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]>;
   getPdfDocument(id: number): Promise<PdfDocument | undefined>;
+  updatePdfDocumentPath(fileActivityId: number, newPath: string): Promise<boolean>;
   deletePdfDocumentsByActivityId(activityId: number): Promise<boolean>;
   
   // Watchlist Person methods
@@ -404,6 +405,25 @@ export class MemStorage implements IStorage {
   
   async getPdfDocument(id: number): Promise<PdfDocument | undefined> {
     return this.pdfDocuments.get(id);
+  }
+  
+  async updatePdfDocumentPath(fileActivityId: number, newPath: string): Promise<boolean> {
+    // Buscar todos los documentos PDF con ese fileActivityId
+    const pdfDocsToUpdate = Array.from(this.pdfDocuments.values())
+      .filter(doc => doc.fileActivityId === fileActivityId);
+    
+    // Si no hay documentos, no se pudo actualizar
+    if (pdfDocsToUpdate.length === 0) {
+      return false;
+    }
+    
+    // Actualizar cada documento encontrado con la nueva ruta
+    for (const doc of pdfDocsToUpdate) {
+      const updatedDoc = { ...doc, path: newPath };
+      this.pdfDocuments.set(doc.id, updatedDoc);
+    }
+    
+    return true;
   }
   
   async deleteFileActivity(id: number): Promise<boolean> {
@@ -1352,6 +1372,22 @@ export class DatabaseStorage implements IStorage {
       return true; // Consideramos exitoso incluso si no hay registros, ya que el objetivo es eliminarlos
     } catch (error) {
       console.error(`Error al eliminar documentos PDF por activityId ${activityId}:`, error);
+      return false;
+    }
+  }
+  
+  async updatePdfDocumentPath(fileActivityId: number, newPath: string): Promise<boolean> {
+    try {
+      const result = await db
+        .update(pdfDocuments)
+        .set({ path: newPath })
+        .where(eq(pdfDocuments.fileActivityId, fileActivityId))
+        .returning({ id: pdfDocuments.id });
+      
+      // Si al menos un documento fue actualizado, consideramos éxito
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error al actualizar la ruta del documento PDF para activityId ${fileActivityId}:`, error);
       return false;
     }
   }

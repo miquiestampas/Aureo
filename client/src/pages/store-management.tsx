@@ -91,6 +91,7 @@ import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -1427,13 +1428,6 @@ export default function StoreManagementPage() {
                             Activo o Inactivo
                           </FormDescription>
                         </div>
-                        </FormControl>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
                       </FormItem>
                     )}
                   />
@@ -1598,22 +1592,23 @@ export default function StoreManagementPage() {
                       />
                     </div>
                   </div>
+                </div>
 
-                  <DialogFooter>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => setIsEditDialogOpen(false)}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button 
-                      type="submit"
-                      disabled={updateMutation.isPending}
-                    >
-                      {updateMutation.isPending ? "Actualizando..." : "Actualizar Tienda"}
-                    </Button>
-                  </DialogFooter>
+                <DialogFooter>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsEditDialogOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit"
+                    disabled={updateMutation.isPending}
+                  >
+                    {updateMutation.isPending ? "Actualizando..." : "Actualizar Tienda"}
+                  </Button>
+                </DialogFooter>
                 </form>
               </Form>
             </DialogContent>
