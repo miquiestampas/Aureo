@@ -14,6 +14,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DateRange } from "react-day-picker";
+import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -28,7 +32,9 @@ import {
   Trash2,
   AlertCircle,
   Plus,
-  Upload
+  Upload,
+  Calendar as CalendarIcon,
+  X
 } from "lucide-react";
 import FileUploadModal from "@/components/FileUploadModal";
 import { ColumnDef } from "@tanstack/react-table";
@@ -270,9 +276,19 @@ export default function DashboardPage() {
   const { toast } = useToast();
   
   // Estados para los modales y diálogos
+  // Estado para filtros
+  const [fileTypeFilter, setFileTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<{
+    from: Date | null;
+    to: Date | null;
+  }>({
+    from: null,
+    to: null
+  });
+  
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [isBatchUploadModalOpen, setIsBatchUploadModalOpen] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [selectedActivities, setSelectedActivities] = useState<FileActivity[]>([]);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
@@ -736,21 +752,141 @@ export default function DashboardPage() {
                 <Plus className="mr-2 h-5 w-5" />
                 Cargar Archivo
               </Button>
-              <Button 
-                className="inline-flex items-center bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => setIsBatchUploadModalOpen(true)}
-              >
-                <FileText className="mr-2 h-5 w-5" />
-                Carga por Lotes
-              </Button>
             </div>
           </div>
           
-          <div className="mt-5 bg-white shadow overflow-hidden rounded-lg">
+          {/* Filtros */}
+          <div className="mt-5 bg-white shadow-sm rounded-lg border p-4 mb-4">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Filtro por tipo de archivo */}
+              <div className="flex-1 min-w-[200px]">
+                <Label htmlFor="file-type-filter" className="mb-1 block">Tipo de Archivo</Label>
+                <Select value={fileTypeFilter} onValueChange={setFileTypeFilter}>
+                  <SelectTrigger id="file-type-filter" className="w-full">
+                    <SelectValue placeholder="Todos los tipos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los tipos</SelectItem>
+                    <SelectItem value="Excel">Excel</SelectItem>
+                    <SelectItem value="PDF">PDF</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Filtro por estado */}
+              <div className="flex-1 min-w-[200px]">
+                <Label htmlFor="status-filter" className="mb-1 block">Estado</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger id="status-filter" className="w-full">
+                    <SelectValue placeholder="Todos los estados" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="Processed">Procesado</SelectItem>
+                    <SelectItem value="Processing">Procesando</SelectItem>
+                    <SelectItem value="Failed">Fallido</SelectItem>
+                    <SelectItem value="Pending">Pendiente</SelectItem>
+                    <SelectItem value="PendingStoreAssignment">Asignación pendiente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Filtro por fecha */}
+              <div className="flex-1 min-w-[200px]">
+                <Label htmlFor="date-filter" className="mb-1 block">Rango de Fechas</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="date-filter"
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      {dateRange.from ? (
+                        dateRange.to ? (
+                          <>Del {format(dateRange.from, "dd/MM/yyyy")} al {format(dateRange.to, "dd/MM/yyyy")}</>
+                        ) : (
+                          <>Desde {format(dateRange.from, "dd/MM/yyyy")}</>
+                        )
+                      ) : (
+                        "Seleccionar rango de fechas"
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={new Date()}
+                      selected={{
+                        from: dateRange.from,
+                        to: dateRange.to
+                      }}
+                      onSelect={(range) => 
+                        setDateRange({
+                          from: range?.from || null,
+                          to: range?.to || null
+                        })
+                      }
+                      numberOfMonths={2}
+                      locale={es}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              {/* Botón para limpiar filtros */}
+              <div className="flex items-end">
+                <Button 
+                  variant="outline" 
+                  className="h-10"
+                  onClick={() => {
+                    setFileTypeFilter("all");
+                    setStatusFilter("all");
+                    setDateRange({ from: null, to: null });
+                  }}
+                >
+                  Limpiar Filtros
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white shadow overflow-hidden rounded-lg">
             {activities ? (
               <DataTable 
                 columns={columns} 
-                data={activities} 
+                data={activities.filter(activity => {
+                  // Filtro por tipo de archivo
+                  if (fileTypeFilter !== "all" && activity.fileType !== fileTypeFilter) {
+                    return false;
+                  }
+                  
+                  // Filtro por estado
+                  if (statusFilter !== "all" && activity.status !== statusFilter) {
+                    return false;
+                  }
+                  
+                  // Filtro por fecha
+                  if (dateRange.from && dateRange.to) {
+                    const activityDate = new Date(activity.processingDate);
+                    const fromDate = new Date(dateRange.from);
+                    const toDate = new Date(dateRange.to);
+                    toDate.setHours(23, 59, 59, 999); // Ajustar hasta el final del día
+                    
+                    if (activityDate < fromDate || activityDate > toDate) {
+                      return false;
+                    }
+                  } else if (dateRange.from) {
+                    const activityDate = new Date(activity.processingDate);
+                    const fromDate = new Date(dateRange.from);
+                    
+                    if (activityDate < fromDate) {
+                      return false;
+                    }
+                  }
+                  
+                  return true;
+                })} 
                 searchKey="filename"
                 pageSizeOptions={[5, 10, 25, 50]}
                 showColumnToggle={true}
@@ -819,13 +955,6 @@ export default function DashboardPage() {
       <FileUploadModal 
         isOpen={isUploadModalOpen} 
         onClose={() => setIsUploadModalOpen(false)} 
-        storesByType={[]} 
-        fileType="PDF" 
-      />
-      
-      <FileUploadModal 
-        isOpen={isBatchUploadModalOpen} 
-        onClose={() => setIsBatchUploadModalOpen(false)} 
         storesByType={[]} 
         fileType="PDF" 
       />
