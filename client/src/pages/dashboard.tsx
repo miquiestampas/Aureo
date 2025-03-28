@@ -40,7 +40,8 @@ import {
   X,
   ArrowUp,
   ArrowDown,
-  ArrowUpDown
+  ArrowUpDown,
+  Eye
 } from "lucide-react";
 import FileUploadModal from "@/components/FileUploadModal";
 import { ColumnDef } from "@tanstack/react-table";
@@ -393,10 +394,22 @@ export default function DashboardPage() {
     setIsPasswordDialogOpen(true);
   };
 
+  // Estado para el modal de previsualización
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [previewFileId, setPreviewFileId] = useState<number | null>(null);
+  const [previewFileType, setPreviewFileType] = useState<"Excel" | "PDF" | null>(null);
+
   // Manejador para descargar archivo
   const handleDownload = (id: number) => {
     // Redireccionar a la URL de descarga
     window.open(`/api/file-activities/${id}/download`, '_blank');
+  };
+
+  // Manejador para previsualizar archivo
+  const handlePreview = (id: number, fileType: "Excel" | "PDF") => {
+    setPreviewFileId(id);
+    setPreviewFileType(fileType);
+    setPreviewDialogOpen(true);
   };
 
   // Manejador para eliminar archivo
@@ -628,6 +641,15 @@ export default function DashboardPage() {
               <Download className="h-4 w-4" />
             </Button>
             
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-green-600 border-green-200 hover:bg-green-50"
+              onClick={() => handlePreview(row.original.id, row.original.fileType)}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button 
@@ -663,9 +685,62 @@ export default function DashboardPage() {
     }
   ];
   
+  // Modal para previsualización de archivos
+  const PreviewDialog = () => {
+    if (!previewFileId) return null;
+    
+    const previewUrl = `/api/file-activities/${previewFileId}/preview`;
+    
+    return (
+      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Previsualización de archivo</DialogTitle>
+            <DialogDescription>
+              {previewFileType === "PDF" 
+                ? "Visualización del documento PDF" 
+                : "Visualización de la hoja de cálculo"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-grow overflow-hidden">
+            {previewFileType === "PDF" ? (
+              <iframe 
+                src={previewUrl} 
+                className="w-full h-full border-none"
+                title="PDF Preview"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="text-center p-6">
+                  <FileSpreadsheet className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Archivo Excel</h3>
+                  <p className="text-gray-500 mb-4">
+                    La previsualización de archivos Excel no está disponible directamente en el navegador.
+                  </p>
+                  <Button 
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => window.open(previewUrl, '_blank')}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Descargar Excel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setPreviewDialogOpen(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   return (
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+        {/* Modal de previsualización */}
+        <PreviewDialog />
         {/* Overview Stats */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {/* Total Stores Card */}

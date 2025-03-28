@@ -460,6 +460,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Previsualizar archivo
+  app.get("/api/file-activities/:id/preview", async (req, res, next) => {
+    try {
+      const activityId = parseInt(req.params.id);
+      if (isNaN(activityId)) {
+        return res.status(400).json({ message: "ID de actividad inválido" });
+      }
+      
+      const activity = await storage.getFileActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Actividad no encontrada" });
+      }
+      
+      // Obtener las configuraciones de los directorios según el tipo de archivo
+      let baseConfig;
+      let procesadosDir;
+      
+      if (activity.fileType === 'Excel') {
+        baseConfig = await storage.getConfig('EXCEL_WATCH_DIR');
+      } else {
+        baseConfig = await storage.getConfig('PDF_WATCH_DIR');
+      }
+      
+      if (!baseConfig || !baseConfig.value) {
+        return res.status(500).json({ message: "Configuración de directorio no encontrada" });
+      }
+      
+      // Determinar la ruta base según el tipo de archivo
+      const baseDir = baseConfig.value;
+      procesadosDir = path.join(baseDir, 'procesados');
+      
+      // Intentar encontrar el archivo en varias ubicaciones posibles
+      let filePath = '';
+      let possibleDirs = [baseDir];
+      
+      // Si existe la carpeta procesados, incluirla en la búsqueda
+      if (fs.existsSync(procesadosDir)) {
+        possibleDirs.push(procesadosDir);
+      }
+      
+      // Intentar varias ubicaciones en orden
+      for (const dir of possibleDirs) {
+        // 1. Primero intentamos con el nombre exacto
+        const exactPath = path.join(dir, activity.filename);
+        if (fs.existsSync(exactPath)) {
+          filePath = exactPath;
+          break;
+        }
+        
+        // 2. Si es un PDF, buscar por patrones con fechas agregadas al nombre
+        if (activity.fileType === 'PDF') {
+          const files = fs.readdirSync(dir);
+          const fileBase = path.parse(activity.filename).name;
+          const fileExt = path.parse(activity.filename).ext;
+          
+          // Buscar cualquier archivo que comience con el nombre base
+          const matchingFile = files.find(f => 
+            f.startsWith(fileBase) && f.endsWith(fileExt)
+          );
+          
+          if (matchingFile) {
+            filePath = path.join(dir, matchingFile);
+            break;
+          }
+        }
+      }
+      
+      // En caso de PDFs procesados, también buscar en la tabla pdf_documents
+      if (!filePath && activity.fileType === 'PDF') {
+        const pdfDoc = await storage.getPdfDocumentByActivityId(activityId);
+        if (pdfDoc && pdfDoc.path) {
+          // Verificar si el archivo existe físicamente
+          if (fs.existsSync(pdfDoc.path)) {
+            filePath = pdfDoc.path;
+          }
+        }
+      }
+      
+      if (!filePath || !fs.existsSync(filePath)) {
+        return res.status(404).json({
+          message: "Archivo no encontrado en el sistema",
+          details: {
+            activityId,
+            filename: activity.filename,
+            searchedDirs: possibleDirs
+          }
+        });
+      }
+      
+      // Configurar headers para visualización en el navegador
+      res.setHeader('Content-Disposition', `inline; filename="${activity.filename}"`);
+      
+      // Determinar el tipo de contenido según la extensión del archivo
+      if (activity.fileType === 'PDF') {
+        res.setHeader('Content-Type', 'application/pdf');
+      } else if (activity.fileType === 'Excel') {
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      }
+      
+      // Enviar el archivo para previsualización
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (err) {
+      console.error("Error previsualizando archivo:", err);
+      next(err);
+    }
+  });
+  
   // Eliminar actividad y datos relacionados
   app.delete("/api/file-activities/:id", async (req, res, next) => {
     try {
