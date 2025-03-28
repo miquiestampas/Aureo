@@ -13,9 +13,11 @@
 }
 
 .user-avatar {
-  background-color: #FFD700 !important;
+  background-color: #FFE600 !important;
 }
 
 .role-badge {
-  background-color: #FFD700 !important;
+  background-color: #FFE600 !important;
+  color: #000000 !important;
+  border-color: #FFD000 !important;
 }
