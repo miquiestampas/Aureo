@@ -334,7 +334,7 @@ export default function PurchaseControlPage() {
                 <CardTitle>Buscador de Compras</CardTitle>
               </div>
               <Button
-                variant="outline"
+                variant="default"
                 onClick={() => setAdvancedSearch(!advancedSearch)}
                 className="flex items-center"
               >
