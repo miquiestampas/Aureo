@@ -341,6 +341,101 @@ export default function ActivityControlPage() {
           <h1 className="text-2xl font-semibold text-gray-900">Control de Actividad</h1>
         </div>
         
+        {/* Módulos de filtro rápido por estado */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {/* Tiendas Activas */}
+          <div 
+            className={`${statusFilter === "active" ? "ring-2 ring-green-400" : ""} bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg p-4 cursor-pointer transition-all`}
+            onClick={() => setStatusFilter(statusFilter === "active" ? "all" : "active")}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <CheckCircle2 className="h-6 w-6 text-green-500 mr-2" />
+                <h3 className="font-medium">Activas</h3>
+              </div>
+              <span className="text-lg font-semibold">
+                {storeActivities.filter(sa => sa.status === "active" && sa.store.active).length}
+              </span>
+            </div>
+            <p className="text-sm text-green-700 mt-2">Tiendas con actividad en los últimos 7 días</p>
+            {statusFilter === "active" && (
+              <div className="mt-3 text-xs text-green-600 flex items-center">
+                <span>Mostrando solo activas</span>
+                <span className="ml-1 underline">Click para ver todas</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Tiendas Retrasadas */}
+          <div 
+            className={`${statusFilter === "warning" ? "ring-2 ring-yellow-400" : ""} bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-lg p-4 cursor-pointer transition-all`}
+            onClick={() => setStatusFilter(statusFilter === "warning" ? "all" : "warning")}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Clock className="h-6 w-6 text-yellow-500 mr-2" />
+                <h3 className="font-medium">Retrasadas</h3>
+              </div>
+              <span className="text-lg font-semibold">
+                {storeActivities.filter(sa => sa.status === "warning" && sa.store.active).length}
+              </span>
+            </div>
+            <p className="text-sm text-yellow-700 mt-2">Tiendas sin actividad entre 7 y 15 días</p>
+            {statusFilter === "warning" && (
+              <div className="mt-3 text-xs text-yellow-600 flex items-center">
+                <span>Mostrando solo retrasadas</span>
+                <span className="ml-1 underline">Click para ver todas</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Tiendas Críticas */}
+          <div 
+            className={`${statusFilter === "danger" ? "ring-2 ring-red-400" : ""} bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg p-4 cursor-pointer transition-all`}
+            onClick={() => setStatusFilter(statusFilter === "danger" ? "all" : "danger")}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <AlertCircle className="h-6 w-6 text-red-500 mr-2" />
+                <h3 className="font-medium">Críticas</h3>
+              </div>
+              <span className="text-lg font-semibold">
+                {storeActivities.filter(sa => sa.status === "danger" && sa.store.active).length}
+              </span>
+            </div>
+            <p className="text-sm text-red-700 mt-2">Tiendas sin actividad por más de 15 días</p>
+            {statusFilter === "danger" && (
+              <div className="mt-3 text-xs text-red-600 flex items-center">
+                <span>Mostrando solo críticas</span>
+                <span className="ml-1 underline">Click para ver todas</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Tiendas Inactivas */}
+          <div 
+            className={`${statusFilter === "inactive" ? "ring-2 ring-gray-400" : ""} bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg p-4 cursor-pointer transition-all`}
+            onClick={() => setStatusFilter(statusFilter === "inactive" ? "all" : "inactive")}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <AlertCircle className="h-6 w-6 text-gray-500 mr-2" />
+                <h3 className="font-medium">Inactivas</h3>
+              </div>
+              <span className="text-lg font-semibold">
+                {storeActivities.filter(sa => !sa.store.active).length}
+              </span>
+            </div>
+            <p className="text-sm text-gray-700 mt-2">Tiendas marcadas como inactivas en el sistema</p>
+            {statusFilter === "inactive" && (
+              <div className="mt-3 text-xs text-gray-600 flex items-center">
+                <span>Mostrando solo inactivas</span>
+                <span className="ml-1 underline">Click para ver todas</span>
+              </div>
+            )}
+          </div>
+        </div>
+        
         {/* Filtros */}
         <Card className="mb-6">
           <CardHeader>
@@ -403,15 +498,32 @@ export default function ActivityControlPage() {
                   value={statusFilter}
                   onValueChange={(value) => setStatusFilter(value)}
                 >
-                  <SelectTrigger id="status-filter">
+                  <SelectTrigger id="status-filter" className={
+                    statusFilter === "active" ? "bg-green-50 border-green-300 text-green-800" :
+                    statusFilter === "warning" ? "bg-yellow-50 border-yellow-300 text-yellow-800" :
+                    statusFilter === "danger" ? "bg-red-50 border-red-300 text-red-800" :
+                    statusFilter === "inactive" ? "bg-gray-50 border-gray-300 text-gray-800" : ""
+                  }>
                     <SelectValue placeholder="Todos los estados" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los estados</SelectItem>
-                    <SelectItem value="active">Activa</SelectItem>
-                    <SelectItem value="warning">Retrasada</SelectItem>
-                    <SelectItem value="danger">Crítica</SelectItem>
-                    <SelectItem value="inactive">Inactiva</SelectItem>
+                    <SelectItem value="active" className="text-green-700 font-medium flex items-center">
+                      <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
+                      Activa
+                    </SelectItem>
+                    <SelectItem value="warning" className="text-yellow-700 font-medium flex items-center">
+                      <Clock className="h-4 w-4 mr-2 text-yellow-500" />
+                      Retrasada
+                    </SelectItem>
+                    <SelectItem value="danger" className="text-red-700 font-medium flex items-center">
+                      <AlertCircle className="h-4 w-4 mr-2 text-red-500" />
+                      Crítica
+                    </SelectItem>
+                    <SelectItem value="inactive" className="text-gray-700 font-medium flex items-center">
+                      <AlertCircle className="h-4 w-4 mr-2 text-gray-500" />
+                      Inactiva
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
