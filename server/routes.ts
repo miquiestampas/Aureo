@@ -1639,13 +1639,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const data = req.body;
         
         // Validar datos requeridos
-        if (!data.nombre) {
-          return res.status(400).json({ error: "El nombre es obligatorio" });
+        if (!data.nombre && !data.documentoId) {
+          return res.status(400).json({ error: "Debe proporcionar al menos un nombre o un documento de identidad" });
         }
         
         // Agregar ID del usuario creador
         const senalPersona: InsertSenalPersona = {
           ...data,
+          // Si el nombre es una cadena vacía, establecerlo como null para la base de datos
+          nombre: data.nombre || null,
           creadoPor: req.user!.id
         };
         
@@ -1701,13 +1703,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const data = req.body;
         
         // Validar datos requeridos
-        if (!data.nombre) {
-          return res.status(400).json({ error: "El nombre es obligatorio" });
+        if (!data.nombre && !data.documentoId) {
+          return res.status(400).json({ error: "Debe proporcionar al menos un nombre o un documento de identidad" });
         }
         
         // Agregar ID del usuario que modifica
         const updates: Partial<SenalPersona> = {
           ...data,
+          // Si el nombre es una cadena vacía, establecerlo como null para la base de datos
+          nombre: data.nombre || null,
           modificadoPor: req.user!.id
         };
         
