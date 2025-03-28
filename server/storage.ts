@@ -1771,6 +1771,14 @@ export class DatabaseStorage implements IStorage {
       // Función para escapar patrones LIKE
       function escapeLikePattern(str: string) {
         if (str === null || str === undefined) return "NULL";
+        
+        // Normalizar texto para búsqueda (similar a normalizeText() en fileProcessors.ts)
+        // Esto mejora las búsquedas parciales ignorando caracteres especiales, acentos, etc.
+        str = str.toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')  // Elimina diacríticos
+                .replace(/[^a-z0-9\s]/g, '');     // Elimina caracteres especiales
+
         // Escapar caracteres especiales en LIKE: %, _, [, ], ^, -
         const escaped = str.replace(/[%_[\]^-]/g, '\\$&');
         return "'%" + escaped.replace(/'/g, "''") + "%'";
@@ -1789,14 +1797,14 @@ export class DatabaseStorage implements IStorage {
         
         // Siempre incluir condiciones de texto
         const textConditions = [
-          `customer_name ILIKE ${searchTermEscaped}`,
-          `customer_contact ILIKE ${searchTermEscaped}`,
-          `order_number ILIKE ${searchTermEscaped}`,
-          `item_details ILIKE ${searchTermEscaped}`,
-          `metals ILIKE ${searchTermEscaped}`,
-          `engravings ILIKE ${searchTermEscaped}`,
-          `stones ILIKE ${searchTermEscaped}`,
-          `pawn_ticket ILIKE ${searchTermEscaped}`
+          `LOWER(UNACCENT(customer_name)) LIKE ${searchTermEscaped}`,
+          `LOWER(UNACCENT(customer_contact)) LIKE ${searchTermEscaped}`,
+          `LOWER(UNACCENT(order_number)) LIKE ${searchTermEscaped}`,
+          `LOWER(UNACCENT(item_details)) LIKE ${searchTermEscaped}`,
+          `LOWER(UNACCENT(metals)) LIKE ${searchTermEscaped}`,
+          `LOWER(UNACCENT(engravings)) LIKE ${searchTermEscaped}`,
+          `LOWER(UNACCENT(stones)) LIKE ${searchTermEscaped}`,
+          `LOWER(UNACCENT(pawn_ticket)) LIKE ${searchTermEscaped}`
         ];
         
         // Si es numérico, añadir condiciones numéricas
@@ -1830,38 +1838,43 @@ export class DatabaseStorage implements IStorage {
       
       // Aplicar filtros adicionales
       if (filters) {
-        // Filtro por tienda
+        // Filtro por tienda - tratamiento especial para códigos de tienda
         if (filters.storeCode && filters.storeCode !== "all") {
-          sqlConditions.push(`store_code = ${escapeSQLString(filters.storeCode)}`);
+          // Normalizar el código de tienda (eliminar puntos al inicio)
+          let storeCode = filters.storeCode;
+          if (storeCode.startsWith('.')) {
+            storeCode = storeCode.replace(/^\.+/, '');
+          }
+          sqlConditions.push(`LOWER(UNACCENT(REPLACE(REPLACE(store_code, '.', ''), ' ', ''))) = LOWER(UNACCENT(REPLACE(REPLACE(${escapeSQLString(storeCode)}, '.', ''), ' ', '')))`);
         }
         
         // Filtros específicos por campo de texto
         if (filters.customerName) {
-          sqlConditions.push(`customer_name ILIKE ${escapeLikePattern(filters.customerName)}`);
+          sqlConditions.push(`LOWER(UNACCENT(customer_name)) LIKE ${escapeLikePattern(filters.customerName)}`);
         }
         
         if (filters.customerContact) {
-          sqlConditions.push(`customer_contact ILIKE ${escapeLikePattern(filters.customerContact)}`);
+          sqlConditions.push(`LOWER(UNACCENT(customer_contact)) LIKE ${escapeLikePattern(filters.customerContact)}`);
         }
         
         if (filters.orderNumber) {
-          sqlConditions.push(`order_number ILIKE ${escapeLikePattern(filters.orderNumber)}`);
+          sqlConditions.push(`LOWER(UNACCENT(order_number)) LIKE ${escapeLikePattern(filters.orderNumber)}`);
         }
         
         if (filters.itemDetails) {
-          sqlConditions.push(`item_details ILIKE ${escapeLikePattern(filters.itemDetails)}`);
+          sqlConditions.push(`LOWER(UNACCENT(item_details)) LIKE ${escapeLikePattern(filters.itemDetails)}`);
         }
         
         if (filters.metals) {
-          sqlConditions.push(`metals ILIKE ${escapeLikePattern(filters.metals)}`);
+          sqlConditions.push(`LOWER(UNACCENT(metals)) LIKE ${escapeLikePattern(filters.metals)}`);
         }
         
         if (filters.engravings) {
-          sqlConditions.push(`engravings ILIKE ${escapeLikePattern(filters.engravings)}`);
+          sqlConditions.push(`LOWER(UNACCENT(engravings)) LIKE ${escapeLikePattern(filters.engravings)}`);
         }
         
         if (filters.stones) {
-          sqlConditions.push(`stones ILIKE ${escapeLikePattern(filters.stones)}`);
+          sqlConditions.push(`LOWER(UNACCENT(stones)) LIKE ${escapeLikePattern(filters.stones)}`);
         }
         
         // Filtros de fecha
@@ -2117,24 +2130,32 @@ export class DatabaseStorage implements IStorage {
         return this.getSenalPersonas();
       }
       
-      const searchTerm = query.toLowerCase();
+      // Normalizar el término de búsqueda usando la misma técnica del fileProcessor
+      let searchTerm = query.trim().toLowerCase()
+                     .normalize('NFD')
+                     .replace(/[\u0300-\u036f]/g, '') // Elimina diacríticos
+                     .replace(/[^a-z0-9\s]/g, '');    // Elimina caracteres especiales
+      
+      // Para búsqueda por documento, eliminar puntos al principio si existen
+      if (searchTerm.startsWith('.')) {
+        const withoutDots = searchTerm.replace(/^\.+/, '');
+        // Buscar con ambas versiones (con puntos y sin puntos)
+        searchTerm = `%(${searchTerm}|${withoutDots})%`;
+      } else {
+        searchTerm = `%${searchTerm}%`;
+      }
       
       const personas = await db
         .select()
         .from(senalPersonas)
         .where(
           or(
-            sql`LOWER(${senalPersonas.nombre}) LIKE ${'%' + searchTerm + '%'}`,
-            sql`LOWER(${senalPersonas.documentoId}) LIKE ${'%' + searchTerm + '%'}`,
-            sql`LOWER(${senalPersonas.notas}) LIKE ${'%' + searchTerm + '%'}`
+            sql`LOWER(UNACCENT(${senalPersonas.nombre})) SIMILAR TO ${searchTerm}`,
+            sql`LOWER(UNACCENT(REPLACE(${senalPersonas.documentoId}, '.', ''))) SIMILAR TO ${searchTerm}`,
+            sql`LOWER(UNACCENT(${senalPersonas.notas})) SIMILAR TO ${searchTerm}`
           )
         )
         .orderBy(
-          sql`CASE 
-            WHEN ${senalPersonas.nivelRiesgo} = 'Alto' THEN 1 
-            WHEN ${senalPersonas.nivelRiesgo} = 'Medio' THEN 2 
-            WHEN ${senalPersonas.nivelRiesgo} = 'Bajo' THEN 3
-          END`,
           desc(senalPersonas.creadoEn)
         );
         
@@ -2265,24 +2286,32 @@ export class DatabaseStorage implements IStorage {
         return this.getSenalObjetos();
       }
       
-      const searchTerm = query.toLowerCase();
+      // Normalizar el término de búsqueda usando la misma técnica del fileProcessor
+      let searchTerm = query.trim().toLowerCase()
+                     .normalize('NFD')
+                     .replace(/[\u0300-\u036f]/g, '') // Elimina diacríticos
+                     .replace(/[^a-z0-9\s]/g, '');    // Elimina caracteres especiales
+      
+      // Para búsqueda por grabación/número de serie, eliminar puntos al principio si existen
+      if (searchTerm.startsWith('.')) {
+        const withoutDots = searchTerm.replace(/^\.+/, '');
+        // Buscar con ambas versiones (con puntos y sin puntos)
+        searchTerm = `%(${searchTerm}|${withoutDots})%`;
+      } else {
+        searchTerm = `%${searchTerm}%`;
+      }
       
       const objetos = await db
         .select()
         .from(senalObjetos)
         .where(
           or(
-            sql`LOWER(${senalObjetos.descripcion}) LIKE ${'%' + searchTerm + '%'}`,
-            sql`LOWER(${senalObjetos.grabacion}) LIKE ${'%' + searchTerm + '%'}`,
-            sql`LOWER(${senalObjetos.notas}) LIKE ${'%' + searchTerm + '%'}`
+            sql`LOWER(UNACCENT(${senalObjetos.descripcion})) SIMILAR TO ${searchTerm}`,
+            sql`LOWER(UNACCENT(REPLACE(${senalObjetos.grabacion}, '.', ''))) SIMILAR TO ${searchTerm}`,
+            sql`LOWER(UNACCENT(${senalObjetos.notas})) SIMILAR TO ${searchTerm}`
           )
         )
         .orderBy(
-          sql`CASE 
-            WHEN ${senalObjetos.nivelRiesgo} = 'Alto' THEN 1 
-            WHEN ${senalObjetos.nivelRiesgo} = 'Medio' THEN 2 
-            WHEN ${senalObjetos.nivelRiesgo} = 'Bajo' THEN 3
-          END`,
           desc(senalObjetos.creadoEn)
         );
         

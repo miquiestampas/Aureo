@@ -25,22 +25,44 @@ const getPdfParser = async () => {
 
 // Función para verificar si hay coincidencias con la lista de vigilancia
 // Función para normalizar texto eliminando caracteres especiales, espacios extras y convirtiendo a minúsculas
-function normalizeText(text: string): string {
+function normalizeText(text: string, isStoreCode: boolean = false): string {
   if (!text) return '';
-  return text
-    .toLowerCase()
+  
+  // Convertir a minúsculas primero
+  let normalized = text.toLowerCase();
+  
+  // Normalizaciones específicas para códigos de tienda
+  if (isStoreCode) {
+    // Eliminar todos los puntos y espacios para códigos de tienda
+    normalized = normalized
+      .replace(/\./g, '') // Eliminar todos los puntos
+      .replace(/\s+/g, ''); // Eliminar todos los espacios
+  }
+  
+  // Normalización general para cualquier texto
+  normalized = normalized
     .normalize('NFD') // Normaliza caracteres acentuados
     .replace(/[\u0300-\u036f]/g, '') // Elimina diacríticos
-    .replace(/[^a-z0-9\s]/g, '') // Elimina caracteres especiales y guiones
-    .replace(/\s+/g, ' ') // Reemplaza múltiples espacios con uno solo
-    .trim(); // Elimina espacios al inicio y final
+    .replace(/[^a-z0-9\s]/g, ''); // Elimina caracteres especiales y guiones
+    
+  // Para textos que no son código de tienda, mantener formato de espacios
+  if (!isStoreCode) {
+    normalized = normalized
+      .replace(/\s+/g, ' ') // Reemplaza múltiples espacios con uno solo
+      .trim(); // Elimina espacios al inicio y final
+  }
+  
+  return normalized;
 }
 
 // Función para calcular la similitud entre dos textos
-function calculateSimilarity(text1: string, text2: string): { score: number, isExact: boolean } {
-  // Normaliza ambos textos
-  const normalizedText1 = normalizeText(text1);
-  const normalizedText2 = normalizeText(text2);
+function calculateSimilarity(text1: string, text2: string, fieldType: 'store_code' | 'name' | 'id' | 'description' | 'generic' = 'generic'): { score: number, isExact: boolean } {
+  // Normaliza ambos textos según el tipo de campo
+  const isStoreCode = fieldType === 'store_code';
+  const normalizedText1 = normalizeText(text1, isStoreCode);
+  const normalizedText2 = normalizeText(text2, isStoreCode);
+  
+  console.log(`Comparando: "${text1}" con "${text2}" | Normalizados: "${normalizedText1}" y "${normalizedText2}" (tipo: ${fieldType})`);
   
   // Si alguno de los textos está vacío después de normalizar, retorna 0
   if (!normalizedText1 || !normalizedText2) {
@@ -49,10 +71,11 @@ function calculateSimilarity(text1: string, text2: string): { score: number, isE
   
   // Verificar si hay una coincidencia exacta después de normalizar
   if (normalizedText1 === normalizedText2) {
+    console.log(`¡Coincidencia EXACTA encontrada! "${text1}" ≡ "${text2}"`);
     return { score: 1, isExact: true };
   }
   
-  // Verificar si uno está contenido en el otro
+  // Verificar si uno está contenido en el otro (especialmente útil para códigos)
   if (normalizedText1.includes(normalizedText2) || normalizedText2.includes(normalizedText1)) {
     // La puntuación depende de la longitud relativa
     const longerText = normalizedText1.length > normalizedText2.length ? normalizedText1 : normalizedText2;
@@ -60,34 +83,89 @@ function calculateSimilarity(text1: string, text2: string): { score: number, isE
     
     // Si el texto más corto es menos del 30% del más largo, reducir la puntuación
     const lengthRatio = shorterText.length / longerText.length;
-    if (lengthRatio < 0.3) {
-      return { 
-        score: 0.7 + (0.25 * lengthRatio), // entre 0.7 y 0.95
-        isExact: false 
-      };
+    let score: number;
+    
+    if (isStoreCode) {
+      // Para códigos de tienda, ser más permisivo
+      score = Math.max(0.85, 0.85 + (0.15 * lengthRatio));
+      console.log(`Coincidencia PARCIAL (código): "${text1}" y "${text2}" - Score: ${score.toFixed(2)}`);
+    } else if (lengthRatio < 0.3) {
+      score = 0.7 + (0.25 * lengthRatio); // entre 0.7 y 0.95
+      console.log(`Coincidencia PARCIAL (inclusión con ratio bajo): "${text1}" y "${text2}" - Score: ${score.toFixed(2)}`);
+    } else {
+      score = 0.95;
+      console.log(`Coincidencia PARCIAL (inclusión fuerte): "${text1}" y "${text2}" - Score: ${score.toFixed(2)}`);
     }
     
-    return { score: 0.95, isExact: false };
+    return { score, isExact: false };
   }
   
-  // Calcular similitud por palabras compartidas
-  const words1 = normalizedText1.split(' ').filter(w => w.length > 2); // Ignorar palabras muy cortas
-  const words2 = normalizedText2.split(' ').filter(w => w.length > 2);
-  
-  if (words1.length === 0 || words2.length === 0) {
-    return { score: 0, isExact: false };
+  // Códigos de tienda: verificar si los números coinciden (ignorando letras)
+  if (isStoreCode) {
+    const numbers1 = normalizedText1.replace(/[^0-9]/g, '');
+    const numbers2 = normalizedText2.replace(/[^0-9]/g, '');
+    
+    if (numbers1 && numbers2 && (numbers1.includes(numbers2) || numbers2.includes(numbers1))) {
+      const score = 0.8; // Alta puntuación para coincidencia numérica en códigos
+      console.log(`Coincidencia NUMÉRICA de códigos: "${text1}" y "${text2}" - Score: ${score.toFixed(2)}`);
+      return { score, isExact: false };
+    }
   }
   
-  // Contar palabras compartidas
-  const sharedWords = words1.filter(word => words2.some(w2 => w2 === word || w2.includes(word) || word.includes(w2)));
+  // Para IDs y números, ser más estricto
+  if (fieldType === 'id') {
+    // Si los textos tienen números, verificar si hay coincidencia parcial en los números
+    const numbers1 = normalizedText1.replace(/[^0-9]/g, '');
+    const numbers2 = normalizedText2.replace(/[^0-9]/g, '');
+    
+    if (numbers1.length > 4 && numbers2.length > 4) {
+      // Verificar si al menos el 80% de los dígitos coinciden
+      const minLength = Math.min(numbers1.length, numbers2.length);
+      let matchingDigits = 0;
+      
+      for (let i = 0; i < minLength; i++) {
+        if (numbers1.includes(numbers2.charAt(i))) matchingDigits++;
+      }
+      
+      const digitMatchRatio = matchingDigits / minLength;
+      if (digitMatchRatio > 0.8) {
+        const score = 0.7 + (0.3 * digitMatchRatio); // entre 0.7 y 1.0
+        console.log(`Coincidencia NUMÉRICA en ID: "${text1}" y "${text2}" - Score: ${score.toFixed(2)}`);
+        return { score, isExact: false };
+      }
+    }
+  }
   
-  // Calcular puntuación basada en palabras compartidas
-  const score = sharedWords.length / Math.max(words1.length, words2.length);
+  // Para descripciones y nombres, utilizar similitud por palabras compartidas
+  if (fieldType === 'description' || fieldType === 'name' || fieldType === 'generic') {
+    // Calcular similitud por palabras compartidas
+    const words1 = normalizedText1.split(' ').filter(w => w.length > 2); // Ignorar palabras muy cortas
+    const words2 = normalizedText2.split(' ').filter(w => w.length > 2);
+    
+    if (words1.length === 0 || words2.length === 0) {
+      return { score: 0, isExact: false };
+    }
+    
+    // Contar palabras compartidas exactas
+    const exactMatches = words1.filter(word => words2.includes(word)).length;
+    
+    // Contar palabras con coincidencia parcial (una contiene a la otra)
+    const partialMatches = words1.filter(word => 
+      !words2.includes(word) && // No contar las ya contadas como exactas
+      words2.some(w2 => w2.includes(word) || word.includes(w2))
+    ).length;
+    
+    // Dar más peso a las coincidencias exactas
+    const wordScore = (exactMatches + (partialMatches * 0.5)) / Math.max(words1.length, words2.length);
+    const score = Math.min(0.9, wordScore);
+    
+    console.log(`Coincidencia por PALABRAS: "${text1}" y "${text2}" - Exactas: ${exactMatches}, Parciales: ${partialMatches}, Score: ${score.toFixed(2)}`);
+    
+    return { score, isExact: false };
+  }
   
-  return { 
-    score: Math.min(0.9, score), // Máximo 0.9 para coincidencias parciales por palabras
-    isExact: false 
-  };
+  // Por defecto, baja similitud
+  return { score: 0.2, isExact: false };
 }
 
 async function checkWatchlistMatches(excelData: ExcelData) {
@@ -104,8 +182,8 @@ async function checkWatchlistMatches(excelData: ExcelData) {
     // Verificar coincidencias por nombre
     for (const person of watchlistPersons) {
       if (excelData.customerName && person.fullName) {
-        // Calcular similitud de nombre usando la nueva función
-        const nameSimilarity = calculateSimilarity(excelData.customerName, person.fullName);
+        // Calcular similitud de nombre usando la nueva función con tipo 'name'
+        const nameSimilarity = calculateSimilarity(excelData.customerName, person.fullName, 'name');
         
         // Crear alerta si la similitud es suficiente (mayor a 0.7 o 70%)
         if (nameSimilarity.score >= 0.7) {
@@ -124,12 +202,12 @@ async function checkWatchlistMatches(excelData: ExcelData) {
           
           // Crear coincidencia en el sistema con información detallada
           const coincidencia = {
-            tipoCoincidencia: "Persona",
+            tipoCoincidencia: "Persona" as "Persona" | "Objeto",
             idSenalPersona: person.id,
             idSenalObjeto: null,
             idExcelData: excelData.id,
             puntuacionCoincidencia: confidence,
-            tipoMatch: nameSimilarity.isExact ? "Exacto" : "Parcial",
+            tipoMatch: nameSimilarity.isExact ? "Exacto" : "Parcial" as "Exacto" | "Parcial",
             campoCoincidente: "nombre",
             valorCoincidente: person.fullName
           };
@@ -144,7 +222,7 @@ async function checkWatchlistMatches(excelData: ExcelData) {
       // También verificar por número de identificación si está disponible
       if (excelData.customerContact && person.identificationNumber) {
         // Calcular similitud para el número de identificación
-        const idSimilarity = calculateSimilarity(excelData.customerContact, person.identificationNumber);
+        const idSimilarity = calculateSimilarity(excelData.customerContact, person.identificationNumber, 'id');
         
         if (idSimilarity.score >= 0.8) { // Mayor umbral para IDs
           const confidence = idSimilarity.score * 100;
@@ -162,12 +240,12 @@ async function checkWatchlistMatches(excelData: ExcelData) {
           
           // Crear coincidencia en el sistema con información detallada
           const coincidencia = {
-            tipoCoincidencia: "Persona",
+            tipoCoincidencia: "Persona" as "Persona" | "Objeto",
             idSenalPersona: person.id,
             idSenalObjeto: null,
             idExcelData: excelData.id,
             puntuacionCoincidencia: confidence,
-            tipoMatch: idSimilarity.isExact ? "Exacto" : "Parcial",
+            tipoMatch: idSimilarity.isExact ? "Exacto" : "Parcial" as "Exacto" | "Parcial",
             campoCoincidente: "documento",
             valorCoincidente: person.identificationNumber
           };
@@ -192,7 +270,7 @@ async function checkWatchlistMatches(excelData: ExcelData) {
     for (const item of watchlistItems) {
       // Verificar similitud de la descripción del artículo
       if (excelData.itemDetails && item.description) {
-        const descSimilarity = calculateSimilarity(excelData.itemDetails, item.description);
+        const descSimilarity = calculateSimilarity(excelData.itemDetails, item.description, 'description');
         
         if (descSimilarity.score >= 0.65) { // Umbral más bajo para artículos
           const confidence = descSimilarity.score * 100;
@@ -210,12 +288,12 @@ async function checkWatchlistMatches(excelData: ExcelData) {
           
           // Crear coincidencia en el sistema con información detallada
           const coincidencia = {
-            tipoCoincidencia: "Objeto",
+            tipoCoincidencia: "Objeto" as "Persona" | "Objeto",
             idSenalPersona: null,
             idSenalObjeto: item.id,
             idExcelData: excelData.id,
             puntuacionCoincidencia: confidence,
-            tipoMatch: descSimilarity.isExact ? "Exacto" : "Parcial",
+            tipoMatch: descSimilarity.isExact ? "Exacto" : "Parcial" as "Exacto" | "Parcial",
             campoCoincidente: "descripcion",
             valorCoincidente: item.description
           };
@@ -229,7 +307,7 @@ async function checkWatchlistMatches(excelData: ExcelData) {
       
       // También verificar por número de serie si está disponible
       if (excelData.itemDetails && item.serialNumber) {
-        const serialSimilarity = calculateSimilarity(excelData.itemDetails, item.serialNumber);
+        const serialSimilarity = calculateSimilarity(excelData.itemDetails, item.serialNumber, 'id');
         
         if (serialSimilarity.score >= 0.85) { // Mayor umbral para números de serie
           const confidence = serialSimilarity.score * 100;
@@ -247,12 +325,12 @@ async function checkWatchlistMatches(excelData: ExcelData) {
           
           // Crear coincidencia en el sistema con información detallada
           const coincidencia = {
-            tipoCoincidencia: "Objeto",
+            tipoCoincidencia: "Objeto" as "Persona" | "Objeto",
             idSenalPersona: null,
             idSenalObjeto: item.id,
             idExcelData: excelData.id,
             puntuacionCoincidencia: confidence,
-            tipoMatch: serialSimilarity.isExact ? "Exacto" : "Parcial",
+            tipoMatch: serialSimilarity.isExact ? "Exacto" : "Parcial" as "Exacto" | "Parcial",
             campoCoincidente: "serial",
             valorCoincidente: item.serialNumber
           };
