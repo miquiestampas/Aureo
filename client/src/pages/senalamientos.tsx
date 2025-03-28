@@ -210,12 +210,18 @@ export default function Senalamientos() {
   // Mutación para crear persona
   const createPersonaMutation = useMutation({
     mutationFn: async (data: PersonaFormValues) => {
+      // Convertir fecha a formato ISO string si existe
+      const formattedData = {
+        ...data,
+        fecha: data.fecha ? data.fecha.toISOString() : null
+      };
+      
       const response = await fetch("/api/senalamiento/personas", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(formattedData),
       });
       
       if (!response.ok) {
@@ -245,12 +251,18 @@ export default function Senalamientos() {
   // Mutación para actualizar persona
   const updatePersonaMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: PersonaFormValues }) => {
+      // Convertir fecha a formato ISO string si existe
+      const formattedData = {
+        ...data,
+        fecha: data.fecha ? data.fecha.toISOString() : null
+      };
+      
       const response = await fetch(`/api/senalamiento/personas/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(formattedData),
       });
       
       if (!response.ok) {
@@ -311,12 +323,18 @@ export default function Senalamientos() {
   // Mutación para crear objeto
   const createObjetoMutation = useMutation({
     mutationFn: async (data: ObjetoFormValues) => {
+      // Convertir fecha a formato ISO string si existe
+      const formattedData = {
+        ...data,
+        fecha: data.fecha ? data.fecha.toISOString() : null
+      };
+      
       const response = await fetch("/api/senalamiento/objetos", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(formattedData),
       });
       
       if (!response.ok) {
@@ -346,12 +364,18 @@ export default function Senalamientos() {
   // Mutación para actualizar objeto
   const updateObjetoMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: ObjetoFormValues }) => {
+      // Convertir fecha a formato ISO string si existe
+      const formattedData = {
+        ...data,
+        fecha: data.fecha ? data.fecha.toISOString() : null
+      };
+      
       const response = await fetch(`/api/senalamiento/objetos/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(formattedData),
       });
       
       if (!response.ok) {
