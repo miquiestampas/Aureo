@@ -19,6 +19,12 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { 
+  Tooltip, 
+  TooltipContent, 
+  TooltipProvider, 
+  TooltipTrigger 
+} from "@/components/ui/tooltip";
 import { DateRange } from "react-day-picker";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -243,6 +249,9 @@ function StoreAssignmentCard({ file, onAssigned }: { file: FileActivity, onAssig
   );
 }
 
+// Función para formatear mensajes de error técnicos en mensajes más amigables para el usuario
+
+
 export default function DashboardPage() {
   // Socket state for real-time updates
   const { watcherActive, recentEvents } = useSocketStore();
@@ -308,12 +317,22 @@ export default function DashboardPage() {
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
   
   // Consulta para obtener el número de coincidencias no leídas
-  const { data: unreadMatchesData } = useQuery({
+  const { data: unreadMatchesData } = useQuery<{ count: number }>({
     queryKey: ['/api/coincidencias/noleidas/count'],
     refetchInterval: 30000, // Actualizar cada 30 segundos
   });
   
-  const unreadMatches = unreadMatchesData?.count ?? 0;
+  // Verificar si la respuesta tiene la estructura esperada
+  useEffect(() => {
+    if (unreadMatchesData) {
+      console.log("Tipo de unreadMatchesData:", typeof unreadMatchesData);
+      console.log("Estructura de unreadMatchesData:", unreadMatchesData);
+    }
+  }, [unreadMatchesData]);
+  
+  const unreadMatches = unreadMatchesData && 'count' in unreadMatchesData 
+    ? unreadMatchesData.count 
+    : 0;
   
   // Mutación para eliminar actividad de archivo
   const deleteActivityMutation = useMutation({
@@ -569,9 +588,77 @@ export default function DashboardPage() {
             );
           case "Failed":
             return (
-              <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100">
-                <XCircle className="h-3 w-3 mr-1" /> Fallido
-              </Badge>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-100 cursor-help">
+                      <XCircle className="h-3 w-3 mr-1" /> Fallido
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-sm">
+                      {row.original.errorMessage 
+                        ? (() => {
+                            try {
+                              // Intentar traducir el mensaje de error técnico a uno amigable
+                              const msg = row.original.errorMessage;
+                              
+                              if (msg.includes("Cannot read property") || msg.includes("is not defined") || msg.includes("is null") || msg.includes("is undefined")) {
+                                return "El formato del archivo no es compatible con el sistema.";
+                              }
+                              
+                              if (msg.includes("TypeError") || msg.includes("SyntaxError")) {
+                                return "El archivo contiene datos con formato incorrecto.";
+                              }
+                              
+                              if (msg.includes("Error opening") || msg.includes("no such file") || msg.includes("File not found")) {
+                                return "No se pudo abrir el archivo. Es posible que haya sido eliminado o movido.";
+                              }
+                              
+                              if (msg.includes("Permission denied") || msg.includes("Access denied")) {
+                                return "No hay permiso para acceder al archivo.";
+                              }
+                              
+                              if (msg.includes("Invalid format") || msg.includes("Unexpected format")) {
+                                return "El formato del archivo no es válido.";
+                              }
+                              
+                              if (msg.includes("Invalid Excel") || msg.includes("Corrupt Excel")) {
+                                return "El archivo Excel está dañado o tiene un formato no compatible.";
+                              }
+                              
+                              if (msg.includes("Invalid PDF") || msg.includes("PDF error")) {
+                                return "El archivo PDF está dañado o tiene un formato no compatible.";
+                              }
+                              
+                              if (msg.includes("Missing expected column") || msg.includes("Column not found")) {
+                                return "Faltan columnas importantes en el archivo. Por favor, revise la plantilla.";
+                              }
+                              
+                              if (msg.includes("Invalid date")) {
+                                return "Las fechas en el archivo tienen un formato incorrecto.";
+                              }
+                              
+                              if (msg.includes("Timeout") || msg.includes("timed out")) {
+                                return "El procesamiento tomó demasiado tiempo. El archivo podría ser muy grande.";
+                              }
+                              
+                              if (msg.includes("Memory") || msg.includes("Out of memory")) {
+                                return "El archivo es demasiado grande para ser procesado.";
+                              }
+                              
+                              // Si no encuentra ningún patrón específico, devuelve un mensaje general
+                              return "Ocurrió un problema al procesar el archivo. Verifique que el formato sea correcto.";
+                            } catch (err) {
+                              return "Error al procesar el archivo. Contacte al administrador del sistema.";
+                            }
+                          })()
+                        : "No se pudo procesar el archivo. Revisa que el formato sea correcto."
+                      }
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             );
           case "PendingStoreAssignment":
             return (
