@@ -317,7 +317,7 @@ export type SenalPersona = typeof senalPersonas.$inferSelect;
 // Nuevo modelo para señalamientos/alertas sobre objetos
 export const senalObjetos = pgTable("senal_objetos", {
   id: serial("id").primaryKey(),
-  descripcion: text("descripcion").notNull(),
+  descripcion: text("descripcion"),  // Ya no es notNull para permitir registros con otros campos
   grabacion: text("grabacion"),  // Grabados específicos
   notas: text("notas"),
   estado: text("estado", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),

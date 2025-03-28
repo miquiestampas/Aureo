@@ -1795,14 +1795,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const data = req.body;
         
-        // Validar datos requeridos
-        if (!data.descripcion) {
-          return res.status(400).json({ error: "La descripción es obligatoria" });
+        // Validar que al menos uno de los campos tenga información
+        if (!data.descripcion && !data.grabacion && !data.notas) {
+          return res.status(400).json({ error: "Debe proporcionar al menos una descripción, grabación o notas" });
         }
         
         // Agregar ID del usuario creador
         const senalObjeto: InsertSenalObjeto = {
           ...data,
+          // Si la descripción es una cadena vacía, establecerla como null para la base de datos
+          descripcion: data.descripcion || null,
           creadoPor: req.user!.id
         };
         
@@ -1857,14 +1859,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const data = req.body;
         
-        // Validar datos requeridos
-        if (!data.descripcion) {
-          return res.status(400).json({ error: "La descripción es obligatoria" });
+        // Validar que al menos uno de los campos tenga información
+        if (!data.descripcion && !data.grabacion && !data.notas) {
+          return res.status(400).json({ error: "Debe proporcionar al menos una descripción, grabación o notas" });
         }
         
         // Agregar ID del usuario que modifica
         const updates: Partial<SenalObjeto> = {
           ...data,
+          // Si la descripción es una cadena vacía, establecerla como null para la base de datos
+          descripcion: data.descripcion || null,
           modificadoPor: req.user!.id
         };
         

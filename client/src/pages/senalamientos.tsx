@@ -124,11 +124,20 @@ const personaSchema = z.object({
 });
 
 const objetoSchema = z.object({
-  descripcion: z.string().min(3, "La descripción debe tener al menos 3 caracteres"),
+  descripcion: z.union([
+    z.string().min(3, "La descripción debe tener al menos 3 caracteres"),
+    z.literal("")
+  ]),
   grabacion: z.string().nullable().optional(),
   notas: z.string().nullable().optional(),
   estado: z.enum(["Activo", "Inactivo"]),
   nivelRiesgo: z.enum(["Alto", "Medio", "Bajo"])
+}).refine(data => {
+  // Al menos uno de los campos debe tener información
+  return !!data.descripcion || !!data.grabacion || !!data.notas;
+}, {
+  message: "Debe proporcionar al menos una descripción, grabación o notas",
+  path: ["descripcion"]
 });
 
 type PersonaFormValues = z.infer<typeof personaSchema>;
