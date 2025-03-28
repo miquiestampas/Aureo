@@ -552,6 +552,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Configurar headers para visualización en el navegador
       res.setHeader('Content-Disposition', `inline; filename="${activity.filename}"`);
       
+      // Agregar headers de seguridad para permitir la carga en iframe
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+      res.setHeader('Content-Security-Policy', "default-src 'self'; object-src 'self'; frame-ancestors 'self'");
+      
       // Determinar el tipo de contenido según la extensión del archivo
       if (activity.fileType === 'PDF') {
         res.setHeader('Content-Type', 'application/pdf');

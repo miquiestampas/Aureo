@@ -1149,6 +1149,47 @@ export default function DashboardPage() {
         storesByType={stores.filter(store => store.type === "Excel" && store.active)} 
         fileType="Excel" 
       />
+      
+      {/* Modal de previsualización de archivos */}
+      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Previsualización de archivo</DialogTitle>
+            <DialogDescription>
+              {previewFileType === "PDF" ? "Visualización del documento PDF" : "Visualización del archivo Excel"}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="min-h-[60vh] w-full bg-gray-100 rounded-md">
+            {previewFileId && (
+              previewFileType === "PDF" ? (
+                <iframe 
+                  src={`/api/file-activities/${previewFileId}/preview`}
+                  className="w-full h-[60vh] rounded-md border-none"
+                  title="Previsualización de PDF"
+                  sandbox="allow-same-origin allow-scripts"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-[60vh]">
+                  <FileSpreadsheet className="h-16 w-16 text-gray-400 mb-4" />
+                  <p className="text-gray-600 mb-6">Los archivos Excel no se pueden previsualizar directamente.</p>
+                  <Button
+                    onClick={() => handleDownload(previewFileId)}
+                    variant="default"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Descargar archivo Excel
+                  </Button>
+                </div>
+              )
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button onClick={() => setPreviewDialogOpen(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
