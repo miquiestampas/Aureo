@@ -207,21 +207,27 @@ export default function ActivityControlPage() {
   const storeColumns: ColumnDef<StoreActivity>[] = [
     {
       accessorKey: "store.code",
-      header: "Código",
+      header: ({ column }) => (
+        <SortableColumnHeader column={column} title="Código" />
+      ),
       cell: ({ row }) => {
         return <span>{row.original.store.code}</span>;
       }
     },
     {
       accessorKey: "store.name",
-      header: "Nombre",
+      header: ({ column }) => (
+        <SortableColumnHeader column={column} title="Nombre" />
+      ),
       cell: ({ row }) => {
         return <span>{row.original.store.name}</span>;
       }
     },
     {
       id: "ubicacion",
-      header: "Ubicación",
+      header: ({ column }) => (
+        <SortableColumnHeader column={column} title="Ubicación" />
+      ),
       cell: ({ row }) => {
         const store = row.original.store;
         if (store.district || store.locality) {
@@ -234,11 +240,17 @@ export default function ActivityControlPage() {
         } else {
           return <span>{store.location || "—"}</span>;
         }
+      },
+      accessorFn: (row) => {
+        const store = row.store;
+        return store.district || store.locality || store.location || "";
       }
     },
     {
       accessorKey: "store.type",
-      header: "Tipo",
+      header: ({ column }) => (
+        <SortableColumnHeader column={column} title="Tipo" />
+      ),
       cell: ({ row }) => {
         const type = row.original.store.type;
         return (
@@ -255,7 +267,9 @@ export default function ActivityControlPage() {
     },
     {
       accessorKey: "lastActivity",
-      header: "Última Actividad",
+      header: ({ column }) => (
+        <SortableColumnHeader column={column} title="Última Actividad" />
+      ),
       cell: ({ row }) => {
         const { lastActivity } = row.original;
         return lastActivity ? (
@@ -263,11 +277,16 @@ export default function ActivityControlPage() {
         ) : (
           <span className="text-muted-foreground">Sin actividad</span>
         );
+      },
+      accessorFn: (row) => {
+        return row.lastActivity ? new Date(row.lastActivity.processingDate).getTime() : 0;
       }
     },
     {
       accessorKey: "daysSinceLastActivity",
-      header: "Días sin actividad",
+      header: ({ column }) => (
+        <SortableColumnHeader column={column} title="Días sin actividad" />
+      ),
       cell: ({ row }) => {
         const days = row.original.daysSinceLastActivity;
         if (days === 999) {
@@ -278,7 +297,9 @@ export default function ActivityControlPage() {
     },
     {
       accessorKey: "status",
-      header: "Estado",
+      header: ({ column }) => (
+        <SortableColumnHeader column={column} title="Estado" />
+      ),
       cell: ({ row }) => {
         const { status } = row.original;
         const isActive = row.original.store.active;
@@ -313,6 +334,11 @@ export default function ActivityControlPage() {
             </Badge>
           );
         }
+      },
+      accessorFn: (row) => {
+        if (!row.store.active) return "z-inactive"; // "z-" para ordenar al final
+        const statusOrder: Record<string, string> = { "active": "a", "warning": "b", "danger": "c", "inactive": "z" };
+        return statusOrder[row.status] || row.status;
       }
     },
     {

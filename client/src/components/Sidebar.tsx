@@ -86,32 +86,18 @@ export default function Sidebar() {
       {/* Navigation Links */}
       <nav className="flex-1 py-4 overflow-y-auto">
         <div className="px-2 space-y-1">
+          {/* Panel Principal */}
+          <div className="mb-2">
+            <h3 className="px-4 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              Panel Principal
+            </h3>
+          </div>
+          
           <NavItem
             href="/"
             icon={<LayoutDashboard size={20} />}
-            label="Panel Principal"
+            label="Dashboard"
             active={location === '/'}
-          />
-          
-          <NavItem
-            href="/excel-stores"
-            icon={<FileSpreadsheet size={20} />}
-            label="Tiendas Excel"
-            active={location === '/excel-stores'}
-          />
-          
-          <NavItem
-            href="/pdf-stores"
-            icon={<FileText size={20} />}
-            label="Tiendas PDF"
-            active={location === '/pdf-stores'}
-          />
-          
-          <NavItem
-            href="/activity-control"
-            icon={<ActivitySquare size={20} />}
-            label="Control de Actividad"
-            active={location === '/activity-control'}
           />
 
           {/* Investigación Section */}
@@ -128,12 +114,19 @@ export default function Sidebar() {
             active={location === '/purchase-control'}
           />
 
-          {/* Management Section */}
+          {/* Administración Section */}
           <div className="mt-6 mb-2">
             <h3 className="px-4 text-xs font-semibold text-gray-300 uppercase tracking-wider">
               Administración
             </h3>
           </div>
+          
+          <NavItem
+            href="/activity-control"
+            icon={<ActivitySquare size={20} />}
+            label="Control de Actividad"
+            active={location === '/activity-control'}
+          />
           
           <NavItem
             href="/store-management"
@@ -143,6 +136,27 @@ export default function Sidebar() {
             requiredRoles={["SuperAdmin", "Admin"]}
             userRole={user?.role}
           />
+          
+          <NavItem
+            href="/excel-stores"
+            icon={<FileSpreadsheet size={20} />}
+            label="Tiendas Excel"
+            active={location === '/excel-stores'}
+          />
+          
+          <NavItem
+            href="/pdf-stores"
+            icon={<FileText size={20} />}
+            label="Tiendas PDF"
+            active={location === '/pdf-stores'}
+          />
+          
+          {/* Sistema Section */}
+          <div className="mt-6 mb-2">
+            <h3 className="px-4 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              Sistema
+            </h3>
+          </div>
           
           <NavItem
             href="/user-management"
