@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { storage } from './storage';
 import { emitFileProcessingStatus } from './fileWatcher';
-import { InsertExcelData, InsertPdfDocument, InsertAlert, ExcelData } from '@shared/schema';
+import { InsertExcelData, InsertPdfDocument, InsertAlert, ExcelData, FileActivity } from '@shared/schema';
 import { promisify } from 'util';
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
@@ -394,8 +394,15 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
   
   console.log(`Usando offset: ${offset} para valores ${JSON.stringify(values.slice(0, 5))}`);
   
-  // Columna A: Código de tienda
-  const excelStoreCode = values[offset]?.toString().trim() || '';
+  // Columna A: Código de tienda (si está presente en el archivo)
+  let excelStoreCode = '';
+  if (values[offset] !== undefined && values[offset] !== null) {
+    if (typeof values[offset] === 'string') {
+      excelStoreCode = values[offset].trim(); 
+    } else if (typeof values[offset].toString === 'function') {
+      excelStoreCode = values[offset].toString().trim();
+    }
+  }
   // Si no tenemos código de tienda en la celda ni como parámetro, no podemos procesar la fila
   const finalStoreCode = excelStoreCode || storeCode;
   if (!finalStoreCode) {
@@ -553,6 +560,10 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     // Extracting store code from the file
     let excelStoreCode = '';
     
+    // Almacenará todos los códigos de tienda únicos encontrados en el archivo
+    const uniqueStoreCodes = new Set<string>();
+    uniqueStoreCodes.add(storeCode); // Añadir el código de tienda proporcionado por defecto
+    
     // First extract the store code from cell A2 based on the file type
     if (fileExt === '.csv') {
       // Procesar archivo CSV para obtener código de tienda
@@ -582,17 +593,67 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       
       // Continuar con el procesamiento normal
       // Saltar la primera fila (encabezado) e indexar los valores por posición
-      rows.forEach((row, index) => {
-        if (index === 0) return; // Saltar encabezado
+      // Procesamos primero los códigos de tienda para recopilación sin esperar operaciones asíncronas
+      for (let index = 1; index < rows.length; index++) {
+        const row = rows[index];
         
         // Extraer valores de las columnas en orden
         const values = Object.values(row);
         console.log("CSV row values:", values);
+        
+        // Simplemente extraemos y guardamos los códigos para procesarlos después
+        if (values.length > 0 && values[0]) {
+          const rowStoreCode = values[0].toString().trim();
+          if (rowStoreCode) {
+            uniqueStoreCodes.add(rowStoreCode);
+          }
+        }
+        
+        // Procesamos los datos
         const excelData = createExcelDataFromValues(values, storeCode, activityId);
         if (excelData) {
           processedRows.push(excelData);
         }
-      });
+      }
+      
+      // Ahora procesamos los códigos de tienda de forma asíncrona
+      const storeCodesToCheck = Array.from(uniqueStoreCodes);
+      uniqueStoreCodes.clear(); // Limpiamos y volveremos a llenar con los códigos validados
+      uniqueStoreCodes.add(storeCode); // Añadir de nuevo el código por defecto
+      
+      for (const codeToCheck of storeCodesToCheck) {
+        // 1. Verificar si el código de tienda existe en la base de datos
+        const store = await storage.getStoreByCode(codeToCheck);
+        if (store) {
+          console.log(`Found valid store code: ${codeToCheck}`);
+          uniqueStoreCodes.add(codeToCheck);
+        } 
+        else {
+          // 2. Si no existe exactamente, buscar códigos similares
+          const allStores = await storage.getStores();
+          let foundMatchingStore = false;
+          
+          for (const store of allStores) {
+            // Calcular similitud en códigos de tienda
+            const similarity = calculateSimilarity(
+              codeToCheck, 
+              store.code,
+              'store_code'
+            );
+            
+            if (similarity.score >= 0.7) {
+              console.log(`Found similar store code: ${store.code} (similarity: ${similarity.score.toFixed(2)})`);
+              uniqueStoreCodes.add(store.code);
+              foundMatchingStore = true;
+              break;
+            }
+          }
+          
+          if (!foundMatchingStore) {
+            console.log(`No matching store found for code: ${codeToCheck}`);
+          }
+        }
+      }
     } 
     else if (fileExt === '.xls') {
       // Procesar archivo XLS (formato antiguo) usando la biblioteca XLSX
@@ -619,6 +680,46 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         const row = jsonData[i] as any[];
         if (row.length > 0) {
           console.log("XLS row values:", row);
+          
+          // Extraer código de tienda de la columna A (si existe)
+          if (row.length > 0 && row[0]) {
+            const rowStoreCode = row[0].toString().trim();
+            if (rowStoreCode) {
+              // 1. Verificar si el código de tienda existe en la base de datos
+              const store = await storage.getStoreByCode(rowStoreCode);
+              if (store) {
+                console.log(`Found valid store code in row: ${rowStoreCode}`);
+                uniqueStoreCodes.add(rowStoreCode);
+              } 
+              else {
+                // 2. Si no existe exactamente, buscar códigos similares
+                const allStores = await storage.getStores();
+                let foundMatchingStore = false;
+                
+                for (const store of allStores) {
+                  // Calcular similitud en códigos de tienda
+                  const similarity = calculateSimilarity(
+                    rowStoreCode, 
+                    store.code,
+                    'store_code'
+                  );
+                  
+                  if (similarity.score >= 0.7) {
+                    console.log(`Found similar store code: ${store.code} (similarity: ${similarity.score.toFixed(2)})`);
+                    uniqueStoreCodes.add(store.code);
+                    foundMatchingStore = true;
+                    break;
+                  }
+                }
+                
+                if (!foundMatchingStore) {
+                  console.log(`No matching store found for code: ${rowStoreCode}`);
+                  uniqueStoreCodes.add(storeCode); // Usar código de tienda por defecto
+                }
+              }
+            }
+          }
+          
           const excelData = createExcelDataFromValues(row, storeCode, activityId);
           if (excelData) {
             processedRows.push(excelData);
@@ -644,11 +745,51 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       }
       
       // Procesar filas (saltar fila de encabezado)
-      worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      worksheet.eachRow({ includeEmpty: false }, async (row, rowNumber) => {
         // Saltar fila de encabezado
         if (rowNumber === 1) return;
         
         const values = row.values as any[];
+        
+        // Extraer código de tienda de la columna A (si existe)
+        if (values.length > 1 && values[1]) { // En ExcelJS los índices empiezan en 1, no en 0
+          const rowStoreCode = values[1].toString().trim();
+          if (rowStoreCode) {
+            // 1. Verificar si el código de tienda existe en la base de datos
+            const store = await storage.getStoreByCode(rowStoreCode);
+            if (store) {
+              console.log(`Found valid store code in row: ${rowStoreCode}`);
+              uniqueStoreCodes.add(rowStoreCode);
+            } 
+            else {
+              // 2. Si no existe exactamente, buscar códigos similares
+              const allStores = await storage.getStores();
+              let foundMatchingStore = false;
+              
+              for (const store of allStores) {
+                // Calcular similitud en códigos de tienda
+                const similarity = calculateSimilarity(
+                  rowStoreCode, 
+                  store.code,
+                  'store_code'
+                );
+                
+                if (similarity.score >= 0.7) {
+                  console.log(`Found similar store code: ${store.code} (similarity: ${similarity.score.toFixed(2)})`);
+                  uniqueStoreCodes.add(store.code);
+                  foundMatchingStore = true;
+                  break;
+                }
+              }
+              
+              if (!foundMatchingStore) {
+                console.log(`No matching store found for code: ${rowStoreCode}`);
+                uniqueStoreCodes.add(storeCode); // Usar código de tienda por defecto
+              }
+            }
+          }
+        }
+        
         const excelData = createExcelDataFromValues(values, storeCode, activityId);
         if (excelData) {
           processedRows.push(excelData);
@@ -656,52 +797,109 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       });
     }
     
-    // Verificar si el código de tienda extraído existe
+    // Procesar todos los códigos de tienda únicos encontrados
+    const storeCodesArray = Array.from(uniqueStoreCodes);
+    console.log(`Códigos de tienda encontrados en el archivo: ${storeCodesArray.join(', ')}`);
+    
+    // Primero, verificar si el código principal de A2 existe
     if (excelStoreCode && excelStoreCode.trim() !== '') {
-      console.log(`Excel file has store code ${excelStoreCode} in cell A2`);
+      console.log(`Excel file has main store code ${excelStoreCode} in cell A2`);
       const excelStore = await storage.getStoreByCode(excelStoreCode);
       
       if (excelStore) {
         console.log(`Found matching store in database: ${excelStore.code}`);
+        uniqueStoreCodes.add(excelStore.code);
         
-        // Actualizar la actividad del archivo con el código correcto de tienda
+        // Actualizar la actividad del archivo con el código principal de tienda
         const activity = await storage.getFileActivity(activityId);
         if (activity) {
           try {
-            // Actualiza la actividad con el nuevo código de tienda
+            // Actualiza la actividad con el nuevo código de tienda principal
             await storage.updateFileActivityStatus(activityId, 'Processing');
             
             // IMPORTANTE: También actualizamos la variable storeCode para que los datos se procesen con el código correcto
             storeCode = excelStore.code;
             
-            console.log(`Updated file activity ${activityId} with correct store code: ${excelStore.code}`);
+            console.log(`Updated file activity ${activityId} with main store code: ${excelStore.code}`);
             
             // Actualizar el registro de actividad con el método apropiado
             await storage.updateFileActivity(activityId, { storeCode: excelStore.code });
             console.log(`Updated file activity in database with store code: ${excelStore.code}`);
           } catch (updateError) {
-            console.error(`Error updating file activity with correct store code:`, updateError);
+            console.error(`Error updating file activity with main store code:`, updateError);
           }
         }
-        
-        // Actualizar todos los registros para usar el código de tienda correcto
-        for (const row of processedRows) {
-          row.storeCode = excelStore.code;
-        }
       } else {
-        console.warn(`Store code ${excelStoreCode} from Excel file does not exist in database, using default: ${storeCode}`);
+        console.warn(`Main store code ${excelStoreCode} from Excel file does not exist in database.`);
       }
     } else {
-      console.log(`No store code found in Excel file, using default: ${storeCode}`);
+      console.log(`No main store code found in cell A2, will use codes from individual rows.`);
     }
     
-    // Guardar todos los datos extraídos y verificar coincidencias con la lista de vigilancia
-    for (const row of processedRows) {
-      // Guardar los datos de Excel
-      const savedData = await storage.createExcelData(row);
+    // Crear una copia de las filas para procesarlas en cada tienda
+    const originalRows = [...processedRows];
+    let totalProcessedRows = 0;
+    
+    // Procesar cada código de tienda encontrado
+    for (const currentStoreCode of Array.from(uniqueStoreCodes)) {
+      // Verificar si la tienda existe en la base de datos
+      const store = await storage.getStoreByCode(currentStoreCode);
       
-      // Verificar coincidencias con la lista de vigilancia
-      await checkWatchlistMatches(savedData);
+      if (!store) {
+        console.warn(`Store code ${currentStoreCode} does not exist in database, skipping.`);
+        continue;
+      }
+      
+      console.log(`Processing data for store: ${currentStoreCode}`);
+      
+      // Filtrar filas que corresponden a esta tienda o que no tienen un código específico
+      const storeRows = originalRows.filter(row => {
+        // Si la fila tiene el mismo código que estamos procesando
+        if (row.storeCode === currentStoreCode) return true;
+        
+        // Si la fila no tiene un código específico y estamos en la tienda principal
+        if (currentStoreCode === storeCode && (!row.storeCode || row.storeCode === storeCode)) return true;
+        
+        return false;
+      });
+      
+      if (storeRows.length === 0) {
+        console.log(`No rows to process for store ${currentStoreCode}`);
+        continue;
+      }
+      
+      console.log(`Processing ${storeRows.length} rows for store ${currentStoreCode}`);
+      
+      // Asignar código de tienda a todas las filas
+      for (const row of storeRows) {
+        row.storeCode = currentStoreCode;
+        
+        // Guardar los datos de Excel
+        const savedData = await storage.createExcelData(row);
+        
+        // Verificar coincidencias con la lista de vigilancia
+        await checkWatchlistMatches(savedData);
+        
+        totalProcessedRows++;
+      }
+    }
+    
+    console.log(`Total de registros procesados en todas las tiendas: ${totalProcessedRows}`);
+    
+    // Si no se procesó ninguna fila, usar el método original con la tienda por defecto
+    if (totalProcessedRows === 0) {
+      console.log(`No se pudo procesar con múltiples tiendas. Usando tienda por defecto: ${storeCode}`);
+      
+      // Guardar todos los datos extraídos y verificar coincidencias con la lista de vigilancia
+      for (const row of originalRows) {
+        row.storeCode = storeCode;
+        
+        // Guardar los datos de Excel
+        const savedData = await storage.createExcelData(row);
+        
+        // Verificar coincidencias con la lista de vigilancia
+        await checkWatchlistMatches(savedData);
+      }
     }
     
     // Mover el archivo a la carpeta "procesados"
@@ -926,8 +1124,9 @@ export async function processPdfFile(filePath: string, activityId: number, store
       } else if (pdfText.toLowerCase().includes('contrato') || pdfText.toLowerCase().includes('contract')) {
         documentType = 'Contrato';
       }
-    } catch (parseError) {
-      console.warn(`Warning: Could not parse PDF content for type detection: ${parseError.message}`);
+    } catch (parseError: unknown) {
+      const errorMessage = parseError instanceof Error ? parseError.message : 'Unknown error';
+      console.warn(`Warning: Could not parse PDF content for type detection: ${errorMessage}`);
       // Continue with unknown document type, we don't want to fail the whole process just for text extraction
     }
     
