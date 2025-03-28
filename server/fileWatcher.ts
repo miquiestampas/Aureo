@@ -5,8 +5,8 @@ import { storage } from './storage';
 import { processExcelFile, processPdfFile } from './fileProcessors';
 import { Server } from 'socket.io';
 
-let excelWatcher: chokidar.FSWatcher | null = null;
-let pdfWatcher: chokidar.FSWatcher | null = null;
+let excelWatcher: any | null = null;
+let pdfWatcher: any | null = null;
 let io: Server | null = null;
 
 // Conjunto para mantener el seguimiento de archivos ya procesados
@@ -70,7 +70,11 @@ export async function initializeFileWatchers() {
     
     // Initialize new watchers
     excelWatcher = chokidar.watch(excelDir, {
-      ignored: /(^|[\/\\])\../, // ignore dotfiles
+      ignored: [
+        /(^|[\/\\])\.\./, // ignore dotfiles
+        /procesados/, // ignore 'procesados' subfolder
+        path.join(excelDir, 'procesados', '**') // Explícitamente ignorar cualquier archivo en la carpeta procesados
+      ],
       persistent: true,
       awaitWriteFinish: {
         stabilityThreshold: 2000,
@@ -79,7 +83,11 @@ export async function initializeFileWatchers() {
     });
     
     pdfWatcher = chokidar.watch(pdfDir, {
-      ignored: /(^|[\/\\])\../, // ignore dotfiles
+      ignored: [
+        /(^|[\/\\])\.\./, // ignore dotfiles
+        /procesados/, // ignore 'procesados' subfolder
+        path.join(pdfDir, 'procesados', '**') // Explícitamente ignorar cualquier archivo en la carpeta procesados
+      ],
       persistent: true,
       awaitWriteFinish: {
         stabilityThreshold: 2000,
@@ -88,8 +96,8 @@ export async function initializeFileWatchers() {
     });
     
     // Set up event handlers
-    excelWatcher.on('add', (filePath) => handleNewExcelFile(filePath));
-    pdfWatcher.on('add', (filePath) => handleNewPdfFile(filePath));
+    excelWatcher.on('add', (filePath: string) => handleNewExcelFile(filePath));
+    pdfWatcher.on('add', (filePath: string) => handleNewPdfFile(filePath));
     
     console.log(`File watchers initialized. Monitoring Excel files at ${excelDir} and PDF files at ${pdfDir}`);
     

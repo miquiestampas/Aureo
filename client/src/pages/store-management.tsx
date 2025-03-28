@@ -1916,7 +1916,7 @@ export default function StoreManagementPage() {
                               title="Descargar"
                               onClick={() => {
                                 fetch(`/api/file-activities/${activity.id}/download`)
-                                  .then(  .then(response => {
+                                  .then(response => {
                                     if (!response.ok) {
                                       throw new Error('Error al descargar el archivo');
                                     }
