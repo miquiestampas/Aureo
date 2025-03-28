@@ -1797,14 +1797,14 @@ export class DatabaseStorage implements IStorage {
         
         // Siempre incluir condiciones de texto
         const textConditions = [
-          `LOWER(UNACCENT(customer_name)) LIKE ${searchTermEscaped}`,
-          `LOWER(UNACCENT(customer_contact)) LIKE ${searchTermEscaped}`,
-          `LOWER(UNACCENT(order_number)) LIKE ${searchTermEscaped}`,
-          `LOWER(UNACCENT(item_details)) LIKE ${searchTermEscaped}`,
-          `LOWER(UNACCENT(metals)) LIKE ${searchTermEscaped}`,
-          `LOWER(UNACCENT(engravings)) LIKE ${searchTermEscaped}`,
-          `LOWER(UNACCENT(stones)) LIKE ${searchTermEscaped}`,
-          `LOWER(UNACCENT(pawn_ticket)) LIKE ${searchTermEscaped}`
+          `LOWER(customer_name) LIKE ${searchTermEscaped}`,
+          `LOWER(customer_contact) LIKE ${searchTermEscaped}`,
+          `LOWER(order_number) LIKE ${searchTermEscaped}`,
+          `LOWER(item_details) LIKE ${searchTermEscaped}`,
+          `LOWER(metals) LIKE ${searchTermEscaped}`,
+          `LOWER(engravings) LIKE ${searchTermEscaped}`,
+          `LOWER(stones) LIKE ${searchTermEscaped}`,
+          `LOWER(pawn_ticket) LIKE ${searchTermEscaped}`
         ];
         
         // Si es numérico, añadir condiciones numéricas
@@ -1845,36 +1845,36 @@ export class DatabaseStorage implements IStorage {
           if (storeCode.startsWith('.')) {
             storeCode = storeCode.replace(/^\.+/, '');
           }
-          sqlConditions.push(`LOWER(UNACCENT(REPLACE(REPLACE(store_code, '.', ''), ' ', ''))) = LOWER(UNACCENT(REPLACE(REPLACE(${escapeSQLString(storeCode)}, '.', ''), ' ', '')))`);
+          sqlConditions.push(`LOWER(REPLACE(REPLACE(store_code, '.', ''), ' ', '')) = LOWER(REPLACE(REPLACE(${escapeSQLString(storeCode)}, '.', ''), ' ', ''))`);
         }
         
         // Filtros específicos por campo de texto
         if (filters.customerName) {
-          sqlConditions.push(`LOWER(UNACCENT(customer_name)) LIKE ${escapeLikePattern(filters.customerName)}`);
+          sqlConditions.push(`LOWER(customer_name) LIKE ${escapeLikePattern(filters.customerName)}`);
         }
         
         if (filters.customerContact) {
-          sqlConditions.push(`LOWER(UNACCENT(customer_contact)) LIKE ${escapeLikePattern(filters.customerContact)}`);
+          sqlConditions.push(`LOWER(customer_contact)) LIKE ${escapeLikePattern(filters.customerContact)}`);
         }
         
         if (filters.orderNumber) {
-          sqlConditions.push(`LOWER(UNACCENT(order_number)) LIKE ${escapeLikePattern(filters.orderNumber)}`);
+          sqlConditions.push(`LOWER(order_number)) LIKE ${escapeLikePattern(filters.orderNumber)}`);
         }
         
         if (filters.itemDetails) {
-          sqlConditions.push(`LOWER(UNACCENT(item_details)) LIKE ${escapeLikePattern(filters.itemDetails)}`);
+          sqlConditions.push(`LOWER(item_details)) LIKE ${escapeLikePattern(filters.itemDetails)}`);
         }
         
         if (filters.metals) {
-          sqlConditions.push(`LOWER(UNACCENT(metals)) LIKE ${escapeLikePattern(filters.metals)}`);
+          sqlConditions.push(`LOWER(metals)) LIKE ${escapeLikePattern(filters.metals)}`);
         }
         
         if (filters.engravings) {
-          sqlConditions.push(`LOWER(UNACCENT(engravings)) LIKE ${escapeLikePattern(filters.engravings)}`);
+          sqlConditions.push(`LOWER(engravings)) LIKE ${escapeLikePattern(filters.engravings)}`);
         }
         
         if (filters.stones) {
-          sqlConditions.push(`LOWER(UNACCENT(stones)) LIKE ${escapeLikePattern(filters.stones)}`);
+          sqlConditions.push(`LOWER(stones)) LIKE ${escapeLikePattern(filters.stones)}`);
         }
         
         // Filtros de fecha
@@ -2150,9 +2150,9 @@ export class DatabaseStorage implements IStorage {
         .from(senalPersonas)
         .where(
           or(
-            sql`LOWER(UNACCENT(${senalPersonas.nombre})) SIMILAR TO ${searchTerm}`,
-            sql`LOWER(UNACCENT(REPLACE(${senalPersonas.documentoId}, '.', ''))) SIMILAR TO ${searchTerm}`,
-            sql`LOWER(UNACCENT(${senalPersonas.notas})) SIMILAR TO ${searchTerm}`
+            sql`LOWER(${senalPersonas.nombre})) SIMILAR TO ${searchTerm}`,
+            sql`LOWER(REPLACE(${senalPersonas.documentoId}, '.', ''))) SIMILAR TO ${searchTerm}`,
+            sql`LOWER(${senalPersonas.notas})) SIMILAR TO ${searchTerm}`
           )
         )
         .orderBy(
@@ -2306,9 +2306,9 @@ export class DatabaseStorage implements IStorage {
         .from(senalObjetos)
         .where(
           or(
-            sql`LOWER(UNACCENT(${senalObjetos.descripcion})) SIMILAR TO ${searchTerm}`,
-            sql`LOWER(UNACCENT(REPLACE(${senalObjetos.grabacion}, '.', ''))) SIMILAR TO ${searchTerm}`,
-            sql`LOWER(UNACCENT(${senalObjetos.notas})) SIMILAR TO ${searchTerm}`
+            sql`LOWER(${senalObjetos.descripcion})) SIMILAR TO ${searchTerm}`,
+            sql`LOWER(REPLACE(${senalObjetos.grabacion}, '.', ''))) SIMILAR TO ${searchTerm}`,
+            sql`LOWER(${senalObjetos.notas})) SIMILAR TO ${searchTerm}`
           )
         )
         .orderBy(
