@@ -81,7 +81,6 @@ interface SenalPersona {
   documentoId: string | null;
   notas: string | null;
   estado: "Activo" | "Inactivo";
-  nivelRiesgo: "Alto" | "Medio" | "Bajo";
   creadoPor: number;
   creadoEn: string;
   modificadoPor: number | null;
@@ -94,7 +93,6 @@ interface SenalObjeto {
   grabacion: string | null;
   notas: string | null;
   estado: "Activo" | "Inactivo";
-  nivelRiesgo: "Alto" | "Medio" | "Bajo";
   creadoPor: number;
   creadoEn: string;
   modificadoPor: number | null;
@@ -109,8 +107,7 @@ const personaSchema = z.object({
   ]).optional(),
   documentoId: z.string().min(1, "El documento es requerido si no se proporciona nombre").optional(),
   notas: z.string().nullable().optional(),
-  estado: z.enum(["Activo", "Inactivo"]),
-  nivelRiesgo: z.enum(["Alto", "Medio", "Bajo"])
+  estado: z.enum(["Activo", "Inactivo"])
 }).refine(data => {
   // Si el nombre está vacío, debe tener documento
   if (!data.nombre && !data.documentoId) {
@@ -130,8 +127,7 @@ const objetoSchema = z.object({
   ]),
   grabacion: z.string().nullable().optional(),
   notas: z.string().nullable().optional(),
-  estado: z.enum(["Activo", "Inactivo"]),
-  nivelRiesgo: z.enum(["Alto", "Medio", "Bajo"])
+  estado: z.enum(["Activo", "Inactivo"])
 }).refine(data => {
   // Al menos uno de los campos debe tener información
   return !!data.descripcion || !!data.grabacion || !!data.notas;
@@ -164,8 +160,7 @@ export default function Senalamientos() {
       nombre: "",
       documentoId: "",
       notas: "",
-      estado: "Activo",
-      nivelRiesgo: "Medio"
+      estado: "Activo"
     }
   });
   
@@ -176,8 +171,7 @@ export default function Senalamientos() {
       descripcion: "",
       grabacion: "",
       notas: "",
-      estado: "Activo",
-      nivelRiesgo: "Medio"
+      estado: "Activo"
     }
   });
   
@@ -425,8 +419,7 @@ export default function Senalamientos() {
       nombre: persona.nombre || undefined,
       documentoId: persona.documentoId || undefined,
       notas: persona.notas || undefined,
-      estado: persona.estado,
-      nivelRiesgo: persona.nivelRiesgo
+      estado: persona.estado
     });
     setEditingPersona(persona);
     setIsPersonaDialogOpen(true);
@@ -438,8 +431,7 @@ export default function Senalamientos() {
       descripcion: objeto.descripcion,
       grabacion: objeto.grabacion || undefined,
       notas: objeto.notas || undefined,
-      estado: objeto.estado,
-      nivelRiesgo: objeto.nivelRiesgo
+      estado: objeto.estado
     });
     setEditingObjeto(objeto);
     setIsObjetoDialogOpen(true);
@@ -472,24 +464,12 @@ export default function Senalamientos() {
         );
       },
     },
-    {
-      accessorKey: "nivelRiesgo",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Riesgo" />,
-      cell: ({ row }: { row: Row<SenalPersona> }) => {
-        const riesgo = row.getValue("nivelRiesgo") as string;
-        let variant: "default" | "destructive" | "outline" = "default";
-        
-        if (riesgo === "Alto") variant = "destructive";
-        else if (riesgo === "Bajo") variant = "outline";
-        
-        return <Badge variant={variant}>{riesgo}</Badge>;
-      },
-    },
+
     {
       accessorKey: "creadoEn",
       header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha" />,
       cell: ({ row }: { row: Row<SenalPersona> }) => {
-        const fechaStr = row.getValue("creadoEn");
+        const fechaStr = row.getValue("creadoEn") as string;
         if (!fechaStr) return "N/A";
         try {
           const fecha = new Date(fechaStr);
@@ -578,24 +558,12 @@ export default function Senalamientos() {
         );
       },
     },
-    {
-      accessorKey: "nivelRiesgo",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Riesgo" />,
-      cell: ({ row }: { row: Row<SenalObjeto> }) => {
-        const riesgo = row.getValue("nivelRiesgo") as string;
-        let variant: "default" | "destructive" | "outline" = "default";
-        
-        if (riesgo === "Alto") variant = "destructive";
-        else if (riesgo === "Bajo") variant = "outline";
-        
-        return <Badge variant={variant}>{riesgo}</Badge>;
-      },
-    },
+
     {
       accessorKey: "creadoEn",
       header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha" />,
       cell: ({ row }: { row: Row<SenalObjeto> }) => {
-        const fechaStr = row.getValue("creadoEn");
+        const fechaStr = row.getValue("creadoEn") as string;
         if (!fechaStr) return "N/A";
         try {
           const fecha = new Date(fechaStr);
@@ -792,32 +760,7 @@ export default function Senalamientos() {
                   )}
                 />
                 
-                <FormField
-                  control={personaForm.control}
-                  name="nivelRiesgo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nivel de riesgo</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar nivel de riesgo" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Alto">Alto</SelectItem>
-                          <SelectItem value="Medio">Medio</SelectItem>
-                          <SelectItem value="Bajo">Bajo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+
                 
                 <FormField
                   control={personaForm.control}
@@ -927,32 +870,7 @@ export default function Senalamientos() {
                   )}
                 />
                 
-                <FormField
-                  control={objetoForm.control}
-                  name="nivelRiesgo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nivel de riesgo</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar nivel de riesgo" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Alto">Alto</SelectItem>
-                          <SelectItem value="Medio">Medio</SelectItem>
-                          <SelectItem value="Bajo">Bajo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+
                 
                 <FormField
                   control={objetoForm.control}

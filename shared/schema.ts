@@ -294,7 +294,6 @@ export const senalPersonas = pgTable("senal_personas", {
   documentoId: text("documento_id"),  // DNI, NIE, pasaporte
   notas: text("notas"),
   estado: text("estado", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
-  nivelRiesgo: text("nivel_riesgo", { enum: ["Alto", "Medio", "Bajo"] }).notNull().default("Medio"),
   creadoPor: integer("creado_por").notNull(), // ID del usuario creador
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
   modificadoPor: integer("modificado_por"), // ID del usuario que modificó
@@ -306,7 +305,6 @@ export const insertSenalPersonaSchema = createInsertSchema(senalPersonas).pick({
   documentoId: true,
   notas: true,
   estado: true,
-  nivelRiesgo: true,
   creadoPor: true,
   modificadoPor: true,
 });
@@ -321,7 +319,6 @@ export const senalObjetos = pgTable("senal_objetos", {
   grabacion: text("grabacion"),  // Grabados específicos
   notas: text("notas"),
   estado: text("estado", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
-  nivelRiesgo: text("nivel_riesgo", { enum: ["Alto", "Medio", "Bajo"] }).notNull().default("Medio"),
   creadoPor: integer("creado_por").notNull(), // ID del usuario creador
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
   modificadoPor: integer("modificado_por"), // ID del usuario que modificó
@@ -333,7 +330,6 @@ export const insertSenalObjetoSchema = createInsertSchema(senalObjetos).pick({
   grabacion: true,
   notas: true,
   estado: true,
-  nivelRiesgo: true,
   creadoPor: true,
   modificadoPor: true,
 });
