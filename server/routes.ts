@@ -1051,6 +1051,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileProcessingConfig = await storage.getConfig('FILE_PROCESSING_ENABLED');
       const fileWatchingActive = fileProcessingConfig?.value === 'true';
       
+      // Calcular el tamaño de la base de datos SQLite (en porcentaje respecto a 1TB máximo)
+      const getDatabaseSize = async () => {
+        try {
+          // Obtener estadísticas del archivo de la BD (SQLite)
+          const dbPath = process.env.DATABASE_PATH || './aureo_app/datos.sqlite';
+          const stats = await fs.promises.stat(dbPath);
+          const sizeInBytes = stats.size;
+          const sizeInGB = sizeInBytes / (1024 * 1024 * 1024);
+          
+          // Calcular porcentaje relativo a 1TB
+          // 1TB = 1024GB, por lo que el porcentaje sería (tamaño en GB / 1024) * 100
+          const percentageOfMaxSize = (sizeInGB / 1024) * 100;
+          
+          // Redondear a 2 decimales
+          return Math.round(percentageOfMaxSize * 100) / 100;
+        } catch (error) {
+          console.error("Error al obtener el tamaño de la base de datos:", error);
+          return 0; // Valor por defecto en caso de error
+        }
+      };
+      
+      const databaseSize = await getDatabaseSize();
+      
       res.json({
         totalStores: excelStores.length + pdfStores.length,
         excelStores: excelStores.length,
@@ -1059,7 +1082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pendingFiles,
         fileWatchingActive,
         lastSystemCheck: new Date().toISOString(),
-        systemLoad: 25 // Placeholder value
+        databaseSize
       });
     } catch (err) {
       res.status(500).json({ message: "Error fetching system status" });

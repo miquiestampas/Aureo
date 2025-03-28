@@ -54,7 +54,7 @@ interface SystemStatus {
   pendingFiles: number;
   fileWatchingActive: boolean;
   lastSystemCheck: string;
-  systemLoad: number;
+  databaseSize: number; // Tamaño relativo de la BD en porcentaje (0-100)
 }
 
 interface FileActivity {
@@ -807,18 +807,18 @@ export default function DashboardPage() {
                   </dd>
                 </div>
                 
-                {/* System Load */}
+                {/* Database Size */}
                 <div className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">Carga del Sistema</dt>
+                  <dt className="text-sm font-medium text-gray-500">Tamaño de la Base de Datos</dt>
                   <dd className="mt-1 text-sm text-gray-900">
                     <div className="w-full bg-gray-200 rounded-full h-2.5">
                       <div 
-                        className="bg-green-500 h-2.5 rounded-full" 
-                        style={{ width: `${systemStatus?.systemLoad ?? 0}%` }}
+                        className="bg-blue-500 h-2.5 rounded-full" 
+                        style={{ width: `${systemStatus?.databaseSize ?? 0}%` }}
                       ></div>
                     </div>
                     <span className="text-xs text-gray-600 mt-1">
-                      {systemStatus?.systemLoad ?? 0}% - Normal
+                      {systemStatus?.databaseSize ?? 0}% de 1TB
                     </span>
                   </dd>
                 </div>
