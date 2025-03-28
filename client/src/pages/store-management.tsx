@@ -208,7 +208,7 @@ export default function StoreManagementPage() {
   const [selectedStore, setSelectedStore] = useState<StoreData | null>(null);
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const [isRecordsDialogOpen, setIsRecordsDialogOpen] = useState(false);
-  
+
   // Estados para la visualización de archivos procesados
   const [storeActivities, setStoreActivities] = useState<any[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
@@ -585,12 +585,12 @@ export default function StoreManagementPage() {
     setSelectedStore(store);
     setIsDetailDialogOpen(true);
   };
-  
+
   // Cargar archivos procesados de tienda en un diálogo
   const handleViewStoreRecords = async (store: StoreData) => {
     setSelectedStore(store);
     setIsRecordsDialogOpen(true);
-    
+
     // Cargar actividades de archivos para la tienda
     setIsLoadingActivities(true);
     try {
@@ -1334,63 +1334,63 @@ export default function StoreManagementPage() {
                     <FormField
                       control={editForm.control}
                       name="code"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Código de Tienda</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ej: ST001" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={editForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nombre de Tienda</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ej: Tienda Principal" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={editForm.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Tipo de Tienda</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccione tipo de tienda" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Excel">Tienda Excel</SelectItem>
-                            <SelectItem value="PDF">Tienda PDF</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={editForm.control}
-                      name="locality"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Localidad</FormLabel>
+                          <FormLabel>Código de Tienda</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ej: ST001" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nombre de Tienda</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ej: Tienda Principal" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tipo de Tienda</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccione tipo de tienda" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Excel">Tienda Excel</SelectItem>
+                              <SelectItem value="PDF">Tienda PDF</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={editForm.control}
+                        name="locality"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Localidad</FormLabel>
                           <Select 
                             onValueChange={field.onChange} 
                             value={field.value || ""}
@@ -1462,19 +1462,19 @@ export default function StoreManagementPage() {
                     control={editForm.control}
                     name="active"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 p-2 border rounded-md">
+                      <FormItem className="flex flex-row items-center justify-between col-span-3 space-x-2 p-3 border rounded-md bg-muted/10">
+                        <div className="space-y-0.5">
+                          <FormLabel>Estado de la Tienda</FormLabel>
+                          <FormDescription>
+                            Activar o desactivar el procesamiento de archivos para esta tienda
+                          </FormDescription>
+                        </div>
                         <FormControl>
-                          <Checkbox
+                          <Switch
                             checked={field.value}
                             onCheckedChange={field.onChange}
                           />
                         </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Estado Activo</FormLabel>
-                          <FormDescription>
-                            Activo o Inactivo
-                          </FormDescription>
-                        </div>
                       </FormItem>
                     )}
                   />
@@ -1852,7 +1852,7 @@ export default function StoreManagementPage() {
           </Dialog>
         )}
       </div>
-      
+
       {/* Diálogo para ver archivos procesados de tienda */}
       <Dialog open={isRecordsDialogOpen} onOpenChange={setIsRecordsDialogOpen}>
         <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden">
@@ -1864,7 +1864,7 @@ export default function StoreManagementPage() {
               Historial de archivos procesados para esta tienda
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="overflow-auto max-h-[60vh] mt-4">
             {isLoadingActivities ? (
               <div className="py-8 flex items-center justify-center">
@@ -1916,7 +1916,7 @@ export default function StoreManagementPage() {
                               title="Descargar"
                               onClick={() => {
                                 fetch(`/api/file-activities/${activity.id}/download`)
-                                  .then(response => {
+                                  .then(  .then(response => {
                                     if (!response.ok) {
                                       throw new Error('Error al descargar el archivo');
                                     }
@@ -1954,7 +1954,7 @@ export default function StoreManagementPage() {
               </div>
             )}
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsRecordsDialogOpen(false)}>
               Cerrar
