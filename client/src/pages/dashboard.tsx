@@ -27,8 +27,10 @@ import {
   Clock,
   Trash2,
   AlertCircle,
-  Plus
+  Plus,
+  Upload
 } from "lucide-react";
+import FileUploadModal from "@/components/FileUploadModal";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 
@@ -267,8 +269,10 @@ export default function DashboardPage() {
   // Toast para mensajes al usuario
   const { toast } = useToast();
   
-  // Estado para el diálogo de contraseña
+  // Estados para los modales y diálogos
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isBatchUploadModalOpen, setIsBatchUploadModalOpen] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [selectedActivities, setSelectedActivities] = useState<FileActivity[]>([]);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
@@ -724,10 +728,20 @@ export default function DashboardPage() {
         <div className="mt-8">
           <div className="flex items-center justify-between">
             <h2 className="text-lg leading-6 font-medium text-gray-900">Actividad Reciente</h2>
-            <div className="flex">
-              <Button className="ml-3 inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90">
-                <Download className="mr-2 h-5 w-5" />
-                Exportar Informe
+            <div className="flex space-x-2">
+              <Button 
+                className="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => setIsUploadModalOpen(true)}
+              >
+                <Plus className="mr-2 h-5 w-5" />
+                Cargar Archivo
+              </Button>
+              <Button 
+                className="inline-flex items-center bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => setIsBatchUploadModalOpen(true)}
+              >
+                <FileText className="mr-2 h-5 w-5" />
+                Carga por Lotes
               </Button>
             </div>
           </div>
@@ -800,6 +814,21 @@ export default function DashboardPage() {
           </Dialog>
         </div>
       </div>
+      
+      {/* Modales de carga de archivos */}
+      <FileUploadModal 
+        isOpen={isUploadModalOpen} 
+        onClose={() => setIsUploadModalOpen(false)} 
+        storesByType={[]} 
+        fileType="PDF" 
+      />
+      
+      <FileUploadModal 
+        isOpen={isBatchUploadModalOpen} 
+        onClose={() => setIsBatchUploadModalOpen(false)} 
+        storesByType={[]} 
+        fileType="PDF" 
+      />
     </div>
   );
 }
