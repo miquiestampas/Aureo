@@ -23,7 +23,9 @@ import {
   CheckCircle2,
   Clock,
   CalendarClock,
-  Filter
+  Filter,
+  Download,
+  Eye
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { format, differenceInDays } from "date-fns";
@@ -201,6 +203,26 @@ export default function ActivityControlPage() {
     } finally {
       setIsLoadingActivityHistory(false);
     }
+  };
+  
+  // Descargar un archivo
+  const handleDownloadFile = (activityId: number) => {
+    window.location.href = `/api/file-activities/${activityId}/download`;
+  };
+  
+  // Ver un archivo PDF
+  const handleViewPdf = (activity: FileActivity) => {
+    if (activity.fileType !== 'PDF') {
+      toast({
+        title: "Visualización no disponible",
+        description: "Solo se pueden visualizar archivos PDF",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Abrir en una nueva pestaña
+    window.open(`/api/file-activities/${activity.id}/view`, '_blank');
   };
 
   // Columnas para la tabla de tiendas
@@ -621,6 +643,7 @@ export default function ActivityControlPage() {
                           <th className="text-left py-3 px-3">Tipo</th>
                           <th className="text-left py-3 px-3">Fecha</th>
                           <th className="text-left py-3 px-3">Estado</th>
+                          <th className="text-left py-3 px-3">Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -651,6 +674,36 @@ export default function ActivityControlPage() {
                                 activity.status === 'Processing' ? 'Procesando' :
                                 activity.status === 'Pending' ? 'Pendiente' : 'Error'}
                               </Badge>
+                              {activity.status === 'Failed' && activity.errorMessage && (
+                                <div className="text-xs text-red-600 mt-1" title={activity.errorMessage}>
+                                  Error: {activity.errorMessage.length > 30 ? `${activity.errorMessage.substring(0, 30)}...` : activity.errorMessage}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="flex space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => handleDownloadFile(activity.id)}
+                                  title="Descargar archivo"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                                
+                                {activity.fileType === 'PDF' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    onClick={() => handleViewPdf(activity)}
+                                    title="Ver PDF"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}

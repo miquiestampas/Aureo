@@ -427,6 +427,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Endpoint para visualizar PDFs (solo para PDFs)
+  app.get("/api/file-activities/:id/view", async (req, res, next) => {
+    try {
+      const activityId = parseInt(req.params.id);
+      if (isNaN(activityId)) {
+        return res.status(400).json({ message: "ID de actividad inválido" });
+      }
+      
+      const activity = await storage.getFileActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Actividad no encontrada" });
+      }
+      
+      // Solo permitir visualización de PDFs
+      if (activity.fileType !== 'PDF') {
+        return res.status(400).json({ message: "Solo se pueden visualizar archivos PDF" });
+      }
+      
+      const baseDir = "./uploads/pdf";
+      
+      // Intentar encontrar el archivo correcto
+      let filePath = '';
+      
+      // 1. Primero intentamos con el nombre exacto
+      filePath = path.join(baseDir, activity.filename);
+      if (!fs.existsSync(filePath)) {
+        // 2. Si no existe, intentamos encontrar cualquier archivo que comience con ese nombre
+        const baseFileName = activity.filename.replace(/\.[^/.]+$/, ''); // Nombre sin extensión
+        const extension = path.extname(activity.filename);
+        
+        const dir = fs.readdirSync(baseDir);
+        for (const file of dir) {
+          // Si el archivo comienza con el nombre base y tiene la misma extensión
+          if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+            filePath = path.join(baseDir, file);
+            break;
+          }
+        }
+      }
+      
+      if (!filePath || !fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Archivo no encontrado" });
+      }
+      
+      console.log(`Visualizando PDF: ${filePath}`);
+      
+      // Configurar el encabezado para mostrar PDF en el navegador
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename=' + activity.filename);
+      
+      // Enviar el archivo PDF como respuesta
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (err) {
+      console.error("Error visualizando PDF:", err);
+      next(err);
+    }
+  });
+  
   // Eliminar actividad y datos relacionados
   app.delete("/api/file-activities/:id", async (req, res, next) => {
     try {
