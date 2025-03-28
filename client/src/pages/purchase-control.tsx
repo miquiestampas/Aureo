@@ -69,6 +69,8 @@ import {
   Download,
   Printer,
   AlertTriangle,
+  Quote,
+  Gem,
 } from "lucide-react";
 
 // Types
@@ -125,6 +127,8 @@ interface SearchParams {
   customerContact?: string;
   itemDetails?: string;
   metals?: string;
+  engravings?: string; // Agregamos campo para grabaciones
+  stones?: string; // Agregamos campo para piedras
   price?: string;
   priceOperator?: string;
   onlyAlerts?: boolean;
@@ -141,6 +145,8 @@ export default function PurchaseControlPage() {
     customerContact: "",
     itemDetails: "",
     metals: "",
+    engravings: "",
+    stones: "",
   });
   const [advancedSearch, setAdvancedSearch] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
@@ -225,6 +231,8 @@ export default function PurchaseControlPage() {
         customerContact: searchParams.customerContact || undefined,
         itemDetails: searchParams.itemDetails || undefined,
         metals: searchParams.metals || undefined,
+        engravings: searchParams.engravings || undefined,
+        stones: searchParams.stones || undefined,
         price: searchParams.price || undefined,
         priceOperator: searchParams.priceOperator || undefined,
         onlyAlerts: searchParams.onlyAlerts || undefined
@@ -528,7 +536,48 @@ export default function PurchaseControlPage() {
                       }
                     />
                   </div>
+                </div>
 
+                {/* Nueva fila para grabados y piedras */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="engravings" className="flex items-center">
+                      <Quote className="h-4 w-4 mr-1 text-primary" />
+                      <span>Grabados</span>
+                    </Label>
+                    <Input
+                      id="engravings"
+                      placeholder="Iniciales, fechas, inscripciones..."
+                      value={searchParams.engravings || ""}
+                      onChange={(e) =>
+                        setSearchParams({
+                          ...searchParams,
+                          engravings: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="stones" className="flex items-center">
+                      <Gem className="h-4 w-4 mr-1 text-primary" />
+                      <span>Piedras</span>
+                    </Label>
+                    <Input
+                      id="stones"
+                      placeholder="Diamantes, rubíes, etc."
+                      value={searchParams.stones || ""}
+                      onChange={(e) =>
+                        setSearchParams({
+                          ...searchParams,
+                          stones: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="flex gap-2">
                     <div className="flex-1">
                       <Label htmlFor="price">Precio</Label>
