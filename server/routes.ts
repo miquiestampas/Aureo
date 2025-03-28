@@ -1648,8 +1648,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...data,
           // Si el nombre es una cadena vacía, establecerlo como null para la base de datos
           nombre: data.nombre || null,
+          // Asegurar que fecha es una fecha válida en formato ISO string o null
+          fecha: data.fecha ? new Date(data.fecha).toISOString() : null,
           creadoPor: req.user!.id
         };
+        
+        console.log("Persona a crear:", senalPersona);
         
         const nuevaPersona = await storage.createSenalPersona(senalPersona);
         res.status(201).json(nuevaPersona);
@@ -1712,8 +1716,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...data,
           // Si el nombre es una cadena vacía, establecerlo como null para la base de datos
           nombre: data.nombre || null,
+          // Asegurar que fecha es una fecha válida en formato ISO string o null
+          fecha: data.fecha ? new Date(data.fecha).toISOString() : null,
           modificadoPor: req.user!.id
         };
+        
+        console.log("Persona a actualizar:", updates);
         
         const personaActualizada = await storage.updateSenalPersona(id, updates);
         if (!personaActualizada) {
@@ -1805,9 +1813,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...data,
           // Si la descripción es una cadena vacía, establecerla como null para la base de datos
           descripcion: data.descripcion || null,
+          // Asegurar que fecha es una fecha válida en formato ISO string o null
+          fecha: data.fecha ? new Date(data.fecha).toISOString() : null,
           creadoPor: req.user!.id
         };
         
+        console.log("Objeto a crear:", senalObjeto);
         const nuevoObjeto = await storage.createSenalObjeto(senalObjeto);
         res.status(201).json(nuevoObjeto);
       } catch (error) {
@@ -1869,9 +1880,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...data,
           // Si la descripción es una cadena vacía, establecerla como null para la base de datos
           descripcion: data.descripcion || null,
+          // Asegurar que fecha es una fecha válida en formato ISO string o null
+          fecha: data.fecha ? new Date(data.fecha).toISOString() : null,
           modificadoPor: req.user!.id
         };
         
+        console.log("Objeto a actualizar:", updates);
         const objetoActualizado = await storage.updateSenalObjeto(id, updates);
         if (!objetoActualizado) {
           return res.status(404).json({ error: "No se pudo actualizar el señalamiento" });
