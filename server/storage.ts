@@ -73,6 +73,7 @@ export interface IStorage {
   createPdfDocument(doc: InsertPdfDocument): Promise<PdfDocument>;
   getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]>;
   getPdfDocument(id: number): Promise<PdfDocument | undefined>;
+  getPdfDocumentByActivityId(activityId: number): Promise<PdfDocument | undefined>;
   updatePdfDocumentPath(fileActivityId: number, newPath: string): Promise<boolean>;
   deletePdfDocumentsByActivityId(activityId: number): Promise<boolean>;
   
@@ -446,6 +447,19 @@ export class MemStorage implements IStorage {
   
   async getPdfDocument(id: number): Promise<PdfDocument | undefined> {
     return this.pdfDocuments.get(id);
+  }
+  
+  async getPdfDocumentByActivityId(activityId: number): Promise<PdfDocument | undefined> {
+    // Buscar todos los documentos PDF con ese fileActivityId y devolver el primero
+    const pdfDocs = Array.from(this.pdfDocuments.values())
+      .filter(doc => doc.fileActivityId === activityId);
+    
+    // Si hay documentos, devolver el primero
+    if (pdfDocs.length > 0) {
+      return pdfDocs[0];
+    }
+    
+    return undefined;
   }
   
   async updatePdfDocumentPath(fileActivityId: number, newPath: string): Promise<boolean> {
@@ -1751,6 +1765,15 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(pdfDocuments)
       .where(eq(pdfDocuments.id, id));
+    return document;
+  }
+  
+  async getPdfDocumentByActivityId(activityId: number): Promise<PdfDocument | undefined> {
+    const [document] = await db
+      .select()
+      .from(pdfDocuments)
+      .where(eq(pdfDocuments.fileActivityId, activityId))
+      .limit(1);
     return document;
   }
   
