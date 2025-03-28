@@ -22,6 +22,8 @@ import UserManagementPage from "@/pages/user-management";
 import SystemConfigPage from "@/pages/system-config";
 import ActivityControlPage from "@/pages/activity-control";
 import PurchaseControlPage from "@/pages/purchase-control";
+import SenalamientosPage from "@/pages/senalamientos";
+import CoincidenciasPage from "@/pages/coincidencias";
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -152,6 +154,24 @@ function Router() {
         component={() => (
           <AppLayout>
             <PurchaseControlPage />
+          </AppLayout>
+        )} 
+      />
+      
+      <ProtectedRoute 
+        path="/senalamientos" 
+        component={() => (
+          <AppLayout>
+            <SenalamientosPage />
+          </AppLayout>
+        )} 
+      />
+      
+      <ProtectedRoute 
+        path="/coincidencias" 
+        component={() => (
+          <AppLayout>
+            <CoincidenciasPage />
           </AppLayout>
         )} 
       />

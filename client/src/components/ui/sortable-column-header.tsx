@@ -1,30 +1,51 @@
-import { Column } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button";
-import { ArrowDownIcon, ArrowUpIcon, ArrowUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React from 'react';
+import { ArrowUpDown, ArrowDown, ArrowUp } from 'lucide-react';
+import { Button } from './button';
+import { cn } from '@/lib/utils';
 
-interface SortableColumnHeaderProps<TData, TValue> {
-  column: Column<TData, TValue>;
-  title: string;
+type SortDirection = 'asc' | 'desc' | null;
+
+interface SortableColumnHeaderProps {
+  label: string;
+  field: string;
+  sortField: string | null;
+  sortDirection: SortDirection;
+  onSort: (field: string) => void;
   className?: string;
 }
 
-export function SortableColumnHeader<TData, TValue>({
-  column,
-  title,
+export function SortableColumnHeader({
+  label,
+  field,
+  sortField,
+  sortDirection,
+  onSort,
   className,
-}: SortableColumnHeaderProps<TData, TValue>) {
+}: SortableColumnHeaderProps) {
+  const isActive = sortField === field;
+  
+  const handleSort = () => {
+    onSort(field);
+  };
+  
   return (
     <Button
       variant="ghost"
-      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      className={cn("text-sm font-medium", className)}
+      onClick={handleSort}
+      className={cn(
+        'flex items-center justify-between px-0 hover:bg-transparent',
+        isActive && 'font-bold',
+        className
+      )}
     >
-      {title}
-      {column.getIsSorted() === "asc" ? (
-        <ArrowUpIcon className="ml-2 h-4 w-4" />
-      ) : column.getIsSorted() === "desc" ? (
-        <ArrowDownIcon className="ml-2 h-4 w-4" />
+      <span>{label}</span>
+      
+      {isActive ? (
+        sortDirection === 'asc' ? (
+          <ArrowUp className="ml-2 h-4 w-4" />
+        ) : (
+          <ArrowDown className="ml-2 h-4 w-4" />
+        )
       ) : (
         <ArrowUpDown className="ml-2 h-4 w-4" />
       )}
