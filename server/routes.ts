@@ -388,10 +388,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Para PDFs, primero intentar obtener la ruta desde los documentos PDF si existe
         const pdfDoc = await storage.getPdfDocumentByActivityId(activityId);
         
-        if (pdfDoc && pdfDoc.path && fs.existsSync(pdfDoc.path)) {
-          filePath = pdfDoc.path;
-          fileName = activity.filename;
-          console.log(`Usando ruta de documento PDF almacenada: ${filePath}`);
+        if (pdfDoc && pdfDoc.path) {
+          // Probar la ruta con y sin "./" al principio
+          if (fs.existsSync(pdfDoc.path)) {
+            filePath = pdfDoc.path;
+            fileName = activity.filename;
+            console.log(`Usando ruta de documento PDF almacenada: ${filePath}`);
+          } else if (fs.existsSync(`./${pdfDoc.path}`)) {
+            filePath = `./${pdfDoc.path}`;
+            fileName = activity.filename;
+            console.log(`Usando ruta de documento PDF con prefijo ./: ${filePath}`);
+          } else {
+            console.log(`La ruta almacenada ${pdfDoc.path} no existe, buscando alternativas...`);
+          }
         }
       }
       
@@ -509,10 +518,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Primero, intentar obtener la ruta desde los documentos PDF si existe
       const pdfDoc = await storage.getPdfDocumentByActivityId(activityId);
       
-      if (pdfDoc && pdfDoc.path && fs.existsSync(pdfDoc.path)) {
-        filePath = pdfDoc.path;
-        console.log(`Usando ruta de documento PDF almacenada: ${filePath}`);
-      } else {
+      if (pdfDoc && pdfDoc.path) {
+        // Probar la ruta con y sin "./" al principio
+        if (fs.existsSync(pdfDoc.path)) {
+          filePath = pdfDoc.path;
+          console.log(`Usando ruta de documento PDF almacenada: ${filePath}`);
+        } else if (fs.existsSync(`./${pdfDoc.path}`)) {
+          filePath = `./${pdfDoc.path}`;
+          console.log(`Usando ruta de documento PDF con prefijo ./: ${filePath}`);
+        } else {
+          console.log(`La ruta almacenada ${pdfDoc.path} no existe, buscando alternativas...`);
+        }
+      }
+      
+      if (!filePath) {
         // Directorios base a comprobar
         const baseDirs = ["./uploads/pdf", "./data/pdf"];
         
