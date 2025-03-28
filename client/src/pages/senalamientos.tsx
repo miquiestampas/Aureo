@@ -165,7 +165,7 @@ export default function Senalamientos() {
     isLoading: isLoadingPersonas,
     isError: isErrorPersonas
   } = useQuery<SenalPersona[]>({
-    queryKey: ["/api/senalamientos/personas"],
+    queryKey: ["/api/senalamiento/personas"],
   });
   
   // Cargar datos de señalamientos de objetos
@@ -174,13 +174,13 @@ export default function Senalamientos() {
     isLoading: isLoadingObjetos,
     isError: isErrorObjetos
   } = useQuery<SenalObjeto[]>({
-    queryKey: ["/api/senalamientos/objetos"],
+    queryKey: ["/api/senalamiento/objetos"],
   });
   
   // Mutación para crear persona
   const createPersonaMutation = useMutation({
     mutationFn: async (data: PersonaFormValues) => {
-      const response = await fetch("/api/senalamientos/personas", {
+      const response = await fetch("/api/senalamiento/personas", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -199,7 +199,7 @@ export default function Senalamientos() {
         title: "Señalamiento creado",
         description: "El señalamiento de persona ha sido creado correctamente",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/senalamientos/personas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/senalamiento/personas"] });
       personaForm.reset();
       setIsPersonaDialogOpen(false);
     },
@@ -215,7 +215,7 @@ export default function Senalamientos() {
   // Mutación para actualizar persona
   const updatePersonaMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: PersonaFormValues }) => {
-      const response = await fetch(`/api/senalamientos/personas/${id}`, {
+      const response = await fetch(`/api/senalamiento/personas/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -234,7 +234,7 @@ export default function Senalamientos() {
         title: "Señalamiento actualizado",
         description: "El señalamiento de persona ha sido actualizado correctamente",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/senalamientos/personas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/senalamiento/personas"] });
       personaForm.reset();
       setEditingPersona(null);
       setIsPersonaDialogOpen(false);
@@ -251,7 +251,7 @@ export default function Senalamientos() {
   // Mutación para eliminar persona
   const deletePersonaMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await fetch(`/api/senalamientos/personas/${id}`, {
+      const response = await fetch(`/api/senalamiento/personas/${id}`, {
         method: "DELETE",
       });
       
@@ -266,7 +266,7 @@ export default function Senalamientos() {
         title: "Señalamiento eliminado",
         description: "El señalamiento de persona ha sido eliminado correctamente",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/senalamientos/personas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/senalamiento/personas"] });
       setDeleteConfirmDialog({ open: false, type: "persona", id: null });
     },
     onError: (error) => {
@@ -281,7 +281,7 @@ export default function Senalamientos() {
   // Mutación para crear objeto
   const createObjetoMutation = useMutation({
     mutationFn: async (data: ObjetoFormValues) => {
-      const response = await fetch("/api/senalamientos/objetos", {
+      const response = await fetch("/api/senalamiento/objetos", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -300,7 +300,7 @@ export default function Senalamientos() {
         title: "Señalamiento creado",
         description: "El señalamiento de objeto ha sido creado correctamente",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/senalamientos/objetos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/senalamiento/objetos"] });
       objetoForm.reset();
       setIsObjetoDialogOpen(false);
     },
@@ -316,7 +316,7 @@ export default function Senalamientos() {
   // Mutación para actualizar objeto
   const updateObjetoMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: ObjetoFormValues }) => {
-      const response = await fetch(`/api/senalamientos/objetos/${id}`, {
+      const response = await fetch(`/api/senalamiento/objetos/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -335,7 +335,7 @@ export default function Senalamientos() {
         title: "Señalamiento actualizado",
         description: "El señalamiento de objeto ha sido actualizado correctamente",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/senalamientos/objetos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/senalamiento/objetos"] });
       objetoForm.reset();
       setEditingObjeto(null);
       setIsObjetoDialogOpen(false);
@@ -352,7 +352,7 @@ export default function Senalamientos() {
   // Mutación para eliminar objeto
   const deleteObjetoMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await fetch(`/api/senalamientos/objetos/${id}`, {
+      const response = await fetch(`/api/senalamiento/objetos/${id}`, {
         method: "DELETE",
       });
       
@@ -367,7 +367,7 @@ export default function Senalamientos() {
         title: "Señalamiento eliminado",
         description: "El señalamiento de objeto ha sido eliminado correctamente",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/senalamientos/objetos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/senalamiento/objetos"] });
       setDeleteConfirmDialog({ open: false, type: "objeto", id: null });
     },
     onError: (error) => {
