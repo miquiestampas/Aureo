@@ -5,6 +5,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
   Edit,
   Trash2,
@@ -80,6 +88,7 @@ interface SenalPersona {
   nombre: string;
   documentoId: string | null;
   notas: string | null;
+  fecha: string | null;
   estado: "Activo" | "Inactivo";
   creadoPor: number;
   creadoEn: string;
@@ -92,6 +101,7 @@ interface SenalObjeto {
   descripcion: string;
   grabacion: string | null;
   notas: string | null;
+  fecha: string | null;
   estado: "Activo" | "Inactivo";
   creadoPor: number;
   creadoEn: string;
@@ -107,6 +117,7 @@ const personaSchema = z.object({
   ]).optional(),
   documentoId: z.string().min(1, "El documento es requerido si no se proporciona nombre").optional(),
   notas: z.string().nullable().optional(),
+  fecha: z.date().optional().nullable(),
   estado: z.enum(["Activo", "Inactivo"])
 }).refine(data => {
   // Si el nombre está vacío, debe tener documento
@@ -127,6 +138,7 @@ const objetoSchema = z.object({
   ]),
   grabacion: z.string().nullable().optional(),
   notas: z.string().nullable().optional(),
+  fecha: z.date().optional().nullable(),
   estado: z.enum(["Activo", "Inactivo"])
 }).refine(data => {
   // Al menos uno de los campos debe tener información
@@ -160,6 +172,7 @@ export default function Senalamientos() {
       nombre: "",
       documentoId: "",
       notas: "",
+      fecha: new Date(),
       estado: "Activo"
     }
   });
@@ -171,6 +184,7 @@ export default function Senalamientos() {
       descripcion: "",
       grabacion: "",
       notas: "",
+      fecha: new Date(),
       estado: "Activo"
     }
   });
@@ -419,6 +433,7 @@ export default function Senalamientos() {
       nombre: persona.nombre || undefined,
       documentoId: persona.documentoId || undefined,
       notas: persona.notas || undefined,
+      fecha: persona.fecha ? new Date(persona.fecha) : new Date(),
       estado: persona.estado
     });
     setEditingPersona(persona);
@@ -431,6 +446,7 @@ export default function Senalamientos() {
       descripcion: objeto.descripcion,
       grabacion: objeto.grabacion || undefined,
       notas: objeto.notas || undefined,
+      fecha: objeto.fecha ? new Date(objeto.fecha) : new Date(),
       estado: objeto.estado
     });
     setEditingObjeto(objeto);
@@ -464,10 +480,25 @@ export default function Senalamientos() {
         );
       },
     },
-
+    {
+      accessorKey: "fecha",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha registro" />,
+      cell: ({ row }: { row: Row<SenalPersona> }) => {
+        const fechaStr = row.getValue("fecha") as string;
+        if (!fechaStr) return "N/A";
+        try {
+          const fecha = new Date(fechaStr);
+          if (isNaN(fecha.getTime())) return "Fecha inválida";
+          return format(fecha, "dd/MM/yyyy", { locale: es });
+        } catch (error) {
+          console.error("Error al formatear fecha:", error);
+          return "Error de formato";
+        }
+      },
+    },
     {
       accessorKey: "creadoEn",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha" />,
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha creación" />,
       cell: ({ row }: { row: Row<SenalPersona> }) => {
         const fechaStr = row.getValue("creadoEn") as string;
         if (!fechaStr) return "N/A";
@@ -558,10 +589,25 @@ export default function Senalamientos() {
         );
       },
     },
-
+    {
+      accessorKey: "fecha",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha registro" />,
+      cell: ({ row }: { row: Row<SenalObjeto> }) => {
+        const fechaStr = row.getValue("fecha") as string;
+        if (!fechaStr) return "N/A";
+        try {
+          const fecha = new Date(fechaStr);
+          if (isNaN(fecha.getTime())) return "Fecha inválida";
+          return format(fecha, "dd/MM/yyyy", { locale: es });
+        } catch (error) {
+          console.error("Error al formatear fecha:", error);
+          return "Error de formato";
+        }
+      },
+    },
     {
       accessorKey: "creadoEn",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha" />,
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha creación" />,
       cell: ({ row }: { row: Row<SenalObjeto> }) => {
         const fechaStr = row.getValue("creadoEn") as string;
         if (!fechaStr) return "N/A";
@@ -760,7 +806,48 @@ export default function Senalamientos() {
                   )}
                 />
                 
-
+                <FormField
+                  control={personaForm.control}
+                  name="fecha"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Fecha</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(field.value, "dd/MM/yyyy", { locale: es })
+                              ) : (
+                                <span>Seleccione una fecha</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormDescription>
+                        Fecha de registro (por defecto: hoy)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
                 
                 <FormField
                   control={personaForm.control}
@@ -870,7 +957,48 @@ export default function Senalamientos() {
                   )}
                 />
                 
-
+                <FormField
+                  control={objetoForm.control}
+                  name="fecha"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Fecha</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(field.value, "dd/MM/yyyy", { locale: es })
+                              ) : (
+                                <span>Seleccione una fecha</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormDescription>
+                        Fecha de registro (por defecto: hoy)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
                 
                 <FormField
                   control={objetoForm.control}

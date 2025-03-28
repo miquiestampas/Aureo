@@ -293,6 +293,7 @@ export const senalPersonas = pgTable("senal_personas", {
   nombre: text("nombre"),  // Ya no es notNull para permitir registros con solo DNI
   documentoId: text("documento_id"),  // DNI, NIE, pasaporte
   notas: text("notas"),
+  fecha: timestamp("fecha"),  // Fecha de registro del señalamiento
   estado: text("estado", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
   creadoPor: integer("creado_por").notNull(), // ID del usuario creador
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
@@ -304,6 +305,7 @@ export const insertSenalPersonaSchema = createInsertSchema(senalPersonas).pick({
   nombre: true,
   documentoId: true,
   notas: true,
+  fecha: true,
   estado: true,
   creadoPor: true,
   modificadoPor: true,
@@ -318,6 +320,7 @@ export const senalObjetos = pgTable("senal_objetos", {
   descripcion: text("descripcion"),  // Ya no es notNull para permitir registros con otros campos
   grabacion: text("grabacion"),  // Grabados específicos
   notas: text("notas"),
+  fecha: timestamp("fecha"),  // Fecha de registro del señalamiento
   estado: text("estado", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
   creadoPor: integer("creado_por").notNull(), // ID del usuario creador
   creadoEn: timestamp("creado_en").notNull().defaultNow(),
@@ -329,6 +332,7 @@ export const insertSenalObjetoSchema = createInsertSchema(senalObjetos).pick({
   descripcion: true,
   grabacion: true,
   notas: true,
+  fecha: true,
   estado: true,
   creadoPor: true,
   modificadoPor: true,
