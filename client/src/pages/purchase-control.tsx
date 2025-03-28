@@ -749,6 +749,15 @@ export default function PurchaseControlPage() {
                       <TableHead>
                         <div 
                           className="flex items-center cursor-pointer" 
+                          onClick={() => handleSort('engravings')}
+                        >
+                          Grabaciones
+                          <ChevronsUpDown className="ml-1 h-4 w-4" />
+                        </div>
+                      </TableHead>
+                      <TableHead>
+                        <div 
+                          className="flex items-center cursor-pointer" 
                           onClick={() => handleSort('price')}
                         >
                           Precio
@@ -778,6 +787,9 @@ export default function PurchaseControlPage() {
                           {record.itemDetails.length > 30
                             ? `${record.itemDetails.substring(0, 30)}...`
                             : record.itemDetails}
+                        </TableCell>
+                        <TableCell>
+                          {record.engravings || "—"}
                         </TableCell>
                         <TableCell>{record.price} €</TableCell>
                         <TableCell className="text-right">

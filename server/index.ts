@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import os from 'os';
 
 const app = express();
 app.use(express.json());
@@ -67,11 +68,11 @@ app.use((req, res, next) => {
   }, () => {
     log(`Server running at http://0.0.0.0:${port}`);
     // Mostrar todas las IPs disponibles para facilitar el acceso
-    const networkInterfaces = require('os').networkInterfaces();
+    const networkInterfaces = os.networkInterfaces();
     Object.keys(networkInterfaces).forEach((interfaceName) => {
-      networkInterfaces[interfaceName].forEach((interface) => {
-        if (interface.family === 'IPv4' && !interface.internal) {
-          log(`Available on network at: http://${interface.address}:${port}`);
+      networkInterfaces[interfaceName]?.forEach((iface: any) => {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          log(`Available on network at: http://${iface.address}:${port}`);
         }
       });
     });
