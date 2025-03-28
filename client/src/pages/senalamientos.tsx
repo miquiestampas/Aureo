@@ -103,11 +103,14 @@ interface SenalObjeto {
 
 // Schemas para validación de formularios
 const personaSchema = z.object({
-  nombre: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
-  documentoId: z.string().nullable().optional(),
+  nombre: z.string().min(3, "El nombre debe tener al menos 3 caracteres").optional(),
+  documentoId: z.string().min(1, "El documento es requerido si no se proporciona nombre").optional(),
   notas: z.string().nullable().optional(),
   estado: z.enum(["Activo", "Inactivo"]),
   nivelRiesgo: z.enum(["Alto", "Medio", "Bajo"])
+}).refine(data => data.nombre || data.documentoId, {
+  message: "Debe proporcionar al menos un nombre o un documento de identidad",
+  path: ["documentoId"]
 });
 
 const objetoSchema = z.object({
@@ -400,9 +403,9 @@ export default function Senalamientos() {
   // Abrir diálogo de edición para persona
   const handleEditPersona = (persona: SenalPersona) => {
     personaForm.reset({
-      nombre: persona.nombre,
-      documentoId: persona.documentoId,
-      notas: persona.notas,
+      nombre: persona.nombre || undefined,
+      documentoId: persona.documentoId || undefined,
+      notas: persona.notas || undefined,
       estado: persona.estado,
       nivelRiesgo: persona.nivelRiesgo
     });
@@ -414,8 +417,8 @@ export default function Senalamientos() {
   const handleEditObjeto = (objeto: SenalObjeto) => {
     objetoForm.reset({
       descripcion: objeto.descripcion,
-      grabacion: objeto.grabacion,
-      notas: objeto.notas,
+      grabacion: objeto.grabacion || undefined,
+      notas: objeto.notas || undefined,
       estado: objeto.estado,
       nivelRiesgo: objeto.nivelRiesgo
     });
@@ -740,7 +743,7 @@ export default function Senalamientos() {
                   name="nombre"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nombre completo</FormLabel>
+                      <FormLabel>Nombre completo (opcional)</FormLabel>
                       <FormControl>
                         <Input placeholder="Nombre de la persona" {...field} />
                       </FormControl>
@@ -763,7 +766,7 @@ export default function Senalamientos() {
                         />
                       </FormControl>
                       <FormDescription>
-                        Puede ser DNI, NIE u otro documento de identificación
+                        Debe proporcionar al menos nombre o documento de identidad
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
