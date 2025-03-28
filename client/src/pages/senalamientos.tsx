@@ -103,12 +103,22 @@ interface SenalObjeto {
 
 // Schemas para validación de formularios
 const personaSchema = z.object({
-  nombre: z.string().min(3, "El nombre debe tener al menos 3 caracteres").optional(),
+  nombre: z.union([
+    z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
+    z.literal("")
+  ]).optional(),
   documentoId: z.string().min(1, "El documento es requerido si no se proporciona nombre").optional(),
   notas: z.string().nullable().optional(),
   estado: z.enum(["Activo", "Inactivo"]),
   nivelRiesgo: z.enum(["Alto", "Medio", "Bajo"])
-}).refine(data => data.nombre || data.documentoId, {
+}).refine(data => {
+  // Si el nombre está vacío, debe tener documento
+  if (!data.nombre && !data.documentoId) {
+    return false;
+  }
+  // Si hay nombre, debe tener al menos 3 caracteres (ya validado arriba)
+  return true;
+}, {
   message: "Debe proporcionar al menos un nombre o un documento de identidad",
   path: ["documentoId"]
 });
