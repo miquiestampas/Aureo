@@ -1646,8 +1646,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...data,
           // Si el nombre es una cadena vacía, establecerlo como null para la base de datos
           nombre: data.nombre || null,
-          // Asegurar que fecha es una fecha válida en formato ISO string o null
-          fecha: data.fecha ? new Date(data.fecha).toISOString() : null,
+          // Manejar la fecha de manera segura
+          fecha: data.fecha ? (typeof data.fecha === 'string' ? data.fecha : new Date(data.fecha).toISOString()) : null,
           creadoPor: req.user!.id
         };
         
@@ -1712,8 +1712,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...data,
           // Si el nombre es una cadena vacía, establecerlo como null para la base de datos
           nombre: data.nombre || null,
-          // Asegurar que fecha es una fecha válida en formato ISO string o null
-          fecha: data.fecha ? new Date(data.fecha).toISOString() : null,
+          // Manejar la fecha de manera segura
+          fecha: data.fecha ? (typeof data.fecha === 'string' ? data.fecha : new Date(data.fecha).toISOString()) : null,
           modificadoPor: req.user!.id
         };
         
@@ -1807,8 +1807,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...data,
           // Si la descripción es una cadena vacía, establecerla como null para la base de datos
           descripcion: data.descripcion || null,
-          // Asegurar que fecha es una fecha válida en formato ISO string o null
-          fecha: data.fecha ? new Date(data.fecha).toISOString() : null,
+          // Manejar la fecha de manera segura
+          fecha: data.fecha ? (typeof data.fecha === 'string' ? data.fecha : new Date(data.fecha).toISOString()) : null,
           creadoPor: req.user!.id
         };
         
@@ -1872,8 +1872,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...data,
           // Si la descripción es una cadena vacía, establecerla como null para la base de datos
           descripcion: data.descripcion || null,
-          // Asegurar que fecha es una fecha válida en formato ISO string o null
-          fecha: data.fecha ? new Date(data.fecha).toISOString() : null,
+          // Manejar la fecha de manera segura
+          fecha: data.fecha ? (typeof data.fecha === 'string' ? data.fecha : new Date(data.fecha).toISOString()) : null,
           modificadoPor: req.user!.id
         };
         
