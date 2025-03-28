@@ -89,7 +89,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DataTable } from "@/components/ui/data-table";
+import { DataTable, SortableColumnHeader } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -644,19 +644,23 @@ export default function StoreManagementPage() {
     },
     {
       id: "locality",
-      header: "Localidad",
+      accessorFn: (row) => row.locality || (row.location || "—"),
+      header: ({ column }) => <SortableColumnHeader column={column} title="Localidad" />,
       cell: ({ row }) => {
         const store = row.original;
         return store.locality || (store.location || "—");
-      }
+      },
+      enableSorting: true
     },
     {
       id: "district",
-      header: "Distrito",
+      accessorFn: (row) => row.district || "—",
+      header: ({ column }) => <SortableColumnHeader column={column} title="Distrito" />,
       cell: ({ row }) => {
         const store = row.original;
         return store.district || "—";
-      }
+      },
+      enableSorting: true
     },
     {
       accessorKey: "active",
