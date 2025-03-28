@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -286,3 +286,92 @@ export const insertSearchHistorySchema = createInsertSchema(searchHistory).pick(
 
 export type InsertSearchHistory = z.infer<typeof insertSearchHistorySchema>;
 export type SearchHistory = typeof searchHistory.$inferSelect;
+
+// Nuevo modelo para señalamientos/alertas sobre personas
+export const senalPersonas = pgTable("senal_personas", {
+  id: serial("id").primaryKey(),
+  nombre: text("nombre").notNull(),
+  documentoId: text("documento_id"),  // DNI, NIE, pasaporte
+  notas: text("notas"),
+  estado: text("estado", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
+  nivelRiesgo: text("nivel_riesgo", { enum: ["Alto", "Medio", "Bajo"] }).notNull().default("Medio"),
+  creadoPor: integer("creado_por").notNull(), // ID del usuario creador
+  creadoEn: timestamp("creado_en").notNull().defaultNow(),
+  modificadoPor: integer("modificado_por"), // ID del usuario que modificó
+  modificadoEn: timestamp("modificado_en"),
+});
+
+export const insertSenalPersonaSchema = createInsertSchema(senalPersonas).pick({
+  nombre: true,
+  documentoId: true,
+  notas: true,
+  estado: true,
+  nivelRiesgo: true,
+  creadoPor: true,
+  modificadoPor: true,
+});
+
+export type InsertSenalPersona = z.infer<typeof insertSenalPersonaSchema>;
+export type SenalPersona = typeof senalPersonas.$inferSelect;
+
+// Nuevo modelo para señalamientos/alertas sobre objetos
+export const senalObjetos = pgTable("senal_objetos", {
+  id: serial("id").primaryKey(),
+  descripcion: text("descripcion").notNull(),
+  grabacion: text("grabacion"),  // Grabados específicos
+  notas: text("notas"),
+  estado: text("estado", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
+  nivelRiesgo: text("nivel_riesgo", { enum: ["Alto", "Medio", "Bajo"] }).notNull().default("Medio"),
+  creadoPor: integer("creado_por").notNull(), // ID del usuario creador
+  creadoEn: timestamp("creado_en").notNull().defaultNow(),
+  modificadoPor: integer("modificado_por"), // ID del usuario que modificó
+  modificadoEn: timestamp("modificado_en"),
+});
+
+export const insertSenalObjetoSchema = createInsertSchema(senalObjetos).pick({
+  descripcion: true,
+  grabacion: true,
+  notas: true,
+  estado: true,
+  nivelRiesgo: true,
+  creadoPor: true,
+  modificadoPor: true,
+});
+
+export type InsertSenalObjeto = z.infer<typeof insertSenalObjetoSchema>;
+export type SenalObjeto = typeof senalObjetos.$inferSelect;
+
+// Modelo para coincidencias detectadas entre señalamientos y registros
+export const coincidencias = pgTable("coincidencias", {
+  id: serial("id").primaryKey(),
+  tipoCoincidencia: text("tipo_coincidencia", { enum: ["Persona", "Objeto"] }).notNull(),
+  idSenalPersona: integer("id_senal_persona"),
+  idSenalObjeto: integer("id_senal_objeto"),
+  idExcelData: integer("id_excel_data").notNull(),
+  puntuacionCoincidencia: integer("puntuacion_coincidencia").notNull(), // 0-100
+  tipoMatch: text("tipo_match", { enum: ["Exacto", "Parcial"] }).notNull(),
+  campoCoincidente: text("campo_coincidente").notNull(), // nombre, documento, descripcion, grabacion
+  valorCoincidente: text("valor_coincidente").notNull(), // El valor que coincidió
+  estado: text("estado", { enum: ["NoLeido", "Leido", "Descartado"] }).notNull().default("NoLeido"),
+  revisadoPor: integer("revisado_por"), // ID del usuario que revisó
+  notasRevision: text("notas_revision"),
+  creadoEn: timestamp("creado_en").notNull().defaultNow(),
+  revisadoEn: timestamp("revisado_en"),
+});
+
+export const insertCoincidenciaSchema = createInsertSchema(coincidencias).pick({
+  tipoCoincidencia: true,
+  idSenalPersona: true,
+  idSenalObjeto: true,
+  idExcelData: true,
+  puntuacionCoincidencia: true,
+  tipoMatch: true,
+  campoCoincidente: true,
+  valorCoincidente: true,
+  estado: true,
+  revisadoPor: true,
+  notasRevision: true,
+});
+
+export type InsertCoincidencia = z.infer<typeof insertCoincidenciaSchema>;
+export type Coincidencia = typeof coincidencias.$inferSelect;

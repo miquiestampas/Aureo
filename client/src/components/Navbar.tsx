@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { 
   Menu, 
   Bell, 
-  HelpCircle 
+  HelpCircle,
+  AlertTriangle 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
 interface NavbarProps {
   onMenuToggle: () => void;
@@ -21,8 +24,14 @@ interface NavbarProps {
 
 export default function Navbar({ onMenuToggle }: NavbarProps) {
   const { user, logoutMutation } = useAuth();
-  const [location] = useLocation();
-  const [hasNotification] = useState(true);
+  const [location, setLocation] = useLocation();
+
+  // Query para obtener notificaciones de coincidencias no leídas
+  const { data: coincidenciasNoLeidas } = useQuery<{ count: number }>({
+    queryKey: ["/api/coincidencias/noleidas/count"],
+    refetchInterval: 60000, // Actualizar cada minuto
+    refetchOnWindowFocus: true,
+  });
   
   // Get page title based on current location
   const getPageTitle = () => {
@@ -30,17 +39,25 @@ export default function Navbar({ onMenuToggle }: NavbarProps) {
       case '/':
         return 'Dashboard';
       case '/excel-stores':
-        return 'Excel Stores';
+        return 'Tiendas Excel';
       case '/pdf-stores':
-        return 'PDF Stores';
+        return 'Tiendas PDF';
       case '/store-management':
-        return 'Store Management';
+        return 'Gestión de Tiendas';
       case '/user-management':
-        return 'User Management';
+        return 'Gestión de Usuarios';
       case '/system-config':
-        return 'System Configuration';
+        return 'Configuración del Sistema';
+      case '/activity-control':
+        return 'Control de Actividad';
+      case '/purchase-control':
+        return 'Control de Compras';
+      case '/senalamientos':
+        return 'Señalamientos';
+      case '/coincidencias':
+        return 'Coincidencias';
       default:
-        return 'RetailManager';
+        return 'Áureo';
     }
   };
   
@@ -63,17 +80,49 @@ export default function Navbar({ onMenuToggle }: NavbarProps) {
         
         <div className="ml-4 flex items-center md:ml-6">
           {/* Notification Button */}
-          <Button variant="ghost" size="icon" className="relative ml-2 text-gray-400 hover:text-gray-500">
-            <span className="sr-only">View notifications</span>
-            <Bell className="h-6 w-6" />
-            {hasNotification && (
-              <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-400"></span>
-            )}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="relative ml-2 text-gray-400 hover:text-gray-500"
+                onClick={() => (user?.role === "SuperAdmin" || user?.role === "Admin") && setLocation("/coincidencias")}
+              >
+                <span className="sr-only">Ver coincidencias</span>
+                <Bell className="h-6 w-6" />
+                {coincidenciasNoLeidas && coincidenciasNoLeidas.count > 0 && (
+                  <span className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-5 p-1 rounded-full bg-red-500 text-white text-xs font-medium">
+                    {coincidenciasNoLeidas.count > 99 ? '99+' : coincidenciasNoLeidas.count}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                className="cursor-pointer" 
+                onClick={() => setLocation("/coincidencias")}
+              >
+                <AlertTriangle className="mr-2 h-4 w-4 text-amber-500" />
+                Ver coincidencias
+                {coincidenciasNoLeidas && coincidenciasNoLeidas.count > 0 && (
+                  <Badge className="ml-2 bg-red-500">
+                    {coincidenciasNoLeidas.count}
+                  </Badge>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                className="cursor-pointer" 
+                onClick={() => setLocation("/senalamientos")}
+              >
+                <AlertTriangle className="mr-2 h-4 w-4 text-indigo-500" />
+                Gestionar señalamientos
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
           {/* Help Button */}
           <Button variant="ghost" size="icon" className="ml-2 text-gray-400 hover:text-gray-500">
-            <span className="sr-only">Help</span>
+            <span className="sr-only">Ayuda</span>
             <HelpCircle className="h-6 w-6" />
           </Button>
           

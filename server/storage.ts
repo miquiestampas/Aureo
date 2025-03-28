@@ -1,6 +1,7 @@
 import { 
   users, stores, systemConfigs, fileActivities, excelData, pdfDocuments,
   watchlistPersons, watchlistItems, alerts, searchHistory,
+  senalPersonas, senalObjetos, coincidencias,
   type User, type InsertUser, type Store, type InsertStore, 
   type SystemConfig, type InsertSystemConfig, type FileActivity, 
   type InsertFileActivity, type ExcelData, type InsertExcelData,
@@ -8,7 +9,10 @@ import {
   type WatchlistPerson, type InsertWatchlistPerson,
   type WatchlistItem, type InsertWatchlistItem,
   type Alert, type InsertAlert,
-  type SearchHistory, type InsertSearchHistory
+  type SearchHistory, type InsertSearchHistory,
+  type SenalPersona, type InsertSenalPersona,
+  type SenalObjeto, type InsertSenalObjeto,
+  type Coincidencia, type InsertCoincidencia
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -98,6 +102,31 @@ export interface IStorage {
   // Search History methods
   addSearchHistory(searchHistory: InsertSearchHistory): Promise<SearchHistory>;
   getRecentSearches(userId: number, limit?: number): Promise<SearchHistory[]>;
+  
+  // Señalamientos de Personas
+  createSenalPersona(persona: InsertSenalPersona): Promise<SenalPersona>;
+  getSenalPersonas(incluirInactivos?: boolean): Promise<SenalPersona[]>;
+  getSenalPersona(id: number): Promise<SenalPersona | undefined>;
+  updateSenalPersona(id: number, persona: Partial<SenalPersona>): Promise<SenalPersona | undefined>;
+  deleteSenalPersona(id: number, userId: number): Promise<boolean>;
+  searchSenalPersonas(query: string): Promise<SenalPersona[]>;
+  
+  // Señalamientos de Objetos
+  createSenalObjeto(objeto: InsertSenalObjeto): Promise<SenalObjeto>;
+  getSenalObjetos(incluirInactivos?: boolean): Promise<SenalObjeto[]>;
+  getSenalObjeto(id: number): Promise<SenalObjeto | undefined>;
+  updateSenalObjeto(id: number, objeto: Partial<SenalObjeto>): Promise<SenalObjeto | undefined>;
+  deleteSenalObjeto(id: number, userId: number): Promise<boolean>;
+  searchSenalObjetos(query: string): Promise<SenalObjeto[]>;
+  
+  // Coincidencias
+  createCoincidencia(coincidencia: InsertCoincidencia): Promise<Coincidencia>;
+  getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit?: number): Promise<Coincidencia[]>;
+  getCoincidencia(id: number): Promise<Coincidencia | undefined>;
+  updateCoincidenciaEstado(id: number, estado: "NoLeido" | "Leido" | "Descartado", revisadoPor: number, notasRevision?: string): Promise<Coincidencia | undefined>;
+  getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]>;
+  getNumeroCoincidenciasNoLeidas(): Promise<number>;
+  detectarCoincidencias(excelDataId: number): Promise<{ nuevasCoincidencias: number }>;
 
   // Database cleaning methods
   purgeExcelStores(): Promise<{ count: number }>;
@@ -121,6 +150,9 @@ export class MemStorage implements IStorage {
   private watchlistItems: Map<number, WatchlistItem>;
   private alerts: Map<number, Alert>;
   private searchHistories: Map<number, SearchHistory>;
+  private senalPersonas: Map<number, SenalPersona>;
+  private senalObjetos: Map<number, SenalObjeto>;
+  private coincidencias: Map<number, Coincidencia>;
   
   sessionStore: any; // Using any to bypass type issues with express-session
   
@@ -134,6 +166,9 @@ export class MemStorage implements IStorage {
   private watchlistItemId: number;
   private alertId: number;
   private searchHistoryId: number;
+  private senalPersonaId: number;
+  private senalObjetoId: number;
+  private coincidenciaId: number;
 
   constructor() {
     this.users = new Map();
@@ -146,6 +181,9 @@ export class MemStorage implements IStorage {
     this.watchlistItems = new Map();
     this.alerts = new Map();
     this.searchHistories = new Map();
+    this.senalPersonas = new Map();
+    this.senalObjetos = new Map();
+    this.coincidencias = new Map();
     
     this.userId = 1;
     this.storeId = 1;
@@ -157,6 +195,9 @@ export class MemStorage implements IStorage {
     this.watchlistItemId = 1;
     this.alertId = 1;
     this.searchHistoryId = 1;
+    this.senalPersonaId = 1;
+    this.senalObjetoId = 1;
+    this.coincidenciaId = 1;
     
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // prune expired entries every 24h
@@ -457,6 +498,267 @@ export class MemStorage implements IStorage {
   }
   
   // Implementación de nuevos métodos para cumplir con la interfaz
+  
+  // Métodos para señalamientos de personas
+  async createSenalPersona(persona: InsertSenalPersona): Promise<SenalPersona> {
+    const id = this.senalPersonaId++;
+    const now = new Date();
+    
+    const senalPersona: SenalPersona = {
+      ...persona,
+      id,
+      estado: persona.estado || "Activo",
+      nivelRiesgo: persona.nivelRiesgo || "Medio",
+      creadoEn: persona.creadoEn || now,
+      modificadoEn: null,
+      modificadoPor: null
+    };
+    
+    this.senalPersonas.set(id, senalPersona);
+    return senalPersona;
+  }
+  
+  async getSenalPersonas(incluirInactivos: boolean = false): Promise<SenalPersona[]> {
+    let personas = Array.from(this.senalPersonas.values());
+    
+    if (!incluirInactivos) {
+      personas = personas.filter(persona => persona.estado === "Activo");
+    }
+    
+    return personas.sort((a, b) => {
+      // Ordenar por nivel de riesgo (Alto > Medio > Bajo)
+      const riskLevelOrder = { "Alto": 0, "Medio": 1, "Bajo": 2 };
+      const riskComparison = riskLevelOrder[a.nivelRiesgo] - riskLevelOrder[b.nivelRiesgo];
+      
+      if (riskComparison !== 0) return riskComparison;
+      
+      // Si el nivel de riesgo es el mismo, ordenar por fecha de creación (más reciente primero)
+      const dateA = new Date(a.creadoEn).getTime();
+      const dateB = new Date(b.creadoEn).getTime();
+      return dateB - dateA;
+    });
+  }
+  
+  async getSenalPersona(id: number): Promise<SenalPersona | undefined> {
+    return this.senalPersonas.get(id);
+  }
+  
+  async updateSenalPersona(id: number, updates: Partial<SenalPersona>): Promise<SenalPersona | undefined> {
+    const persona = this.senalPersonas.get(id);
+    if (!persona) return undefined;
+    
+    const updatedPersona = {
+      ...persona,
+      ...updates,
+      modificadoEn: new Date()
+    };
+    
+    this.senalPersonas.set(id, updatedPersona);
+    return updatedPersona;
+  }
+  
+  async deleteSenalPersona(id: number, userId: number): Promise<boolean> {
+    const persona = this.senalPersonas.get(id);
+    
+    // Solo permitir eliminar si la persona que creó el registro es la misma que intenta eliminarlo,
+    // o si el usuario tiene rol de SuperAdmin (esto se verificará en la ruta)
+    if (!persona || (persona.creadoPor !== userId)) {
+      return false;
+    }
+    
+    return this.senalPersonas.delete(id);
+  }
+  
+  async searchSenalPersonas(query: string): Promise<SenalPersona[]> {
+    if (!query || query.trim() === "") {
+      return this.getSenalPersonas();
+    }
+    
+    const searchTerm = query.toLowerCase();
+    
+    return (await this.getSenalPersonas()).filter(persona => {
+      return (
+        (persona.nombre && persona.nombre.toLowerCase().includes(searchTerm)) ||
+        (persona.documentoId && persona.documentoId.toLowerCase().includes(searchTerm)) ||
+        (persona.notas && persona.notas.toLowerCase().includes(searchTerm))
+      );
+    });
+  }
+  
+  // Métodos para señalamientos de objetos
+  async createSenalObjeto(objeto: InsertSenalObjeto): Promise<SenalObjeto> {
+    const id = this.senalObjetoId++;
+    const now = new Date();
+    
+    const senalObjeto: SenalObjeto = {
+      ...objeto,
+      id,
+      estado: objeto.estado || "Activo",
+      nivelRiesgo: objeto.nivelRiesgo || "Medio",
+      creadoEn: objeto.creadoEn || now,
+      modificadoEn: null,
+      modificadoPor: null
+    };
+    
+    this.senalObjetos.set(id, senalObjeto);
+    return senalObjeto;
+  }
+  
+  async getSenalObjetos(incluirInactivos: boolean = false): Promise<SenalObjeto[]> {
+    let objetos = Array.from(this.senalObjetos.values());
+    
+    if (!incluirInactivos) {
+      objetos = objetos.filter(objeto => objeto.estado === "Activo");
+    }
+    
+    return objetos.sort((a, b) => {
+      // Ordenar por nivel de riesgo (Alto > Medio > Bajo)
+      const riskLevelOrder = { "Alto": 0, "Medio": 1, "Bajo": 2 };
+      const riskComparison = riskLevelOrder[a.nivelRiesgo] - riskLevelOrder[b.nivelRiesgo];
+      
+      if (riskComparison !== 0) return riskComparison;
+      
+      // Si el nivel de riesgo es el mismo, ordenar por fecha de creación (más reciente primero)
+      const dateA = new Date(a.creadoEn).getTime();
+      const dateB = new Date(b.creadoEn).getTime();
+      return dateB - dateA;
+    });
+  }
+  
+  async getSenalObjeto(id: number): Promise<SenalObjeto | undefined> {
+    return this.senalObjetos.get(id);
+  }
+  
+  async updateSenalObjeto(id: number, updates: Partial<SenalObjeto>): Promise<SenalObjeto | undefined> {
+    const objeto = this.senalObjetos.get(id);
+    if (!objeto) return undefined;
+    
+    const updatedObjeto = {
+      ...objeto,
+      ...updates,
+      modificadoEn: new Date()
+    };
+    
+    this.senalObjetos.set(id, updatedObjeto);
+    return updatedObjeto;
+  }
+  
+  async deleteSenalObjeto(id: number, userId: number): Promise<boolean> {
+    const objeto = this.senalObjetos.get(id);
+    
+    // Solo permitir eliminar si la persona que creó el registro es la misma que intenta eliminarlo,
+    // o si el usuario tiene rol de SuperAdmin (esto se verificará en la ruta)
+    if (!objeto || (objeto.creadoPor !== userId)) {
+      return false;
+    }
+    
+    return this.senalObjetos.delete(id);
+  }
+  
+  async searchSenalObjetos(query: string): Promise<SenalObjeto[]> {
+    if (!query || query.trim() === "") {
+      return this.getSenalObjetos();
+    }
+    
+    const searchTerm = query.toLowerCase();
+    
+    return (await this.getSenalObjetos()).filter(objeto => {
+      return (
+        (objeto.descripcion && objeto.descripcion.toLowerCase().includes(searchTerm)) ||
+        (objeto.grabacion && objeto.grabacion.toLowerCase().includes(searchTerm)) ||
+        (objeto.notas && objeto.notas.toLowerCase().includes(searchTerm))
+      );
+    });
+  }
+  
+  // Métodos para coincidencias
+  async createCoincidencia(coincidencia: InsertCoincidencia): Promise<Coincidencia> {
+    const id = this.coincidenciaId++;
+    const now = new Date();
+    
+    const nuevaCoincidencia: Coincidencia = {
+      ...coincidencia,
+      id,
+      estado: "NoLeido",
+      creadoEn: now,
+      revisadoEn: null,
+      revisadoPor: null,
+      notasRevision: null
+    };
+    
+    this.coincidencias.set(id, nuevaCoincidencia);
+    return nuevaCoincidencia;
+  }
+  
+  async getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit: number = 50): Promise<Coincidencia[]> {
+    let coincidencias = Array.from(this.coincidencias.values());
+    
+    if (estado) {
+      coincidencias = coincidencias.filter(coincidencia => coincidencia.estado === estado);
+    }
+    
+    return coincidencias
+      .sort((a, b) => {
+        // Ordenar por fecha de creación (más reciente primero)
+        const dateA = new Date(a.creadoEn).getTime();
+        const dateB = new Date(b.creadoEn).getTime();
+        return dateB - dateA;
+      })
+      .slice(0, limit);
+  }
+  
+  async getCoincidencia(id: number): Promise<Coincidencia | undefined> {
+    return this.coincidencias.get(id);
+  }
+  
+  async updateCoincidenciaEstado(
+    id: number, 
+    estado: "NoLeido" | "Leido" | "Descartado", 
+    revisadoPor: number, 
+    notasRevision?: string
+  ): Promise<Coincidencia | undefined> {
+    const coincidencia = this.coincidencias.get(id);
+    if (!coincidencia) return undefined;
+    
+    const updatedCoincidencia = {
+      ...coincidencia,
+      estado,
+      revisadoPor,
+      revisadoEn: new Date(),
+      ...(notasRevision && { notasRevision })
+    };
+    
+    this.coincidencias.set(id, updatedCoincidencia);
+    return updatedCoincidencia;
+  }
+  
+  async getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]> {
+    return Array.from(this.coincidencias.values())
+      .filter(coincidencia => coincidencia.idExcelData === excelDataId)
+      .sort((a, b) => {
+        // Ordenar primero por no leídos y luego por fecha
+        if (a.estado === "NoLeido" && b.estado !== "NoLeido") return -1;
+        if (a.estado !== "NoLeido" && b.estado === "NoLeido") return 1;
+        
+        // Si ambos tienen el mismo estado, ordenar por fecha
+        const dateA = new Date(a.creadoEn).getTime();
+        const dateB = new Date(b.creadoEn).getTime();
+        return dateB - dateA;
+      });
+  }
+  
+  async getNumeroCoincidenciasNoLeidas(): Promise<number> {
+    return Array.from(this.coincidencias.values())
+      .filter(coincidencia => coincidencia.estado === "NoLeido")
+      .length;
+  }
+  
+  async detectarCoincidencias(excelDataId: number): Promise<{ nuevasCoincidencias: number }> {
+    // Implementación simplificada para la versión en memoria
+    // En una implementación real, aquí iría el algoritmo de similitud
+    console.log(`[MemStorage] Detectando coincidencias para excelDataId: ${excelDataId}`);
+    return { nuevasCoincidencias: 0 };
+  }
   
   // Excel Data Search and Lookup
   async searchExcelData(query: string, filters?: any): Promise<ExcelData[]> {
@@ -1695,6 +1997,420 @@ export class DatabaseStorage implements IStorage {
     return data;
   }
   
+  // Implementación de métodos para señalamientos de personas
+  async createSenalPersona(persona: InsertSenalPersona): Promise<SenalPersona> {
+    try {
+      const now = new Date();
+      
+      const [nuevaPersona] = await db
+        .insert(senalPersonas)
+        .values({
+          ...persona,
+          creadoEn: now,
+          modificadoEn: null,
+        })
+        .returning();
+        
+      return nuevaPersona;
+    } catch (error) {
+      console.error("Error al crear señalamiento de persona:", error);
+      throw error;
+    }
+  }
+  
+  async getSenalPersonas(incluirInactivos: boolean = false): Promise<SenalPersona[]> {
+    try {
+      let query = db.select().from(senalPersonas);
+      
+      if (!incluirInactivos) {
+        query = query.where(eq(senalPersonas.estado, "Activo"));
+      }
+      
+      const personas = await query.orderBy(
+        // Ordenar primero por nivel de riesgo (Alto > Medio > Bajo)
+        sql`CASE 
+          WHEN ${senalPersonas.nivelRiesgo} = 'Alto' THEN 1 
+          WHEN ${senalPersonas.nivelRiesgo} = 'Medio' THEN 2 
+          WHEN ${senalPersonas.nivelRiesgo} = 'Bajo' THEN 3
+        END`,
+        // Luego por fecha de creación (más reciente primero)
+        desc(senalPersonas.creadoEn)
+      );
+      
+      return personas;
+    } catch (error) {
+      console.error("Error al obtener señalamientos de personas:", error);
+      return [];
+    }
+  }
+  
+  async getSenalPersona(id: number): Promise<SenalPersona | undefined> {
+    try {
+      const [persona] = await db
+        .select()
+        .from(senalPersonas)
+        .where(eq(senalPersonas.id, id));
+        
+      return persona;
+    } catch (error) {
+      console.error(`Error al obtener señalamiento de persona con ID ${id}:`, error);
+      return undefined;
+    }
+  }
+  
+  async updateSenalPersona(id: number, updates: Partial<SenalPersona>): Promise<SenalPersona | undefined> {
+    try {
+      const now = new Date();
+      
+      // Evitar actualizar campos no permitidos
+      const { id: _id, creadoEn, ...validUpdates } = updates;
+      
+      const [persona] = await db
+        .update(senalPersonas)
+        .set({
+          ...validUpdates,
+          modificadoEn: now,
+        })
+        .where(eq(senalPersonas.id, id))
+        .returning();
+        
+      return persona;
+    } catch (error) {
+      console.error(`Error al actualizar señalamiento de persona con ID ${id}:`, error);
+      return undefined;
+    }
+  }
+  
+  async deleteSenalPersona(id: number, userId: number): Promise<boolean> {
+    try {
+      // Primero verificar si el usuario es el creador
+      const [persona] = await db
+        .select()
+        .from(senalPersonas)
+        .where(eq(senalPersonas.id, id));
+        
+      if (!persona || (persona.creadoPor !== userId)) {
+        // La verificación de rol SuperAdmin se hace en la ruta
+        return false;
+      }
+      
+      // Eliminar las coincidencias asociadas primero
+      await db
+        .delete(coincidencias)
+        .where(eq(coincidencias.idSenalPersona, id));
+      
+      // Ahora eliminar el señalamiento
+      const result = await db
+        .delete(senalPersonas)
+        .where(eq(senalPersonas.id, id));
+        
+      return true;
+    } catch (error) {
+      console.error(`Error al eliminar señalamiento de persona con ID ${id}:`, error);
+      return false;
+    }
+  }
+  
+  async searchSenalPersonas(query: string): Promise<SenalPersona[]> {
+    try {
+      if (!query || query.trim() === "") {
+        return this.getSenalPersonas();
+      }
+      
+      const searchTerm = query.toLowerCase();
+      
+      const personas = await db
+        .select()
+        .from(senalPersonas)
+        .where(
+          or(
+            sql`LOWER(${senalPersonas.nombre}) LIKE ${'%' + searchTerm + '%'}`,
+            sql`LOWER(${senalPersonas.documentoId}) LIKE ${'%' + searchTerm + '%'}`,
+            sql`LOWER(${senalPersonas.notas}) LIKE ${'%' + searchTerm + '%'}`
+          )
+        )
+        .orderBy(
+          sql`CASE 
+            WHEN ${senalPersonas.nivelRiesgo} = 'Alto' THEN 1 
+            WHEN ${senalPersonas.nivelRiesgo} = 'Medio' THEN 2 
+            WHEN ${senalPersonas.nivelRiesgo} = 'Bajo' THEN 3
+          END`,
+          desc(senalPersonas.creadoEn)
+        );
+        
+      return personas;
+    } catch (error) {
+      console.error("Error al buscar señalamientos de personas:", error);
+      return [];
+    }
+  }
+  
+  // Implementación de métodos para señalamientos de objetos
+  async createSenalObjeto(objeto: InsertSenalObjeto): Promise<SenalObjeto> {
+    try {
+      const now = new Date();
+      
+      const [nuevoObjeto] = await db
+        .insert(senalObjetos)
+        .values({
+          ...objeto,
+          creadoEn: now,
+          modificadoEn: null,
+        })
+        .returning();
+        
+      return nuevoObjeto;
+    } catch (error) {
+      console.error("Error al crear señalamiento de objeto:", error);
+      throw error;
+    }
+  }
+  
+  async getSenalObjetos(incluirInactivos: boolean = false): Promise<SenalObjeto[]> {
+    try {
+      let query = db.select().from(senalObjetos);
+      
+      if (!incluirInactivos) {
+        query = query.where(eq(senalObjetos.estado, "Activo"));
+      }
+      
+      const objetos = await query.orderBy(
+        // Ordenar primero por nivel de riesgo (Alto > Medio > Bajo)
+        sql`CASE 
+          WHEN ${senalObjetos.nivelRiesgo} = 'Alto' THEN 1 
+          WHEN ${senalObjetos.nivelRiesgo} = 'Medio' THEN 2 
+          WHEN ${senalObjetos.nivelRiesgo} = 'Bajo' THEN 3
+        END`,
+        // Luego por fecha de creación (más reciente primero)
+        desc(senalObjetos.creadoEn)
+      );
+      
+      return objetos;
+    } catch (error) {
+      console.error("Error al obtener señalamientos de objetos:", error);
+      return [];
+    }
+  }
+  
+  async getSenalObjeto(id: number): Promise<SenalObjeto | undefined> {
+    try {
+      const [objeto] = await db
+        .select()
+        .from(senalObjetos)
+        .where(eq(senalObjetos.id, id));
+        
+      return objeto;
+    } catch (error) {
+      console.error(`Error al obtener señalamiento de objeto con ID ${id}:`, error);
+      return undefined;
+    }
+  }
+  
+  async updateSenalObjeto(id: number, updates: Partial<SenalObjeto>): Promise<SenalObjeto | undefined> {
+    try {
+      const now = new Date();
+      
+      // Evitar actualizar campos no permitidos
+      const { id: _id, creadoEn, ...validUpdates } = updates;
+      
+      const [objeto] = await db
+        .update(senalObjetos)
+        .set({
+          ...validUpdates,
+          modificadoEn: now,
+        })
+        .where(eq(senalObjetos.id, id))
+        .returning();
+        
+      return objeto;
+    } catch (error) {
+      console.error(`Error al actualizar señalamiento de objeto con ID ${id}:`, error);
+      return undefined;
+    }
+  }
+  
+  async deleteSenalObjeto(id: number, userId: number): Promise<boolean> {
+    try {
+      // Primero verificar si el usuario es el creador
+      const [objeto] = await db
+        .select()
+        .from(senalObjetos)
+        .where(eq(senalObjetos.id, id));
+        
+      if (!objeto || (objeto.creadoPor !== userId)) {
+        // La verificación de rol SuperAdmin se hace en la ruta
+        return false;
+      }
+      
+      // Eliminar las coincidencias asociadas primero
+      await db
+        .delete(coincidencias)
+        .where(eq(coincidencias.idSenalObjeto, id));
+      
+      // Ahora eliminar el señalamiento
+      const result = await db
+        .delete(senalObjetos)
+        .where(eq(senalObjetos.id, id));
+        
+      return true;
+    } catch (error) {
+      console.error(`Error al eliminar señalamiento de objeto con ID ${id}:`, error);
+      return false;
+    }
+  }
+  
+  async searchSenalObjetos(query: string): Promise<SenalObjeto[]> {
+    try {
+      if (!query || query.trim() === "") {
+        return this.getSenalObjetos();
+      }
+      
+      const searchTerm = query.toLowerCase();
+      
+      const objetos = await db
+        .select()
+        .from(senalObjetos)
+        .where(
+          or(
+            sql`LOWER(${senalObjetos.descripcion}) LIKE ${'%' + searchTerm + '%'}`,
+            sql`LOWER(${senalObjetos.grabacion}) LIKE ${'%' + searchTerm + '%'}`,
+            sql`LOWER(${senalObjetos.notas}) LIKE ${'%' + searchTerm + '%'}`
+          )
+        )
+        .orderBy(
+          sql`CASE 
+            WHEN ${senalObjetos.nivelRiesgo} = 'Alto' THEN 1 
+            WHEN ${senalObjetos.nivelRiesgo} = 'Medio' THEN 2 
+            WHEN ${senalObjetos.nivelRiesgo} = 'Bajo' THEN 3
+          END`,
+          desc(senalObjetos.creadoEn)
+        );
+        
+      return objetos;
+    } catch (error) {
+      console.error("Error al buscar señalamientos de objetos:", error);
+      return [];
+    }
+  }
+  
+  // Métodos para coincidencias
+  async createCoincidencia(coincidencia: InsertCoincidencia): Promise<Coincidencia> {
+    try {
+      const now = new Date();
+      
+      const [nuevaCoincidencia] = await db
+        .insert(coincidencias)
+        .values({
+          ...coincidencia,
+          creadoEn: now,
+          revisadoEn: null,
+        })
+        .returning();
+        
+      return nuevaCoincidencia;
+    } catch (error) {
+      console.error("Error al crear coincidencia:", error);
+      throw error;
+    }
+  }
+  
+  async getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit: number = 50): Promise<Coincidencia[]> {
+    try {
+      let query = db.select().from(coincidencias);
+      
+      if (estado) {
+        query = query.where(eq(coincidencias.estado, estado));
+      }
+      
+      const resultado = await query
+        .orderBy(desc(coincidencias.creadoEn))
+        .limit(limit);
+        
+      return resultado;
+    } catch (error) {
+      console.error("Error al obtener coincidencias:", error);
+      return [];
+    }
+  }
+  
+  async getCoincidencia(id: number): Promise<Coincidencia | undefined> {
+    try {
+      const [coincidencia] = await db
+        .select()
+        .from(coincidencias)
+        .where(eq(coincidencias.id, id));
+        
+      return coincidencia;
+    } catch (error) {
+      console.error(`Error al obtener coincidencia con ID ${id}:`, error);
+      return undefined;
+    }
+  }
+  
+  async updateCoincidenciaEstado(
+    id: number, 
+    estado: "NoLeido" | "Leido" | "Descartado", 
+    revisadoPor: number, 
+    notasRevision?: string
+  ): Promise<Coincidencia | undefined> {
+    try {
+      const now = new Date();
+      
+      const [coincidencia] = await db
+        .update(coincidencias)
+        .set({
+          estado,
+          revisadoPor,
+          revisadoEn: now,
+          ...(notasRevision && { notasRevision }),
+        })
+        .where(eq(coincidencias.id, id))
+        .returning();
+        
+      return coincidencia;
+    } catch (error) {
+      console.error(`Error al actualizar estado de coincidencia con ID ${id}:`, error);
+      return undefined;
+    }
+  }
+  
+  async getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]> {
+    try {
+      const coincidenciasResult = await db
+        .select()
+        .from(coincidencias)
+        .where(eq(coincidencias.idExcelData, excelDataId))
+        .orderBy(
+          // Ordenar primero por no leídos y luego por fecha
+          sql`CASE 
+            WHEN ${coincidencias.estado} = 'NoLeido' THEN 1 
+            WHEN ${coincidencias.estado} = 'Leido' THEN 2 
+            WHEN ${coincidencias.estado} = 'Descartado' THEN 3
+          END`,
+          desc(coincidencias.creadoEn)
+        );
+        
+      return coincidenciasResult;
+    } catch (error) {
+      console.error(`Error al obtener coincidencias para excelDataId ${excelDataId}:`, error);
+      return [];
+    }
+  }
+  
+  async getNumeroCoincidenciasNoLeidas(): Promise<number> {
+    try {
+      const resultado = await db
+        .select({ count: sql`COUNT(*)` })
+        .from(coincidencias)
+        .where(eq(coincidencias.estado, "NoLeido"));
+        
+      return Number(resultado[0]?.count || 0);
+    } catch (error) {
+      console.error("Error al obtener número de coincidencias no leídas:", error);
+      return 0;
+    }
+  }
+  
   // Watchlist Person methods
   async createWatchlistPerson(person: InsertWatchlistPerson): Promise<WatchlistPerson> {
     const [watchlistPerson] = await db
@@ -2038,6 +2754,545 @@ export class DatabaseStorage implements IStorage {
       console.error("Error al obtener historial de búsquedas:", error);
       return [];
     }
+  }
+  
+  // Métodos para gestionar Señalamientos de Personas
+  async createSenalPersona(persona: InsertSenalPersona): Promise<SenalPersona> {
+    try {
+      const now = new Date().toISOString();
+      const values = {
+        ...persona,
+        creadoEn: now
+      };
+      
+      const [newPersona] = await db
+        .insert(senalPersonas)
+        .values(values)
+        .returning();
+      
+      return newPersona;
+    } catch (error) {
+      console.error("Error al crear señalamiento de persona:", error);
+      throw error;
+    }
+  }
+  
+  async getSenalPersonas(incluirInactivos: boolean = false): Promise<SenalPersona[]> {
+    try {
+      let query = `SELECT * FROM senal_personas`;
+      
+      if (!incluirInactivos) {
+        query += ` WHERE estado = 'Activo'`;
+      }
+      
+      query += ` ORDER BY creado_en DESC`;
+      
+      const result = await db.execute(query);
+      
+      if (result && result.rows && Array.isArray(result.rows)) {
+        return result.rows.map(row => row as SenalPersona);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error("Error al obtener señalamientos de personas:", error);
+      return [];
+    }
+  }
+  
+  async getSenalPersona(id: number): Promise<SenalPersona | undefined> {
+    try {
+      const [persona] = await db
+        .select()
+        .from(senalPersonas)
+        .where(eq(senalPersonas.id, id));
+      
+      return persona;
+    } catch (error) {
+      console.error(`Error al obtener señalamiento de persona con ID ${id}:`, error);
+      return undefined;
+    }
+  }
+  
+  async updateSenalPersona(id: number, updates: Partial<SenalPersona>): Promise<SenalPersona | undefined> {
+    try {
+      const updateData = {
+        ...updates,
+        modificadoEn: new Date().toISOString()
+      };
+      
+      const [updated] = await db
+        .update(senalPersonas)
+        .set(updateData)
+        .where(eq(senalPersonas.id, id))
+        .returning();
+      
+      return updated;
+    } catch (error) {
+      console.error(`Error al actualizar señalamiento de persona con ID ${id}:`, error);
+      return undefined;
+    }
+  }
+  
+  async deleteSenalPersona(id: number, userId: number): Promise<boolean> {
+    try {
+      // En lugar de eliminar, marcamos como inactivo
+      const [updated] = await db
+        .update(senalPersonas)
+        .set({
+          estado: "Inactivo",
+          modificadoPor: userId,
+          modificadoEn: new Date().toISOString()
+        })
+        .where(eq(senalPersonas.id, id))
+        .returning();
+      
+      return !!updated;
+    } catch (error) {
+      console.error(`Error al eliminar señalamiento de persona con ID ${id}:`, error);
+      return false;
+    }
+  }
+  
+  async searchSenalPersonas(query: string): Promise<SenalPersona[]> {
+    try {
+      const searchQuery = `%${query}%`;
+      const result = await db.execute(
+        `SELECT * FROM senal_personas 
+         WHERE estado = 'Activo' AND 
+         (nombre ILIKE $1 OR documento_id ILIKE $1) 
+         ORDER BY creado_en DESC`,
+        [searchQuery]
+      );
+      
+      if (result && result.rows && Array.isArray(result.rows)) {
+        return result.rows.map(row => row as SenalPersona);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error("Error al buscar señalamientos de personas:", error);
+      return [];
+    }
+  }
+  
+  // Métodos para gestionar Señalamientos de Objetos
+  async createSenalObjeto(objeto: InsertSenalObjeto): Promise<SenalObjeto> {
+    try {
+      const now = new Date().toISOString();
+      const values = {
+        ...objeto,
+        creadoEn: now
+      };
+      
+      const [newObjeto] = await db
+        .insert(senalObjetos)
+        .values(values)
+        .returning();
+      
+      return newObjeto;
+    } catch (error) {
+      console.error("Error al crear señalamiento de objeto:", error);
+      throw error;
+    }
+  }
+  
+  async getSenalObjetos(incluirInactivos: boolean = false): Promise<SenalObjeto[]> {
+    try {
+      let query = `SELECT * FROM senal_objetos`;
+      
+      if (!incluirInactivos) {
+        query += ` WHERE estado = 'Activo'`;
+      }
+      
+      query += ` ORDER BY creado_en DESC`;
+      
+      const result = await db.execute(query);
+      
+      if (result && result.rows && Array.isArray(result.rows)) {
+        return result.rows.map(row => row as SenalObjeto);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error("Error al obtener señalamientos de objetos:", error);
+      return [];
+    }
+  }
+  
+  async getSenalObjeto(id: number): Promise<SenalObjeto | undefined> {
+    try {
+      const [objeto] = await db
+        .select()
+        .from(senalObjetos)
+        .where(eq(senalObjetos.id, id));
+      
+      return objeto;
+    } catch (error) {
+      console.error(`Error al obtener señalamiento de objeto con ID ${id}:`, error);
+      return undefined;
+    }
+  }
+  
+  async updateSenalObjeto(id: number, updates: Partial<SenalObjeto>): Promise<SenalObjeto | undefined> {
+    try {
+      const updateData = {
+        ...updates,
+        modificadoEn: new Date().toISOString()
+      };
+      
+      const [updated] = await db
+        .update(senalObjetos)
+        .set(updateData)
+        .where(eq(senalObjetos.id, id))
+        .returning();
+      
+      return updated;
+    } catch (error) {
+      console.error(`Error al actualizar señalamiento de objeto con ID ${id}:`, error);
+      return undefined;
+    }
+  }
+  
+  async deleteSenalObjeto(id: number, userId: number): Promise<boolean> {
+    try {
+      // En lugar de eliminar, marcamos como inactivo
+      const [updated] = await db
+        .update(senalObjetos)
+        .set({
+          estado: "Inactivo",
+          modificadoPor: userId,
+          modificadoEn: new Date().toISOString()
+        })
+        .where(eq(senalObjetos.id, id))
+        .returning();
+      
+      return !!updated;
+    } catch (error) {
+      console.error(`Error al eliminar señalamiento de objeto con ID ${id}:`, error);
+      return false;
+    }
+  }
+  
+  async searchSenalObjetos(query: string): Promise<SenalObjeto[]> {
+    try {
+      const searchQuery = `%${query}%`;
+      const result = await db.execute(
+        `SELECT * FROM senal_objetos 
+         WHERE estado = 'Activo' AND 
+         (descripcion ILIKE $1 OR grabacion ILIKE $1) 
+         ORDER BY creado_en DESC`,
+        [searchQuery]
+      );
+      
+      if (result && result.rows && Array.isArray(result.rows)) {
+        return result.rows.map(row => row as SenalObjeto);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error("Error al buscar señalamientos de objetos:", error);
+      return [];
+    }
+  }
+  
+  // Métodos para gestionar Coincidencias
+  async createCoincidencia(coincidencia: InsertCoincidencia): Promise<Coincidencia> {
+    try {
+      const now = new Date().toISOString();
+      const values = {
+        ...coincidencia,
+        creadoEn: now
+      };
+      
+      const [newCoincidencia] = await db
+        .insert(coincidencias)
+        .values(values)
+        .returning();
+      
+      return newCoincidencia;
+    } catch (error) {
+      console.error("Error al crear coincidencia:", error);
+      throw error;
+    }
+  }
+  
+  async getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit: number = 50): Promise<Coincidencia[]> {
+    try {
+      let query = `SELECT * FROM coincidencias`;
+      const params: any[] = [];
+      
+      if (estado) {
+        query += ` WHERE estado = $1`;
+        params.push(estado);
+      }
+      
+      query += ` ORDER BY creado_en DESC LIMIT $${params.length + 1}`;
+      params.push(limit);
+      
+      const result = await db.execute(query, params);
+      
+      if (result && result.rows && Array.isArray(result.rows)) {
+        return result.rows.map(row => row as Coincidencia);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error("Error al obtener coincidencias:", error);
+      return [];
+    }
+  }
+  
+  async getCoincidencia(id: number): Promise<Coincidencia | undefined> {
+    try {
+      const [coincidencia] = await db
+        .select()
+        .from(coincidencias)
+        .where(eq(coincidencias.id, id));
+      
+      return coincidencia;
+    } catch (error) {
+      console.error(`Error al obtener coincidencia con ID ${id}:`, error);
+      return undefined;
+    }
+  }
+  
+  async updateCoincidenciaEstado(
+    id: number,
+    estado: "NoLeido" | "Leido" | "Descartado",
+    userId: number,
+    notas?: string
+  ): Promise<Coincidencia | undefined> {
+    try {
+      const updateData: Partial<Coincidencia> = {
+        estado,
+        revisadoPor: userId,
+        revisadoEn: new Date().toISOString()
+      };
+      
+      if (notas) {
+        updateData.notasRevision = notas;
+      }
+      
+      const [updated] = await db
+        .update(coincidencias)
+        .set(updateData)
+        .where(eq(coincidencias.id, id))
+        .returning();
+      
+      return updated;
+    } catch (error) {
+      console.error(`Error al actualizar estado de coincidencia con ID ${id}:`, error);
+      return undefined;
+    }
+  }
+  
+  async getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]> {
+    try {
+      const result = await db.execute(
+        `SELECT * FROM coincidencias WHERE id_excel_data = $1 ORDER BY creado_en DESC`,
+        [excelDataId]
+      );
+      
+      if (result && result.rows && Array.isArray(result.rows)) {
+        return result.rows.map(row => row as Coincidencia);
+      }
+      
+      return [];
+    } catch (error) {
+      console.error(`Error al obtener coincidencias para excelDataId ${excelDataId}:`, error);
+      return [];
+    }
+  }
+  
+  async getNumeroCoincidenciasNoLeidas(): Promise<number> {
+    try {
+      const result = await db.execute(
+        `SELECT COUNT(*) as count FROM coincidencias WHERE estado = 'NoLeido'`
+      );
+      
+      if (result && result.rows && result.rows.length > 0) {
+        return parseInt(result.rows[0].count) || 0;
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error("Error al obtener número de coincidencias no leídas:", error);
+      return 0;
+    }
+  }
+  
+  // Método para detectar coincidencias con algoritmo de similitud
+  async detectarCoincidencias(excelDataId: number): Promise<{ nuevasCoincidencias: number }> {
+    try {
+      console.log(`Detectando coincidencias para registro Excel ID: ${excelDataId}`);
+      let nuevasCoincidencias = 0;
+      
+      // 1. Obtener el registro de Excel
+      const excelData = await this.getExcelDataById(excelDataId);
+      if (!excelData) {
+        console.log(`No se encontró el registro de Excel con ID ${excelDataId}`);
+        return { nuevasCoincidencias: 0 };
+      }
+      
+      // 2. Obtener todos los señalamientos activos
+      const personas = await this.getSenalPersonas(false);
+      const objetos = await this.getSenalObjetos(false);
+      
+      console.log(`Comparando con ${personas.length} señalamientos de personas y ${objetos.length} señalamientos de objetos`);
+      
+      // 3. Buscar coincidencias con personas (por nombre o documento)
+      if (excelData.customerName) {
+        for (const persona of personas) {
+          const puntuacion = this.calcularPuntuacionSimilitud(
+            excelData.customerName.toLowerCase(),
+            persona.nombre.toLowerCase()
+          );
+          
+          if (puntuacion >= 70) { // 70% o más de similitud
+            // Crear registro de coincidencia
+            await this.createCoincidencia({
+              tipoCoincidencia: "Persona",
+              idSenalPersona: persona.id,
+              idExcelData: excelData.id,
+              puntuacionCoincidencia: puntuacion,
+              tipoMatch: puntuacion >= 95 ? "Exacto" : "Parcial",
+              campoCoincidente: "nombre",
+              valorCoincidente: excelData.customerName,
+              estado: "NoLeido"
+            });
+            
+            console.log(`Coincidencia de PERSONA detectada: ${persona.nombre} con ${excelData.customerName}, puntuación: ${puntuacion}`);
+          }
+        }
+      }
+      
+      // 4. Buscar coincidencias con objetos por grabaciones
+      if (excelData.engravings) {
+        for (const objeto of objetos) {
+          if (objeto.grabacion) {
+            const puntuacion = this.calcularPuntuacionSimilitud(
+              excelData.engravings.toLowerCase(),
+              objeto.grabacion.toLowerCase()
+            );
+            
+            if (puntuacion >= 70) { // 70% o más de similitud
+              // Crear registro de coincidencia
+              await this.createCoincidencia({
+                tipoCoincidencia: "Objeto",
+                idSenalObjeto: objeto.id,
+                idExcelData: excelData.id,
+                puntuacionCoincidencia: puntuacion,
+                tipoMatch: puntuacion >= 95 ? "Exacto" : "Parcial",
+                campoCoincidente: "grabacion",
+                valorCoincidente: excelData.engravings,
+                estado: "NoLeido"
+              });
+              
+              console.log(`Coincidencia de OBJETO por grabación detectada: ${objeto.grabacion} con ${excelData.engravings}, puntuación: ${puntuacion}`);
+            }
+          }
+        }
+      }
+      
+      // 5. Buscar coincidencias con objetos por descripción
+      if (excelData.itemDetails) {
+        for (const objeto of objetos) {
+          const puntuacion = this.calcularPuntuacionSimilitud(
+            excelData.itemDetails.toLowerCase(),
+            objeto.descripcion.toLowerCase()
+          );
+          
+          if (puntuacion >= 70) { // 70% o más de similitud
+            // Crear registro de coincidencia
+            await this.createCoincidencia({
+              tipoCoincidencia: "Objeto",
+              idSenalObjeto: objeto.id,
+              idExcelData: excelData.id,
+              puntuacionCoincidencia: puntuacion,
+              tipoMatch: puntuacion >= 95 ? "Exacto" : "Parcial",
+              campoCoincidente: "descripcion",
+              valorCoincidente: excelData.itemDetails,
+              estado: "NoLeido"
+            });
+            
+            console.log(`Coincidencia de OBJETO por descripción detectada: ${objeto.descripcion} con ${excelData.itemDetails}, puntuación: ${puntuacion}`);
+          }
+        }
+      }
+      
+      // Contar cuántas coincidencias nuevas se encontraron
+      const coincidenciasActuales = await this.getCoincidenciasByExcelDataId(excelDataId);
+      nuevasCoincidencias = coincidenciasActuales.length;
+      
+      return { nuevasCoincidencias };
+    } catch (error) {
+      console.error(`Error al detectar coincidencias para excelDataId ${excelDataId}:`, error);
+      return { nuevasCoincidencias: 0 };
+    }
+  }
+  
+  // Función para calcular similitud entre dos cadenas (algoritmo de Levenshtein normalizado)
+  private calcularPuntuacionSimilitud(cadena1: string, cadena2: string): number {
+    // Normalizar las cadenas (eliminar espacios extra, acentos, etc.)
+    cadena1 = this.normalizarTexto(cadena1);
+    cadena2 = this.normalizarTexto(cadena2);
+    
+    // Verificar si es una coincidencia exacta
+    if (cadena1 === cadena2) {
+      return 100;
+    }
+    
+    // Calcular distancia de Levenshtein
+    const distancia = this.calcularDistanciaLevenshtein(cadena1, cadena2);
+    
+    // Normalizar la puntuación (100 - porcentaje de diferencia)
+    const longitudMaxima = Math.max(cadena1.length, cadena2.length);
+    if (longitudMaxima === 0) return 100; // Ambas cadenas vacías
+    
+    const puntuacion = 100 - Math.round((distancia / longitudMaxima) * 100);
+    
+    return puntuacion;
+  }
+  
+  private normalizarTexto(texto: string): string {
+    // Convertir a minúsculas y eliminar espacios extra
+    let resultado = texto.toLowerCase().trim().replace(/\s+/g, ' ');
+    
+    // Eliminar acentos
+    resultado = resultado.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
+    // Eliminar caracteres especiales
+    resultado = resultado.replace(/[^\w\s]/gi, '');
+    
+    return resultado;
+  }
+  
+  private calcularDistanciaLevenshtein(a: string, b: string): number {
+    const matrix: number[][] = [];
+    
+    // Inicialización de la matriz
+    for (let i = 0; i <= b.length; i++) {
+      matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= a.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    // Cálculo de la distancia
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        const costo = a[j - 1] === b[i - 1] ? 0 : 1;
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,      // eliminación
+          matrix[i][j - 1] + 1,      // inserción
+          matrix[i - 1][j - 1] + costo // sustitución
+        );
+      }
+    }
+    
+    return matrix[b.length][a.length];
   }
 }
 

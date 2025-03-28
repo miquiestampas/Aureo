@@ -7,7 +7,12 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { processExcelFile, processPdfFile } from "./fileProcessors";
-import { InsertSearchHistory } from "@shared/schema";
+import { 
+  InsertSearchHistory, User, 
+  InsertSenalPersona, SenalPersona, 
+  InsertSenalObjeto, SenalObjeto,
+  InsertCoincidencia, Coincidencia
+} from "@shared/schema";
 import bcrypt from "bcrypt";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1606,6 +1611,432 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(searchHistory);
       } catch (err) {
         next(err);
+      }
+    });
+  });
+  
+  // ===== ENDPOINTS PARA SEÑALAMIENTOS =====
+  
+  // 1. Endpoints para Señalamientos de Personas
+  app.get("/api/senalamiento/personas", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Por defecto solo mostrar activos, a menos que se indique lo contrario
+        const incluirInactivos = req.query.incluirInactivos === "true";
+        
+        const personas = await storage.getSenalPersonas(incluirInactivos);
+        res.json(personas);
+      } catch (error) {
+        console.error("Error al obtener señalamientos de personas:", error);
+        next(error);
+      }
+    });
+  });
+  
+  app.post("/api/senalamiento/personas", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const data = req.body;
+        
+        // Validar datos requeridos
+        if (!data.nombre) {
+          return res.status(400).json({ error: "El nombre es obligatorio" });
+        }
+        
+        // Agregar ID del usuario creador
+        const senalPersona: InsertSenalPersona = {
+          ...data,
+          creadoPor: req.user!.id
+        };
+        
+        const nuevaPersona = await storage.createSenalPersona(senalPersona);
+        res.status(201).json(nuevaPersona);
+      } catch (error) {
+        console.error("Error al crear señalamiento de persona:", error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/senalamiento/personas/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const persona = await storage.getSenalPersona(id);
+        if (!persona) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        res.json(persona);
+      } catch (error) {
+        console.error(`Error al obtener señalamiento de persona con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.put("/api/senalamiento/personas/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        // Obtener el señalamiento para verificar permisos
+        const persona = await storage.getSenalPersona(id);
+        if (!persona) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        // Si es Admin (no SuperAdmin), solo puede editar sus propios señalamientos
+        if (req.user!.role === "Admin" && persona.creadoPor !== req.user!.id) {
+          return res.status(403).json({ error: "Solo puedes modificar tus propios señalamientos" });
+        }
+        
+        const data = req.body;
+        
+        // Validar datos requeridos
+        if (!data.nombre) {
+          return res.status(400).json({ error: "El nombre es obligatorio" });
+        }
+        
+        // Agregar ID del usuario que modifica
+        const updates: Partial<SenalPersona> = {
+          ...data,
+          modificadoPor: req.user!.id
+        };
+        
+        const personaActualizada = await storage.updateSenalPersona(id, updates);
+        if (!personaActualizada) {
+          return res.status(404).json({ error: "No se pudo actualizar el señalamiento" });
+        }
+        
+        res.json(personaActualizada);
+      } catch (error) {
+        console.error(`Error al actualizar señalamiento de persona con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.delete("/api/senalamiento/personas/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        // Obtener el señalamiento para verificar permisos
+        const persona = await storage.getSenalPersona(id);
+        if (!persona) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        // Si es Admin (no SuperAdmin), solo puede eliminar sus propios señalamientos
+        if (req.user!.role === "Admin" && persona.creadoPor !== req.user!.id) {
+          return res.status(403).json({ error: "Solo puedes eliminar tus propios señalamientos" });
+        }
+        
+        const resultado = await storage.deleteSenalPersona(id, req.user!.id);
+        if (!resultado) {
+          return res.status(404).json({ error: "No se pudo eliminar el señalamiento" });
+        }
+        
+        res.json({ success: true, message: "Señalamiento eliminado correctamente" });
+      } catch (error) {
+        console.error(`Error al eliminar señalamiento de persona con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/senalamiento/personas/buscar/:query", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const query = req.params.query || "";
+        
+        const personas = await storage.searchSenalPersonas(query);
+        res.json(personas);
+      } catch (error) {
+        console.error(`Error al buscar señalamientos de personas con query ${req.params.query}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  // 2. Endpoints para Señalamientos de Objetos
+  app.get("/api/senalamiento/objetos", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Por defecto solo mostrar activos, a menos que se indique lo contrario
+        const incluirInactivos = req.query.incluirInactivos === "true";
+        
+        const objetos = await storage.getSenalObjetos(incluirInactivos);
+        res.json(objetos);
+      } catch (error) {
+        console.error("Error al obtener señalamientos de objetos:", error);
+        next(error);
+      }
+    });
+  });
+  
+  app.post("/api/senalamiento/objetos", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const data = req.body;
+        
+        // Validar datos requeridos
+        if (!data.descripcion) {
+          return res.status(400).json({ error: "La descripción es obligatoria" });
+        }
+        
+        // Agregar ID del usuario creador
+        const senalObjeto: InsertSenalObjeto = {
+          ...data,
+          creadoPor: req.user!.id
+        };
+        
+        const nuevoObjeto = await storage.createSenalObjeto(senalObjeto);
+        res.status(201).json(nuevoObjeto);
+      } catch (error) {
+        console.error("Error al crear señalamiento de objeto:", error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/senalamiento/objetos/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const objeto = await storage.getSenalObjeto(id);
+        if (!objeto) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        res.json(objeto);
+      } catch (error) {
+        console.error(`Error al obtener señalamiento de objeto con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.put("/api/senalamiento/objetos/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        // Obtener el señalamiento para verificar permisos
+        const objeto = await storage.getSenalObjeto(id);
+        if (!objeto) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        // Si es Admin (no SuperAdmin), solo puede editar sus propios señalamientos
+        if (req.user!.role === "Admin" && objeto.creadoPor !== req.user!.id) {
+          return res.status(403).json({ error: "Solo puedes modificar tus propios señalamientos" });
+        }
+        
+        const data = req.body;
+        
+        // Validar datos requeridos
+        if (!data.descripcion) {
+          return res.status(400).json({ error: "La descripción es obligatoria" });
+        }
+        
+        // Agregar ID del usuario que modifica
+        const updates: Partial<SenalObjeto> = {
+          ...data,
+          modificadoPor: req.user!.id
+        };
+        
+        const objetoActualizado = await storage.updateSenalObjeto(id, updates);
+        if (!objetoActualizado) {
+          return res.status(404).json({ error: "No se pudo actualizar el señalamiento" });
+        }
+        
+        res.json(objetoActualizado);
+      } catch (error) {
+        console.error(`Error al actualizar señalamiento de objeto con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.delete("/api/senalamiento/objetos/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        // Obtener el señalamiento para verificar permisos
+        const objeto = await storage.getSenalObjeto(id);
+        if (!objeto) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        // Si es Admin (no SuperAdmin), solo puede eliminar sus propios señalamientos
+        if (req.user!.role === "Admin" && objeto.creadoPor !== req.user!.id) {
+          return res.status(403).json({ error: "Solo puedes eliminar tus propios señalamientos" });
+        }
+        
+        const resultado = await storage.deleteSenalObjeto(id, req.user!.id);
+        if (!resultado) {
+          return res.status(404).json({ error: "No se pudo eliminar el señalamiento" });
+        }
+        
+        res.json({ success: true, message: "Señalamiento eliminado correctamente" });
+      } catch (error) {
+        console.error(`Error al eliminar señalamiento de objeto con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/senalamiento/objetos/buscar/:query", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const query = req.params.query || "";
+        
+        const objetos = await storage.searchSenalObjetos(query);
+        res.json(objetos);
+      } catch (error) {
+        console.error(`Error al buscar señalamientos de objetos con query ${req.params.query}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  // 3. Endpoints para Coincidencias
+  app.get("/api/coincidencias", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const estado = req.query.estado as "NoLeido" | "Leido" | "Descartado" | undefined;
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+        
+        const coincidencias = await storage.getCoincidencias(estado, limit);
+        res.json(coincidencias);
+      } catch (error) {
+        console.error("Error al obtener coincidencias:", error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/coincidencias/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const coincidencia = await storage.getCoincidencia(id);
+        if (!coincidencia) {
+          return res.status(404).json({ error: "Coincidencia no encontrada" });
+        }
+        
+        res.json(coincidencia);
+      } catch (error) {
+        console.error(`Error al obtener coincidencia con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.put("/api/coincidencias/:id/estado", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const { estado, notas } = req.body;
+        if (!estado || !["NoLeido", "Leido", "Descartado"].includes(estado)) {
+          return res.status(400).json({ error: "Estado inválido" });
+        }
+        
+        const coincidenciaActualizada = await storage.updateCoincidenciaEstado(
+          id,
+          estado as "NoLeido" | "Leido" | "Descartado",
+          req.user!.id,
+          notas
+        );
+        
+        if (!coincidenciaActualizada) {
+          return res.status(404).json({ error: "No se pudo actualizar la coincidencia" });
+        }
+        
+        res.json(coincidenciaActualizada);
+      } catch (error) {
+        console.error(`Error al actualizar estado de coincidencia con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/coincidencias/excel/:excelDataId", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const excelDataId = parseInt(req.params.excelDataId);
+        if (isNaN(excelDataId)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const coincidencias = await storage.getCoincidenciasByExcelDataId(excelDataId);
+        res.json(coincidencias);
+      } catch (error) {
+        console.error(`Error al obtener coincidencias para excelDataId ${req.params.excelDataId}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/coincidencias/noleidas/count", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const count = await storage.getNumeroCoincidenciasNoLeidas();
+        res.json({ count });
+      } catch (error) {
+        console.error("Error al obtener número de coincidencias no leídas:", error);
+        next(error);
+      }
+    });
+  });
+  
+  // 4. Endpoint para detectar coincidencias manualmente (para pruebas)
+  app.post("/api/coincidencias/detectar/:excelDataId", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const excelDataId = parseInt(req.params.excelDataId);
+        if (isNaN(excelDataId)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        // Ejecutar detección de coincidencias
+        await storage.detectarCoincidencias(excelDataId);
+        
+        res.json({ success: true, message: "Detección de coincidencias ejecutada correctamente" });
+      } catch (error) {
+        console.error(`Error al detectar coincidencias para excelDataId ${req.params.excelDataId}:`, error);
+        next(error);
       }
     });
   });

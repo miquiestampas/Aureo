@@ -11,7 +11,10 @@ import {
   LogOut,
   ActivitySquare,
   Search,
-  Microscope,
+  AlertCircle,
+  AlertTriangle,
+  Shield,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -112,6 +115,24 @@ export default function Sidebar() {
             icon={<Search size={20} />}
             label="Control de Compras"
             active={location === '/purchase-control'}
+          />
+          
+          <NavItem
+            href="/senalamientos"
+            icon={<AlertTriangle size={20} />}
+            label="Señalamientos"
+            active={location === '/senalamientos'}
+            requiredRoles={["SuperAdmin", "Admin"]}
+            userRole={user?.role}
+          />
+          
+          <NavItem
+            href="/coincidencias"
+            icon={<Bell size={20} />}
+            label="Coincidencias"
+            active={location === '/coincidencias'}
+            requiredRoles={["SuperAdmin", "Admin"]}
+            userRole={user?.role}
           />
 
           {/* Administración Section */}
