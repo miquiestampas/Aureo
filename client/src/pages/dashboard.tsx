@@ -307,6 +307,14 @@ export default function DashboardPage() {
   const [selectedActivities, setSelectedActivities] = useState<FileActivity[]>([]);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
   
+  // Consulta para obtener el número de coincidencias no leídas
+  const { data: unreadMatchesData } = useQuery({
+    queryKey: ['/api/coincidencias/noleidas/count'],
+    refetchInterval: 30000, // Actualizar cada 30 segundos
+  });
+  
+  const unreadMatches = unreadMatchesData?.count ?? 0;
+  
   // Mutación para eliminar actividad de archivo
   const deleteActivityMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -712,53 +720,27 @@ export default function DashboardPage() {
             </CardFooter>
           </Card>
           
-          {/* Excel Stores Card */}
+          {/* Coincidencias no leídas Card */}
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center">
-                <div className="flex-shrink-0 bg-green-600 rounded-md p-3">
-                  <FileSpreadsheet className="h-6 w-6 text-white" />
+                <div className="flex-shrink-0 bg-amber-500 rounded-md p-3">
+                  <AlertCircle className="h-6 w-6 text-white" />
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Tiendas Excel</dt>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Señalamientos sin revisar</dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      {systemStatus?.excelStores ?? '...'}
+                      {unreadMatches ?? '...'}
                     </dd>
                   </dl>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="bg-gray-50 px-6 py-3">
-              <Link href="/excel-stores">
+              <Link href="/coincidencias">
                 <div className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer">
-                  Ver tiendas Excel
-                </div>
-              </Link>
-            </CardFooter>
-          </Card>
-          
-          {/* PDF Stores Card */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-red-500 rounded-md p-3">
-                  <FileText className="h-6 w-6 text-white" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Tiendas PDF</dt>
-                    <dd className="text-lg font-medium text-gray-900">
-                      {systemStatus?.pdfStores ?? '...'}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="bg-gray-50 px-6 py-3">
-              <Link href="/pdf-stores">
-                <div className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer">
-                  Ver tiendas PDF
+                  Ver coincidencias
                 </div>
               </Link>
             </CardFooter>
