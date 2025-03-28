@@ -1638,10 +1638,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const data = req.body;
         
-        // Validar datos requeridos
-        if (!data.nombre && !data.documentoId) {
-          return res.status(400).json({ error: "Debe proporcionar al menos un nombre o un documento de identidad" });
-        }
+        // Eliminada la validación de campos requeridos para permitir
+        // crear señalamientos con cualquier campo de forma independiente
         
         // Agregar ID del usuario creador
         const senalPersona: InsertSenalPersona = {
@@ -1706,10 +1704,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const data = req.body;
         
-        // Validar datos requeridos
-        if (!data.nombre && !data.documentoId) {
-          return res.status(400).json({ error: "Debe proporcionar al menos un nombre o un documento de identidad" });
-        }
+        // Eliminada la validación de campos requeridos para permitir
+        // modificar señalamientos con cualquier campo de forma independiente
         
         // Agregar ID del usuario que modifica
         const updates: Partial<SenalPersona> = {
@@ -1803,10 +1799,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const data = req.body;
         
-        // Validar que al menos uno de los campos tenga información
-        if (!data.descripcion && !data.grabacion && !data.notas) {
-          return res.status(400).json({ error: "Debe proporcionar al menos una descripción, grabación o notas" });
-        }
+        // Eliminada la validación de campos requeridos para permitir
+        // crear señalamientos con cualquier campo de forma independiente
         
         // Agregar ID del usuario creador
         const senalObjeto: InsertSenalObjeto = {
@@ -1870,10 +1864,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const data = req.body;
         
-        // Validar que al menos uno de los campos tenga información
-        if (!data.descripcion && !data.grabacion && !data.notas) {
-          return res.status(400).json({ error: "Debe proporcionar al menos una descripción, grabación o notas" });
-        }
+        // Eliminada la validación de campos requeridos para permitir
+        // modificar señalamientos con cualquier campo de forma independiente
         
         // Agregar ID del usuario que modifica
         const updates: Partial<SenalObjeto> = {

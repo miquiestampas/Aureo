@@ -115,20 +115,13 @@ const personaSchema = z.object({
     z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
     z.literal("")
   ]).optional(),
-  documentoId: z.string().min(1, "El documento es requerido si no se proporciona nombre").optional(),
+  documentoId: z.union([
+    z.string().min(3, "El documento debe tener al menos 3 caracteres"),
+    z.literal("")
+  ]).optional(),
   notas: z.string().nullable().optional(),
   fecha: z.date().optional().nullable(),
   estado: z.enum(["Activo", "Inactivo"])
-}).refine(data => {
-  // Si el nombre está vacío, debe tener documento
-  if (!data.nombre && !data.documentoId) {
-    return false;
-  }
-  // Si hay nombre, debe tener al menos 3 caracteres (ya validado arriba)
-  return true;
-}, {
-  message: "Debe proporcionar al menos un nombre o un documento de identidad",
-  path: ["documentoId"]
 });
 
 const objetoSchema = z.object({
@@ -140,12 +133,6 @@ const objetoSchema = z.object({
   notas: z.string().nullable().optional(),
   fecha: z.date().optional().nullable(),
   estado: z.enum(["Activo", "Inactivo"])
-}).refine(data => {
-  // Al menos uno de los campos debe tener información
-  return !!data.descripcion || !!data.grabacion || !!data.notas;
-}, {
-  message: "Debe proporcionar al menos una descripción, grabación o notas",
-  path: ["descripcion"]
 });
 
 type PersonaFormValues = z.infer<typeof personaSchema>;
