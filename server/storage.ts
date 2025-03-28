@@ -2879,15 +2879,10 @@ export class DatabaseStorage implements IStorage {
   // Métodos para gestionar Señalamientos de Objetos
   async createSenalObjeto(objeto: InsertSenalObjeto): Promise<SenalObjeto> {
     try {
-      const now = new Date(); // Usar objeto Date directamente, no convertir a string
-      const values = {
-        ...objeto,
-        creadoEn: now
-      };
-      
+      // No establecemos creadoEn manualmente ya que el esquema tiene defaultNow()
       const [newObjeto] = await db
         .insert(senalObjetos)
-        .values(values)
+        .values(objeto)
         .returning();
       
       return newObjeto;
@@ -2999,15 +2994,10 @@ export class DatabaseStorage implements IStorage {
   // Métodos para gestionar Coincidencias
   async createCoincidencia(coincidencia: InsertCoincidencia): Promise<Coincidencia> {
     try {
-      const now = new Date(); // Usar objeto Date directamente, no convertir a string
-      const values = {
-        ...coincidencia,
-        creadoEn: now
-      };
-      
+      // No establecemos creadoEn manualmente ya que el esquema tiene defaultNow()
       const [newCoincidencia] = await db
         .insert(coincidencias)
-        .values(values)
+        .values(coincidencia)
         .returning();
       
       return newCoincidencia;
