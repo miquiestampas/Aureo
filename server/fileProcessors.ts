@@ -5,7 +5,7 @@ import { emitFileProcessingStatus } from './fileWatcher';
 import { InsertExcelData, InsertPdfDocument, InsertAlert, ExcelData } from '@shared/schema';
 import { promisify } from 'util';
 import ExcelJS from 'exceljs';
-import * as XLSX from 'xlsx';
+import { read as readXLSX, utils as xlsxUtils } from 'xlsx';
 import csvParser from 'csv-parser';
 
 // Import pdf-parse dynamically to avoid initialization errors
@@ -518,7 +518,7 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     } 
     else if (fileExt === '.xls') {
       // Procesar archivo XLS (formato antiguo) usando la biblioteca XLSX
-      const workbook = XLSX.readFile(filePath);
+      const workbook = readXLSX(filePath);
       const sheetName = workbook.SheetNames[0];
       
       if (!sheetName) {
@@ -526,7 +526,7 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       }
       
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      const jsonData = xlsxUtils.sheet_to_json(worksheet, { header: 1 });
       
       // Extraer código de tienda si hay al menos una fila después del encabezado
       if (jsonData.length > 1) {
