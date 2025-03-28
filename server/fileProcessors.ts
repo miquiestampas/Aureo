@@ -414,12 +414,6 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
     return null;
   }
   
-  // Verificar que el número de orden sea numérico
-  if (!/^\d+$/.test(orderNumber)) {
-    console.log(`Rechazando fila con número de orden no numérico: ${orderNumber}`);
-    return null;
-  }
-  
   // Columna C: Fecha de orden
   let orderDate;
   try {
@@ -440,12 +434,6 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
     return null;
   }
   
-  // Verificar que el nombre del cliente sea texto y no contenga comillas
-  if (customerName.includes('"')) {
-    console.log(`Rechazando fila con nombre del cliente que contiene comillas: ${customerName}`);
-    return null;
-  }
-  
   // Columna E: Contacto del cliente (DNI/Pasaporte)
   const customerContact = values[offset + 4]?.toString().trim() || '';
   
@@ -457,12 +445,6 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
   
   // Columna H: Objeto (Detalles del artículo)
   const itemDetails = values[offset + 7]?.toString().trim() || '';
-  
-  // Verificar que el detalle del objeto no contenga comillas
-  if (itemDetails && itemDetails.includes('"')) {
-    console.log(`Rechazando fila con detalles del objeto que contiene comillas: ${itemDetails}`);
-    return null;
-  }
   
   // Columna I: Peso
   const weight = values[offset + 8]?.toString().trim() || '';
