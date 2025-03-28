@@ -160,20 +160,12 @@ function Router() {
       
       <ProtectedRoute 
         path="/senalamientos" 
-        component={() => (
-          <AppLayout>
-            <SenalamientosPage />
-          </AppLayout>
-        )} 
+        component={SenalamientosPage} 
       />
       
       <ProtectedRoute 
         path="/coincidencias" 
-        component={() => (
-          <AppLayout>
-            <CoincidenciasPage />
-          </AppLayout>
-        )} 
+        component={CoincidenciasPage} 
       />
       
       <Route component={NotFound} />

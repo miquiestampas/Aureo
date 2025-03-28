@@ -1,54 +1,45 @@
-import React from 'react';
-import { ArrowUpDown, ArrowDown, ArrowUp } from 'lucide-react';
-import { Button } from './button';
-import { cn } from '@/lib/utils';
+import React from "react";
+import { Column } from "@tanstack/react-table";
+import { cn } from "@/lib/utils";
+import { 
+  ArrowDownIcon, 
+  ArrowUpIcon, 
+  ArrowUpDown 
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-type SortDirection = 'asc' | 'desc' | null;
-
-interface SortableColumnHeaderProps {
-  label: string;
-  field: string;
-  sortField: string | null;
-  sortDirection: SortDirection;
-  onSort: (field: string) => void;
+interface SortableColumnHeaderProps<T> {
+  column: Column<T, unknown>;
+  title: string;
   className?: string;
 }
 
-export function SortableColumnHeader({
-  label,
-  field,
-  sortField,
-  sortDirection,
-  onSort,
+export function SortableColumnHeader<T>({
+  column,
+  title,
   className,
-}: SortableColumnHeaderProps) {
-  const isActive = sortField === field;
-  
-  const handleSort = () => {
-    onSort(field);
-  };
-  
+}: SortableColumnHeaderProps<T>) {
+  if (!column.getCanSort()) {
+    return <div className={cn(className)}>{title}</div>;
+  }
+
   return (
-    <Button
-      variant="ghost"
-      onClick={handleSort}
-      className={cn(
-        'flex items-center justify-between px-0 hover:bg-transparent',
-        isActive && 'font-bold',
-        className
-      )}
-    >
-      <span>{label}</span>
-      
-      {isActive ? (
-        sortDirection === 'asc' ? (
-          <ArrowUp className="ml-2 h-4 w-4" />
+    <div className={cn("flex items-center space-x-2", className)}>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="-ml-3 h-8 data-[state=open]:bg-accent"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        <span>{title}</span>
+        {column.getIsSorted() === "desc" ? (
+          <ArrowDownIcon className="ml-2 h-4 w-4" />
+        ) : column.getIsSorted() === "asc" ? (
+          <ArrowUpIcon className="ml-2 h-4 w-4" />
         ) : (
-          <ArrowDown className="ml-2 h-4 w-4" />
-        )
-      ) : (
-        <ArrowUpDown className="ml-2 h-4 w-4" />
-      )}
-    </Button>
+          <ArrowUpDown className="ml-2 h-4 w-4" />
+        )}
+      </Button>
+    </div>
   );
 }

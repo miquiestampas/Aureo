@@ -1,45 +1,33 @@
-import React, { useState } from "react";
-import Navbar from "@/components/Navbar";
-import Sidebar from "@/components/Sidebar";
+import { useState } from 'react';
+import Navbar from '@/components/Navbar';
+import Sidebar from '@/components/Sidebar';
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-export default function MainLayout({ children }: MainLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
   
   return (
-    <div className="flex min-h-screen flex-col">
-      <Navbar onMenuToggle={toggleSidebar} />
+    <div className="flex h-screen overflow-hidden bg-background">
+      <Sidebar open={sidebarOpen} />
       
-      <div className="flex flex-1">
-        {/* Mobile sidebar (fixed position when open) */}
-        {sidebarOpen && (
-          <>
-            {/* Mobile overlay */}
-            <div 
-              className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 md:hidden"
-              onClick={toggleSidebar}
-            />
-            
-            {/* Mobile sidebar */}
-            <div className="fixed inset-y-0 left-0 z-50 w-64 md:hidden">
-              <Sidebar />
-            </div>
-          </>
-        )}
+      <div className="flex flex-col flex-1 w-0 overflow-hidden">
+        <Navbar onMenuToggle={toggleSidebar} />
         
-        {/* Desktop sidebar (always visible) */}
-        <aside className="hidden border-r md:block md:w-64 lg:w-72">
-          <Sidebar />
-        </aside>
-        
-        <main className="flex-1 p-6 md:p-8">
-          {children}
+        <main className="relative flex-1 overflow-y-auto focus:outline-none">
+          <div className="py-6 px-4 sm:px-6 md:px-8">
+            {children}
+          </div>
         </main>
       </div>
     </div>
   );
-}
+};
+
+export default MainLayout;
