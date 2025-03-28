@@ -290,7 +290,7 @@ export type SearchHistory = typeof searchHistory.$inferSelect;
 // Nuevo modelo para señalamientos/alertas sobre personas
 export const senalPersonas = pgTable("senal_personas", {
   id: serial("id").primaryKey(),
-  nombre: text("nombre").notNull(),
+  nombre: text("nombre"),  // Ya no es notNull para permitir registros con solo DNI
   documentoId: text("documento_id"),  // DNI, NIE, pasaporte
   notas: text("notas"),
   estado: text("estado", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
