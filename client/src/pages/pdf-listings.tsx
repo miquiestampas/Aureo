@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -68,13 +68,17 @@ export default function PdfListingsPage() {
   const buildSearchParams = () => {
     const params = new URLSearchParams();
     
-    if (storeCode) params.append("storeCode", storeCode);
-    if (storeName) params.append("storeName", storeName);
-    if (location) params.append("location", location);
-    if (district) params.append("district", district);
-    if (locality) params.append("locality", locality);
-    if (dateFrom) params.append("dateFrom", dateFrom.toISOString());
-    if (dateTo) params.append("dateTo", dateTo.toISOString());
+    // Construir array de códigos de tienda para la búsqueda
+    const storeCodes = storeCode ? [storeCode] : 
+                      ["J28366AAKA5", "J28L11NKBH4", "J28L33VXBH2", "J28aa6", "J28JV", 
+                      "JEXB33", "JEXB34", "JEXB35", "JEXB36", "JEXB37", "JEXB38"];
+    
+    // Agregar códigos de tienda
+    params.append('storeCodes', JSON.stringify(storeCodes));
+    
+    // Agregar fechas si están presentes
+    if (dateFrom) params.append('dateFrom', dateFrom.toISOString());
+    if (dateTo) params.append('dateTo', dateTo.toISOString());
     
     return params.toString();
   };
@@ -87,8 +91,39 @@ export default function PdfListingsPage() {
     refetch
   } = useQuery<PdfDocument[]>({
     queryKey: ["/api/pdf-documents/search", buildSearchParams()],
+    queryFn: async () => {
+      const response = await fetch(`/api/pdf-documents/search?${buildSearchParams()}`);
+      if (!response.ok) {
+        throw new Error("Error al buscar documentos PDF");
+      }
+      return response.json();
+    },
     enabled: isSearching, // Solo realizar la consulta cuando se busca
   });
+
+  // Filtrar documentos por criterios adicionales en el frontend
+  const filterDocuments = (docs: PdfDocument[] | undefined) => {
+    if (!docs) return [];
+    
+    return docs.filter(doc => {
+      if (storeName && (!doc.storeName || !doc.storeName.toLowerCase().includes(storeName.toLowerCase()))) {
+        return false;
+      }
+      if (location && (!doc.storeLocation || !doc.storeLocation.toLowerCase().includes(location.toLowerCase()))) {
+        return false;
+      }
+      if (district && (!doc.storeDistrict || !doc.storeDistrict.toLowerCase().includes(district.toLowerCase()))) {
+        return false;
+      }
+      if (locality && (!doc.storeLocality || !doc.storeLocality.toLowerCase().includes(locality.toLowerCase()))) {
+        return false;
+      }
+      return true;
+    });
+  };
+
+  // Documentos filtrados
+  const filteredDocs = filterDocuments(pdfDocuments);
 
   // Manejar la búsqueda
   const handleSearch = () => {
@@ -136,7 +171,7 @@ export default function PdfListingsPage() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-8">
+    <div className="container mx-auto py-6 px-4 space-y-8 max-w-7xl">
       <h1 className="text-3xl font-bold tracking-tight">Listados PDF</h1>
       
       {/* Sección de Filtros */}
@@ -284,7 +319,7 @@ export default function PdfListingsPage() {
           <CardTitle>Resultados</CardTitle>
           <CardDescription>
             {isSearching && !isLoading && pdfDocuments ? 
-              `${pdfDocuments.length} documentos encontrados` : 
+              `${filteredDocs.length} documentos encontrados` : 
               "Utilice los filtros para buscar documentos"}
           </CardDescription>
         </CardHeader>
@@ -311,8 +346,8 @@ export default function PdfListingsPage() {
               </Button>
             </div>
           ) : isSearching && pdfDocuments ? (
-            // Resultados de la búsqueda
-            pdfDocuments.length > 0 ? (
+            filteredDocs.length > 0 ? (
+              // Tabla de resultados
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -326,7 +361,7 @@ export default function PdfListingsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pdfDocuments.map((doc) => (
+                    {filteredDocs.map((doc) => (
                       <TableRow key={doc.id}>
                         <TableCell>
                           <div className="font-medium">{doc.storeCode}</div>
