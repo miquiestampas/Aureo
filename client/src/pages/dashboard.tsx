@@ -1163,12 +1163,26 @@ export default function DashboardPage() {
           <div className="min-h-[60vh] w-full bg-gray-100 rounded-md">
             {previewFileId && (
               previewFileType === "PDF" ? (
-                <iframe 
-                  src={`/api/file-activities/${previewFileId}/preview`}
-                  className="w-full h-[60vh] rounded-md border-none"
-                  title="Previsualización de PDF"
-                  sandbox="allow-same-origin allow-scripts"
-                />
+                <div className="flex flex-col items-center justify-center h-[60vh]">
+                  <FileText className="h-16 w-16 text-gray-400 mb-4" />
+                  <p className="text-gray-600 mb-6">Debido a restricciones de seguridad del navegador, el PDF no puede mostrarse directamente.</p>
+                  <div className="flex gap-4">
+                    <Button
+                      onClick={() => window.open(`/api/file-activities/${previewFileId}/preview`, '_blank')}
+                      variant="default"
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      Abrir PDF en nueva pestaña
+                    </Button>
+                    <Button
+                      onClick={() => handleDownload(previewFileId)}
+                      variant="outline"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Descargar PDF
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-[60vh]">
                   <FileSpreadsheet className="h-16 w-16 text-gray-400 mb-4" />
