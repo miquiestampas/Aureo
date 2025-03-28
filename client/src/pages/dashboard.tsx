@@ -40,8 +40,7 @@ import {
   X,
   ArrowUp,
   ArrowDown,
-  ArrowUpDown,
-  Eye
+  ArrowUpDown
 } from "lucide-react";
 import FileUploadModal from "@/components/FileUploadModal";
 import { ColumnDef } from "@tanstack/react-table";
@@ -394,22 +393,10 @@ export default function DashboardPage() {
     setIsPasswordDialogOpen(true);
   };
 
-  // Estado para el modal de previsualización
-  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
-  const [previewFileId, setPreviewFileId] = useState<number | null>(null);
-  const [previewFileType, setPreviewFileType] = useState<"Excel" | "PDF" | null>(null);
-
   // Manejador para descargar archivo
   const handleDownload = (id: number) => {
     // Redireccionar a la URL de descarga
     window.open(`/api/file-activities/${id}/download`, '_blank');
-  };
-
-  // Manejador para previsualizar archivo
-  const handlePreview = (id: number, fileType: "Excel" | "PDF") => {
-    setPreviewFileId(id);
-    setPreviewFileType(fileType);
-    setPreviewDialogOpen(true);
   };
 
   // Manejador para eliminar archivo
@@ -641,15 +628,6 @@ export default function DashboardPage() {
               <Download className="h-4 w-4" />
             </Button>
             
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="text-green-600 border-green-200 hover:bg-green-50"
-              onClick={() => handlePreview(row.original.id, row.original.fileType)}
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-            
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button 
@@ -685,62 +663,9 @@ export default function DashboardPage() {
     }
   ];
   
-  // Modal para previsualización de archivos
-  const PreviewDialog = () => {
-    if (!previewFileId) return null;
-    
-    const previewUrl = `/api/file-activities/${previewFileId}/preview`;
-    
-    return (
-      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
-        <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Previsualización de archivo</DialogTitle>
-            <DialogDescription>
-              {previewFileType === "PDF" 
-                ? "Visualización del documento PDF" 
-                : "Visualización de la hoja de cálculo"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-grow overflow-hidden">
-            {previewFileType === "PDF" ? (
-              <iframe 
-                src={previewUrl} 
-                className="w-full h-full border-none"
-                title="PDF Preview"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="text-center p-6">
-                  <FileSpreadsheet className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Archivo Excel</h3>
-                  <p className="text-gray-500 mb-4">
-                    La previsualización de archivos Excel no está disponible directamente en el navegador.
-                  </p>
-                  <Button 
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => window.open(previewUrl, '_blank')}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Descargar Excel
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setPreviewDialogOpen(false)}>Cerrar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  };
-
   return (
     <div className="py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-        {/* Modal de previsualización */}
-        <PreviewDialog />
         {/* Overview Stats */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {/* Total Stores Card */}
@@ -1149,61 +1074,6 @@ export default function DashboardPage() {
         storesByType={stores.filter(store => store.type === "Excel" && store.active)} 
         fileType="Excel" 
       />
-      
-      {/* Modal de previsualización de archivos */}
-      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Previsualización de archivo</DialogTitle>
-            <DialogDescription>
-              {previewFileType === "PDF" ? "Visualización del documento PDF" : "Visualización del archivo Excel"}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="min-h-[60vh] w-full bg-gray-100 rounded-md">
-            {previewFileId && (
-              previewFileType === "PDF" ? (
-                <div className="flex flex-col items-center justify-center h-[60vh]">
-                  <FileText className="h-16 w-16 text-gray-400 mb-4" />
-                  <p className="text-gray-600 mb-6">Debido a restricciones de seguridad del navegador, el PDF no puede mostrarse directamente.</p>
-                  <div className="flex gap-4">
-                    <Button
-                      onClick={() => window.open(`/api/file-activities/${previewFileId}/preview`, '_blank')}
-                      variant="default"
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      Abrir PDF en nueva pestaña
-                    </Button>
-                    <Button
-                      onClick={() => handleDownload(previewFileId)}
-                      variant="outline"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Descargar PDF
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-[60vh]">
-                  <FileSpreadsheet className="h-16 w-16 text-gray-400 mb-4" />
-                  <p className="text-gray-600 mb-6">Los archivos Excel no se pueden previsualizar directamente.</p>
-                  <Button
-                    onClick={() => handleDownload(previewFileId)}
-                    variant="default"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Descargar archivo Excel
-                  </Button>
-                </div>
-              )
-            )}
-          </div>
-          
-          <DialogFooter>
-            <Button onClick={() => setPreviewDialogOpen(false)}>Cerrar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

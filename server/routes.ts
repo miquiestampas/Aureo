@@ -380,75 +380,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Actividad no encontrada" });
       }
       
-      // Obtener las configuraciones de los directorios según el tipo de archivo
-      let baseConfig;
-      let procesadosDir;
-      
-      if (activity.fileType === 'Excel') {
-        baseConfig = await storage.getConfig('EXCEL_WATCH_DIR');
-      } else {
-        baseConfig = await storage.getConfig('PDF_WATCH_DIR');
-      }
-      
-      if (!baseConfig || !baseConfig.value) {
-        return res.status(500).json({ message: "Configuración de directorio no encontrada" });
-      }
-      
       // Determinar la ruta base según el tipo de archivo
-      const baseDir = baseConfig.value;
-      procesadosDir = path.join(baseDir, 'procesados');
+      let baseDir;
+      if (activity.fileType === 'Excel') {
+        baseDir = "./uploads/excel";
+      } else {
+        baseDir = "./uploads/pdf";
+      }
       
-      // Intentar encontrar el archivo en varias ubicaciones posibles
+      // Intentar encontrar el archivo correcto
       let filePath = '';
       let fileName = '';
-      let possibleDirs = [baseDir];
       
-      // Si existe la carpeta procesados, incluirla en la búsqueda
-      if (fs.existsSync(procesadosDir)) {
-        possibleDirs.push(procesadosDir);
-      }
-      
-      // Intentar varias ubicaciones en orden
-      for (const dir of possibleDirs) {
-        // 1. Primero intentamos con el nombre exacto
-        const exactPath = path.join(dir, activity.filename);
-        if (fs.existsSync(exactPath)) {
-          filePath = exactPath;
-          fileName = activity.filename;
-          break;
-        }
-        
+      // 1. Primero intentamos con el nombre exacto
+      filePath = path.join(baseDir, activity.filename);
+      if (fs.existsSync(filePath)) {
+        fileName = activity.filename;
+      } else {
         // 2. Si no existe, intentamos encontrar cualquier archivo que comience con ese nombre
+        // Los archivos procesados suelen añadir una fecha/timestamp al final
         const baseFileName = activity.filename.replace(/\.[^/.]+$/, ''); // Nombre sin extensión
         const extension = path.extname(activity.filename);
         
-        // Si el directorio existe
-        if (fs.existsSync(dir)) {
-          const files = fs.readdirSync(dir);
-          for (const file of files) {
-            // Si el archivo comienza con el nombre base y tiene la misma extensión
-            if (file.startsWith(baseFileName) && file.endsWith(extension)) {
-              filePath = path.join(dir, file);
-              fileName = file;
-              break;
-            }
+        const dir = fs.readdirSync(baseDir);
+        for (const file of dir) {
+          // Si el archivo comienza con el nombre base y tiene la misma extensión
+          if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+            filePath = path.join(baseDir, file);
+            fileName = file;
+            break;
           }
-          
-          // Si encontramos el archivo, terminamos la búsqueda
-          if (fileName) break;
         }
       }
       
       // Verificar si encontramos el archivo
       if (!fileName || !fs.existsSync(filePath)) {
-        return res.status(404).json({ 
-          message: "Archivo no encontrado en el sistema",
-          details: {
-            activityId,
-            filename: activity.filename,
-            searchedDirs: possibleDirs
-          }
-        });
+        return res.status(404).json({ message: "Archivo no encontrado en el sistema" });
       }
       
       console.log(`Descargando archivo: ${filePath}`);
@@ -456,119 +423,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.download(filePath, activity.filename);
     } catch (err) {
       console.error("Error descargando archivo:", err);
-      next(err);
-    }
-  });
-  
-  // Previsualizar archivo
-  app.get("/api/file-activities/:id/preview", async (req, res, next) => {
-    try {
-      const activityId = parseInt(req.params.id);
-      if (isNaN(activityId)) {
-        return res.status(400).json({ message: "ID de actividad inválido" });
-      }
-      
-      const activity = await storage.getFileActivity(activityId);
-      if (!activity) {
-        return res.status(404).json({ message: "Actividad no encontrada" });
-      }
-      
-      // Obtener las configuraciones de los directorios según el tipo de archivo
-      let baseConfig;
-      let procesadosDir;
-      
-      if (activity.fileType === 'Excel') {
-        baseConfig = await storage.getConfig('EXCEL_WATCH_DIR');
-      } else {
-        baseConfig = await storage.getConfig('PDF_WATCH_DIR');
-      }
-      
-      if (!baseConfig || !baseConfig.value) {
-        return res.status(500).json({ message: "Configuración de directorio no encontrada" });
-      }
-      
-      // Determinar la ruta base según el tipo de archivo
-      const baseDir = baseConfig.value;
-      procesadosDir = path.join(baseDir, 'procesados');
-      
-      // Intentar encontrar el archivo en varias ubicaciones posibles
-      let filePath = '';
-      let possibleDirs = [baseDir];
-      
-      // Si existe la carpeta procesados, incluirla en la búsqueda
-      if (fs.existsSync(procesadosDir)) {
-        possibleDirs.push(procesadosDir);
-      }
-      
-      // Intentar varias ubicaciones en orden
-      for (const dir of possibleDirs) {
-        // 1. Primero intentamos con el nombre exacto
-        const exactPath = path.join(dir, activity.filename);
-        if (fs.existsSync(exactPath)) {
-          filePath = exactPath;
-          break;
-        }
-        
-        // 2. Si es un PDF, buscar por patrones con fechas agregadas al nombre
-        if (activity.fileType === 'PDF') {
-          const files = fs.readdirSync(dir);
-          const fileBase = path.parse(activity.filename).name;
-          const fileExt = path.parse(activity.filename).ext;
-          
-          // Buscar cualquier archivo que comience con el nombre base
-          const matchingFile = files.find(f => 
-            f.startsWith(fileBase) && f.endsWith(fileExt)
-          );
-          
-          if (matchingFile) {
-            filePath = path.join(dir, matchingFile);
-            break;
-          }
-        }
-      }
-      
-      // En caso de PDFs procesados, también buscar en la tabla pdf_documents
-      if (!filePath && activity.fileType === 'PDF') {
-        const pdfDoc = await storage.getPdfDocumentByActivityId(activityId);
-        if (pdfDoc && pdfDoc.path) {
-          // Verificar si el archivo existe físicamente
-          if (fs.existsSync(pdfDoc.path)) {
-            filePath = pdfDoc.path;
-          }
-        }
-      }
-      
-      if (!filePath || !fs.existsSync(filePath)) {
-        return res.status(404).json({
-          message: "Archivo no encontrado en el sistema",
-          details: {
-            activityId,
-            filename: activity.filename,
-            searchedDirs: possibleDirs
-          }
-        });
-      }
-      
-      // Configurar headers para visualización en el navegador
-      res.setHeader('Content-Disposition', `inline; filename="${activity.filename}"`);
-      
-      // Agregar headers de seguridad para permitir la carga en iframe
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-      res.setHeader('Content-Security-Policy', "default-src 'self'; object-src 'self'; frame-ancestors 'self'");
-      
-      // Determinar el tipo de contenido según la extensión del archivo
-      if (activity.fileType === 'PDF') {
-        res.setHeader('Content-Type', 'application/pdf');
-      } else if (activity.fileType === 'Excel') {
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      }
-      
-      // Enviar el archivo para previsualización
-      const fileStream = fs.createReadStream(filePath);
-      fileStream.pipe(res);
-    } catch (err) {
-      console.error("Error previsualizando archivo:", err);
       next(err);
     }
   });
@@ -598,74 +452,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Eliminar el archivo físico
       try {
-        // Obtener las configuraciones de los directorios según el tipo de archivo
-        let baseConfig;
-        let procesadosDir;
-        
-        if (activity.fileType === 'Excel') {
-          baseConfig = await storage.getConfig('EXCEL_WATCH_DIR');
-        } else {
-          baseConfig = await storage.getConfig('PDF_WATCH_DIR');
-        }
-        
-        // Si no encontramos la configuración, usamos los directorios por defecto
+        // Determinar la ruta base según el tipo de archivo
         let baseDir;
-        if (baseConfig && baseConfig.value) {
-          baseDir = baseConfig.value;
-          procesadosDir = path.join(baseDir, 'procesados');
+        if (activity.fileType === 'Excel') {
+          baseDir = "./uploads/excel";
         } else {
-          // Directorios por defecto como fallback
-          if (activity.fileType === 'Excel') {
-            baseDir = "./uploads/excel";
-          } else {
-            baseDir = "./uploads/pdf";
-          }
-          procesadosDir = path.join(baseDir, 'procesados');
+          baseDir = "./uploads/pdf";
         }
         
         // Intentar eliminar el archivo original o cualquier versión de él
         let fileDeleted = false;
-        let possibleDirs = [baseDir];
         
-        // Si existe la carpeta procesados, incluirla en la búsqueda
-        if (fs.existsSync(procesadosDir)) {
-          possibleDirs.push(procesadosDir);
-        }
-        
-        for (const dir of possibleDirs) {
-          // 1. Primero intentamos con el nombre exacto
-          const exactPath = path.join(dir, activity.filename);
-          if (fs.existsSync(exactPath)) {
-            fs.unlinkSync(exactPath);
-            fileDeleted = true;
-            console.log(`Archivo eliminado: ${exactPath}`);
-            break;
-          }
-          
+        // 1. Primero intentamos con el nombre exacto
+        let filePath = path.join(baseDir, activity.filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          fileDeleted = true;
+          console.log(`Archivo eliminado: ${filePath}`);
+        } else {
           // 2. Si no existe, intentamos encontrar cualquier archivo que comience con ese nombre
-          if (fs.existsSync(dir)) {
-            const baseFileName = activity.filename.replace(/\.[^/.]+$/, ''); // Nombre sin extensión
-            const extension = path.extname(activity.filename);
-            
-            const files = fs.readdirSync(dir);
-            for (const file of files) {
-              // Si el archivo comienza con el nombre base y tiene la misma extensión
-              if (file.startsWith(baseFileName) && file.endsWith(extension)) {
-                const filePath = path.join(dir, file);
-                fs.unlinkSync(filePath);
-                fileDeleted = true;
-                console.log(`Archivo eliminado: ${filePath}`);
-                break;
-              }
+          const baseFileName = activity.filename.replace(/\.[^/.]+$/, ''); // Nombre sin extensión
+          const extension = path.extname(activity.filename);
+          
+          const dir = fs.readdirSync(baseDir);
+          for (const file of dir) {
+            // Si el archivo comienza con el nombre base y tiene la misma extensión
+            if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+              filePath = path.join(baseDir, file);
+              fs.unlinkSync(filePath);
+              fileDeleted = true;
+              console.log(`Archivo eliminado: ${filePath}`);
+              break;
             }
-            
-            // Si encontramos y eliminamos el archivo, terminamos la búsqueda
-            if (fileDeleted) break;
           }
         }
         
         if (!fileDeleted) {
-          console.warn(`No se encontró el archivo físico para eliminar: ${activity.filename}. Se buscó en: ${possibleDirs.join(', ')}`);
+          console.warn(`No se encontró el archivo físico para eliminar: ${activity.filename}`);
         }
       } catch (fileErr) {
         console.warn("No se pudo eliminar el archivo físico:", fileErr);
