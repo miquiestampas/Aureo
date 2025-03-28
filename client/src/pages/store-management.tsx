@@ -619,15 +619,17 @@ export default function StoreManagementPage() {
   const columns: ColumnDef<StoreData>[] = [
     {
       accessorKey: "code",
-      header: "Código",
+      header: ({ column }) => <SortableColumnHeader column={column} title="Código" />,
+      enableSorting: true
     },
     {
       accessorKey: "name",
-      header: "Nombre",
+      header: ({ column }) => <SortableColumnHeader column={column} title="Nombre" />,
+      enableSorting: true
     },
     {
       accessorKey: "type",
-      header: "Tipo",
+      header: ({ column }) => <SortableColumnHeader column={column} title="Tipo" />,
       cell: ({ row }) => {
         const type = row.original.type;
         return (
@@ -640,7 +642,8 @@ export default function StoreManagementPage() {
             {type}
           </div>
         );
-      }
+      },
+      enableSorting: true
     },
     {
       id: "locality",
@@ -664,7 +667,7 @@ export default function StoreManagementPage() {
     },
     {
       accessorKey: "active",
-      header: "Estado",
+      header: ({ column }) => <SortableColumnHeader column={column} title="Estado" />,
       cell: ({ row }) => {
         const isActive = row.original.active;
         return isActive ? (
@@ -676,7 +679,8 @@ export default function StoreManagementPage() {
             <XCircle className="h-3 w-3 mr-1" /> Inactiva
           </Badge>
         );
-      }
+      },
+      enableSorting: true
     },
     ...(canModify ? [
       {
