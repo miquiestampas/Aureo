@@ -4,8 +4,20 @@ import { setupVite, serveStatic, log } from "./vite";
 import os from 'os';
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Aumentar límite de tamaño de cuerpo JSON para manejar fechas en formato ISO
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+
+// Middleware para depurar solicitudes de API
+app.use((req, res, next) => {
+  // Si la solicitud es a rutas de señalamientos, imprimir información
+  if (req.path.includes('/api/senalamiento/') && (req.method === 'POST' || req.method === 'PUT')) {
+    console.log('DEBUG - Ruta:', req.path);
+    console.log('DEBUG - Método:', req.method);
+    console.log('DEBUG - Cuerpo:', JSON.stringify(req.body, null, 2));
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
