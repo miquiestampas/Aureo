@@ -22,6 +22,7 @@ import ActivityControlPage from "@/pages/activity-control";
 import PurchaseControlPage from "@/pages/purchase-control";
 import SenalamientosPage from "@/pages/senalamientos";
 import CoincidenciasPage from "@/pages/coincidencias";
+import PdfListingsPage from "@/pages/pdf-listings";
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -146,6 +147,15 @@ function Router() {
       <ProtectedRoute 
         path="/coincidencias" 
         component={CoincidenciasPage} 
+      />
+      
+      <ProtectedRoute 
+        path="/pdf-listings" 
+        component={() => (
+          <AppLayout>
+            <PdfListingsPage />
+          </AppLayout>
+        )} 
       />
       
       <Route component={NotFound} />

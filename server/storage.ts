@@ -72,6 +72,7 @@ export interface IStorage {
   // PdfDocument methods
   createPdfDocument(doc: InsertPdfDocument): Promise<PdfDocument>;
   getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]>;
+  searchPdfDocuments(params: { storeCodes: string[], dateFrom?: Date, dateTo?: Date }): Promise<PdfDocument[]>;
   getPdfDocument(id: number): Promise<PdfDocument | undefined>;
   getPdfDocumentByActivityId(activityId: number): Promise<PdfDocument | undefined>;
   updatePdfDocumentPath(fileActivityId: number, newPath: string): Promise<boolean>;
@@ -443,6 +444,39 @@ export class MemStorage implements IStorage {
         const dateB = new Date(b.uploadDate).getTime();
         return dateB - dateA; // Sort in descending order (newest first)
       });
+  }
+  
+  async searchPdfDocuments(params: { 
+    storeCodes: string[], 
+    dateFrom?: Date, 
+    dateTo?: Date 
+  }): Promise<PdfDocument[]> {
+    let results = Array.from(this.pdfDocuments.values())
+      .filter(doc => params.storeCodes.includes(doc.storeCode));
+    
+    // Filtrar por rango de fechas si se proporciona
+    if (params.dateFrom || params.dateTo) {
+      results = results.filter(doc => {
+        const uploadDate = new Date(doc.uploadDate);
+        
+        if (params.dateFrom && params.dateTo) {
+          return uploadDate >= params.dateFrom && uploadDate <= params.dateTo;
+        } else if (params.dateFrom) {
+          return uploadDate >= params.dateFrom;
+        } else if (params.dateTo) {
+          return uploadDate <= params.dateTo;
+        }
+        
+        return true;
+      });
+    }
+    
+    // Ordenar por fecha (más reciente primero)
+    return results.sort((a, b) => {
+      const dateA = new Date(a.uploadDate).getTime();
+      const dateB = new Date(b.uploadDate).getTime();
+      return dateB - dateA;
+    });
   }
   
   async getPdfDocument(id: number): Promise<PdfDocument | undefined> {
@@ -1251,6 +1285,37 @@ export class DatabaseStorage implements IStorage {
       pool,
       createTableIfMissing: true
     });
+  }
+  
+  async searchPdfDocuments(params: { 
+    storeCodes: string[], 
+    dateFrom?: Date, 
+    dateTo?: Date 
+  }): Promise<PdfDocument[]> {
+    let query = db
+      .select()
+      .from(pdfDocuments)
+      .where(inArray(pdfDocuments.storeCode, params.storeCodes));
+    
+    // Filtrar por rango de fechas si se proporciona
+    if (params.dateFrom && params.dateTo) {
+      query = query.where(
+        and(
+          gte(pdfDocuments.uploadDate, params.dateFrom),
+          lte(pdfDocuments.uploadDate, params.dateTo)
+        )
+      );
+    } else if (params.dateFrom) {
+      query = query.where(gte(pdfDocuments.uploadDate, params.dateFrom));
+    } else if (params.dateTo) {
+      query = query.where(lte(pdfDocuments.uploadDate, params.dateTo));
+    }
+    
+    // Ordenar por fecha (más reciente primero)
+    query = query.orderBy(desc(pdfDocuments.uploadDate));
+    
+    const results = await query;
+    return results;
   }
   
   // Métodos de purga de datos para superadministradores

@@ -1029,6 +1029,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Ruta para búsqueda avanzada de documentos PDF
+  app.get("/api/pdf-documents/search", async (req, res, next) => {
+    try {
+      const {
+        storeCode,
+        storeName,
+        location,
+        district,
+        locality,
+        dateFrom,
+        dateTo
+      } = req.query;
+      
+      // Obtener primero las tiendas que coinciden con los criterios
+      let matchingStores = await storage.getStores();
+      
+      // Filtrar tiendas por los criterios
+      if (storeCode) {
+        matchingStores = matchingStores.filter(store => 
+          store.code.toLowerCase().includes((storeCode as string).toLowerCase()));
+      }
+      
+      if (storeName) {
+        matchingStores = matchingStores.filter(store => 
+          store.name.toLowerCase().includes((storeName as string).toLowerCase()));
+      }
+      
+      if (location) {
+        matchingStores = matchingStores.filter(store => 
+          store.location && store.location.toLowerCase().includes((location as string).toLowerCase()));
+      }
+      
+      if (district) {
+        matchingStores = matchingStores.filter(store => 
+          store.district && store.district.toLowerCase().includes((district as string).toLowerCase()));
+      }
+      
+      if (locality) {
+        matchingStores = matchingStores.filter(store => 
+          store.locality && store.locality.toLowerCase().includes((locality as string).toLowerCase()));
+      }
+      
+      // Extraer los códigos de tienda que coinciden
+      const storeCodesArray = matchingStores.map(store => store.code);
+      
+      // Si no hay tiendas coincidentes, devolver array vacío
+      if (storeCodesArray.length === 0) {
+        return res.json([]);
+      }
+      
+      // Obtener documentos PDF basados en los códigos de tienda y fechas
+      const documents = await storage.searchPdfDocuments({
+        storeCodes: storeCodesArray,
+        dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
+        dateTo: dateTo ? new Date(dateTo as string) : undefined
+      });
+      
+      // Enriquecer los resultados con información de tienda
+      const enrichedDocuments = documents.map(doc => {
+        const store = matchingStores.find(s => s.code === doc.storeCode);
+        return {
+          ...doc,
+          storeName: store?.name || 'Desconocida',
+          storeLocation: store?.location || null,
+          storeDistrict: store?.district || null,
+          storeLocality: store?.locality || null
+        };
+      });
+      
+      res.json(enrichedDocuments);
+    } catch (err) {
+      console.error("Error en búsqueda de documentos PDF:", err);
+      next(err);
+    }
+  });
+  
   // Obtener documento PDF por ID
   app.get("/api/pdf-documents/:id", async (req, res, next) => {
     try {

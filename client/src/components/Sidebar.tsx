@@ -134,6 +134,13 @@ export default function Sidebar() {
             requiredRoles={["SuperAdmin", "Admin"]}
             userRole={user?.role}
           />
+          
+          <NavItem
+            href="/pdf-listings"
+            icon={<FileText size={20} />}
+            label="Listados PDF"
+            active={location === '/pdf-listings'}
+          />
 
           {/* Administración Section */}
           <div className="mt-6 mb-2">
