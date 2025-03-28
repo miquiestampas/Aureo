@@ -105,18 +105,17 @@ const personaSchema = z.object({
     z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
     z.literal("")
   ]).optional(),
-  documentoId: z.string().min(1, "El documento es requerido si no se proporciona nombre").optional(),
+  documentoId: z.union([
+    z.string().min(1, "El documento debe tener al menos 1 caracter"),
+    z.literal("")
+  ]).optional(),
   notas: z.string().nullable().optional(),
   estado: z.enum(["Activo", "Inactivo"])
 }).refine(data => {
-  // Si el nombre está vacío, debe tener documento
-  if (!data.nombre && !data.documentoId) {
-    return false;
-  }
-  // Si hay nombre, debe tener al menos 3 caracteres (ya validado arriba)
+  // Ahora permitimos crear señalamientos con cualquier campo o combinación de campos
   return true;
 }, {
-  message: "Debe proporcionar al menos un nombre o un documento de identidad",
+  message: "Complete los campos que desee registrar",
   path: ["documentoId"]
 });
 
@@ -125,14 +124,17 @@ const objetoSchema = z.object({
     z.string().min(3, "La descripción debe tener al menos 3 caracteres"),
     z.literal("")
   ]),
-  grabacion: z.string().nullable().optional(),
+  grabacion: z.union([
+    z.string().min(1, "La grabación debe tener al menos 1 caracter"),
+    z.literal("")
+  ]).optional(),
   notas: z.string().nullable().optional(),
   estado: z.enum(["Activo", "Inactivo"])
 }).refine(data => {
-  // Al menos uno de los campos debe tener información
-  return !!data.descripcion || !!data.grabacion || !!data.notas;
+  // Permitimos crear señalamientos con cualquier campo
+  return true;
 }, {
-  message: "Debe proporcionar al menos una descripción, grabación o notas",
+  message: "Complete los campos que desee registrar",
   path: ["descripcion"]
 });
 
