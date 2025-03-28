@@ -10,6 +10,7 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
+  RowSelectionState,
 } from "@tanstack/react-table";
 
 import {
@@ -28,7 +29,8 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Checkbox } from "./checkbox";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -37,6 +39,8 @@ interface DataTableProps<TData, TValue> {
   searchFields?: { key: string, placeholder: string }[]; // Multiple search fields
   pageSizeOptions?: number[];
   showColumnToggle?: boolean;
+  enableRowSelection?: boolean;
+  onDeleteSelected?: (selectedRows: TData[]) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -46,14 +50,44 @@ export function DataTable<TData, TValue>({
   searchFields,
   pageSizeOptions = [10, 25, 50, 100],
   showColumnToggle = true,
+  enableRowSelection = false,
+  onDeleteSelected,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  
+  const selectionColumn: ColumnDef<TData, any> = {
+    id: "select",
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && "indeterminate")
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Seleccionar todo"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Seleccionar fila"
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  };
+  
+  const columnsWithSelection = enableRowSelection
+    ? [selectionColumn, ...columns]
+    : columns;
   
   const table = useReactTable({
     data,
-    columns,
+    columns: columnsWithSelection,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
@@ -61,10 +95,13 @@ export function DataTable<TData, TValue>({
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    enableRowSelection,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
+      rowSelection,
     },
   });
 
@@ -101,8 +138,26 @@ export function DataTable<TData, TValue>({
           <div></div>
         )}
         
-        {showColumnToggle && (
-          <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2">
+          {enableRowSelection && onDeleteSelected && Object.keys(rowSelection).length > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="mr-2"
+              onClick={() => {
+                const selectedRows = table
+                  .getFilteredSelectedRowModel()
+                  .rows.map((row) => row.original);
+                onDeleteSelected(selectedRows);
+                setRowSelection({});
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Eliminar ({Object.keys(rowSelection).length})
+            </Button>
+          )}
+          
+          {showColumnToggle && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="ml-auto">
@@ -129,8 +184,8 @@ export function DataTable<TData, TValue>({
                   })}
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        )}
+          )}
+        </div>
       </div>
       
       {/* Table */}

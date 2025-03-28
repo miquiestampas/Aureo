@@ -267,6 +267,12 @@ export default function DashboardPage() {
   // Toast para mensajes al usuario
   const { toast } = useToast();
   
+  // Estado para el diálogo de contraseña
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [selectedActivities, setSelectedActivities] = useState<FileActivity[]>([]);
+  const [isDeleteLoading, setIsDeleteLoading] = useState(false);
+  
   // Mutación para eliminar actividad de archivo
   const deleteActivityMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -295,6 +301,55 @@ export default function DashboardPage() {
       });
     }
   });
+  
+  // Función para eliminar múltiples actividades
+  const deleteMultipleActivities = async () => {
+    setIsDeleteLoading(true);
+    try {
+      // Verificar contraseña de administrador
+      const verifyResponse = await apiRequest("POST", "/api/verify-admin-password", { password: adminPassword });
+      
+      if (!verifyResponse.ok) {
+        throw new Error("Contraseña incorrecta");
+      }
+      
+      // Eliminar cada actividad seleccionada
+      const deletePromises = selectedActivities.map(activity => 
+        apiRequest("DELETE", `/api/file-activities/${activity.id}`)
+      );
+      
+      await Promise.all(deletePromises);
+      
+      toast({
+        title: "Archivos eliminados",
+        description: `Se han eliminado ${selectedActivities.length} archivos correctamente`,
+        variant: "default",
+      });
+      
+      // Limpiar selección y cerrar diálogo
+      setSelectedActivities([]);
+      setAdminPassword("");
+      setIsPasswordDialogOpen(false);
+      
+      // Actualizar datos
+      refetchActivities();
+      refetchStatus();
+    } catch (error: any) {
+      toast({
+        title: "Error al eliminar",
+        description: error.message || "Ha ocurrido un error al eliminar los archivos",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleteLoading(false);
+    }
+  };
+  
+  // Función para manejar selección de actividades
+  const handleSelectActivities = (activities: FileActivity[]) => {
+    setSelectedActivities(activities);
+    setIsPasswordDialogOpen(true);
+  };
 
   // Manejador para descargar archivo
   const handleDownload = (id: number) => {
@@ -685,6 +740,8 @@ export default function DashboardPage() {
                 searchKey="filename"
                 pageSizeOptions={[5, 10, 25, 50]}
                 showColumnToggle={true}
+                enableRowSelection={true}
+                onDeleteSelected={handleSelectActivities}
               />
             ) : (
               <div className="p-8 text-center">
@@ -692,6 +749,55 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+          
+          {/* Diálogo de Confirmación con Contraseña */}
+          <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirmación de Administrador</DialogTitle>
+                <DialogDescription>
+                  Se requiere contraseña de administrador para eliminar {selectedActivities.length} archivo(s).
+                  Esta acción no se puede deshacer.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="admin-password" className="text-right">
+                    Contraseña
+                  </Label>
+                  <Input
+                    id="admin-password"
+                    type="password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    className="col-span-3"
+                    placeholder="Introduce la contraseña de administrador"
+                  />
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsPasswordDialogOpen(false);
+                    setAdminPassword("");
+                    setSelectedActivities([]);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={deleteMultipleActivities}
+                  disabled={!adminPassword || isDeleteLoading}
+                >
+                  {isDeleteLoading ? "Eliminando..." : "Confirmar Eliminación"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

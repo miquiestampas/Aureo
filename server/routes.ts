@@ -1183,6 +1183,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
   
+  // Endpoint para verificar contraseña de administrador (utilizado para operaciones destructivas)
+  app.post("/api/verify-admin-password", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "No autenticado" });
+      }
+      
+      const { password } = req.body;
+      if (!password) {
+        return res.status(400).json({ error: "Se requiere contraseña" });
+      }
+      
+      const isValid = await verifyAdminPassword(req.user.id, password);
+      
+      if (!isValid) {
+        return res.status(403).json({ error: "Contraseña incorrecta o usuario no tiene permisos de administrador" });
+      }
+      
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error al verificar contraseña de administrador:", error);
+      res.status(500).json({ error: "Error al verificar contraseña" });
+    }
+  });
+  
   // Start file watchers
   app.post("/api/system/start-watchers", (req, res, next) => {
     req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
