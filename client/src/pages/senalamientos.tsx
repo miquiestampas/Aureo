@@ -1,8 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import {
+  Edit,
+  Trash2,
+  Plus,
+  Search,
+  User,
+  Package,
+  Shield,
+  AlertTriangle,
+  Info
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -22,666 +44,813 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from "@/components/ui/tabs";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/data-table";
+import { Row } from "@tanstack/react-table";
+import { SortableColumnHeader } from "@/components/ui/sortable-column-header";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { DataTable } from "@/components/ui/data-table";
-import { TableCell, TableRow } from "@/components/ui/table";
-import { Row } from "@tanstack/react-table";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Loader2, PlusCircle, AlertTriangle, Check, X, Edit, Trash2 } from "lucide-react";
-import { SortableColumnHeader } from "@/components/ui/sortable-column-header";
-import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { z } from "zod";
 import MainLayout from "@/layouts/main-layout";
 
-// Define el esquema para los señalamientos de personas
-const personaSchema = z.object({
-  id: z.number().optional(),
-  nombre: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
-  dni: z.string().min(5, "El DNI debe tener al menos 5 caracteres"),
-  motivo: z.string().min(5, "El motivo debe tener al menos 5 caracteres"),
-  createdBy: z.number().optional(),
-});
-
-// Define el esquema para los señalamientos de objetos
-const objetoSchema = z.object({
-  id: z.number().optional(),
-  descripcion: z.string().min(5, "La descripción debe tener al menos 5 caracteres"),
-  grabaciones: z.string().min(2, "Las grabaciones deben tener al menos 2 caracteres"),
-  motivo: z.string().min(5, "El motivo debe tener al menos 5 caracteres"),
-  createdBy: z.number().optional(),
-});
-
-type PersonaForm = z.infer<typeof personaSchema>;
-type ObjetoForm = z.infer<typeof objetoSchema>;
-
-// Interfaces para los datos recibidos del servidor
+// Definición de tipos para las señales
 interface SenalPersona {
   id: number;
   nombre: string;
-  dni: string;
-  motivo: string;
-  createdBy: number;
-  createdAt: string;
-  creatorName?: string;
+  documentoId: string | null;
+  notas: string | null;
+  estado: "Activo" | "Inactivo";
+  nivelRiesgo: "Alto" | "Medio" | "Bajo";
+  creadoPor: number;
+  creadoEn: string;
+  modificadoPor: number | null;
+  modificadoEn: string | null;
 }
 
 interface SenalObjeto {
   id: number;
   descripcion: string;
-  grabaciones: string;
-  motivo: string;
-  createdBy: number;
-  createdAt: string;
-  creatorName?: string;
+  grabacion: string | null;
+  notas: string | null;
+  estado: "Activo" | "Inactivo";
+  nivelRiesgo: "Alto" | "Medio" | "Bajo";
+  creadoPor: number;
+  creadoEn: string;
+  modificadoPor: number | null;
+  modificadoEn: string | null;
 }
 
+// Schemas para validación de formularios
+const personaSchema = z.object({
+  nombre: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
+  documentoId: z.string().nullable().optional(),
+  notas: z.string().nullable().optional(),
+  estado: z.enum(["Activo", "Inactivo"]),
+  nivelRiesgo: z.enum(["Alto", "Medio", "Bajo"])
+});
+
+const objetoSchema = z.object({
+  descripcion: z.string().min(3, "La descripción debe tener al menos 3 caracteres"),
+  grabacion: z.string().nullable().optional(),
+  notas: z.string().nullable().optional(),
+  estado: z.enum(["Activo", "Inactivo"]),
+  nivelRiesgo: z.enum(["Alto", "Medio", "Bajo"])
+});
+
+type PersonaFormValues = z.infer<typeof personaSchema>;
+type ObjetoFormValues = z.infer<typeof objetoSchema>;
+
 export default function Senalamientos() {
+  const { user } = useAuth();
   const { toast } = useToast();
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState("personas");
+  const [activeTab, setActiveTab] = useState<"personas" | "objetos">("personas");
   const [isPersonaDialogOpen, setIsPersonaDialogOpen] = useState(false);
   const [isObjetoDialogOpen, setIsObjetoDialogOpen] = useState(false);
   const [editingPersona, setEditingPersona] = useState<SenalPersona | null>(null);
   const [editingObjeto, setEditingObjeto] = useState<SenalObjeto | null>(null);
-  const [deleteAlertPersona, setDeleteAlertPersona] = useState<SenalPersona | null>(null);
-  const [deleteAlertObjeto, setDeleteAlertObjeto] = useState<SenalObjeto | null>(null);
-
-  // Get current user
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const response = await fetch("/api/user");
-        if (response.ok) {
-          const userData = await response.json();
-          setCurrentUser(userData);
-        }
-      } catch (error) {
-        console.error("Error fetching current user:", error);
-      }
-    };
-
-    fetchCurrentUser();
-  }, []);
-
+  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<{ open: boolean, type: "persona" | "objeto", id: number | null }>({
+    open: false,
+    type: "persona",
+    id: null
+  });
+  
   // Formulario para personas
-  const personaForm = useForm<PersonaForm>({
+  const personaForm = useForm<PersonaFormValues>({
     resolver: zodResolver(personaSchema),
     defaultValues: {
       nombre: "",
-      dni: "",
-      motivo: "",
-    },
+      documentoId: "",
+      notas: "",
+      estado: "Activo",
+      nivelRiesgo: "Medio"
+    }
   });
-
+  
   // Formulario para objetos
-  const objetoForm = useForm<ObjetoForm>({
+  const objetoForm = useForm<ObjetoFormValues>({
     resolver: zodResolver(objetoSchema),
     defaultValues: {
       descripcion: "",
-      grabaciones: "",
-      motivo: "",
-    },
+      grabacion: "",
+      notas: "",
+      estado: "Activo",
+      nivelRiesgo: "Medio"
+    }
   });
-
-  // Queries para obtener los datos
-  const {
-    data: personas,
-    isLoading: loadingPersonas,
-    isError: errorPersonas,
+  
+  // Cargar datos de señalamientos de personas
+  const { 
+    data: personas = [], 
+    isLoading: isLoadingPersonas,
+    isError: isErrorPersonas
   } = useQuery<SenalPersona[]>({
-    queryKey: ["/api/senalamiento/personas"],
-    refetchOnWindowFocus: false,
+    queryKey: ["/api/senalamientos/personas"],
   });
-
-  const {
-    data: objetos,
-    isLoading: loadingObjetos,
-    isError: errorObjetos,
+  
+  // Cargar datos de señalamientos de objetos
+  const { 
+    data: objetos = [], 
+    isLoading: isLoadingObjetos,
+    isError: isErrorObjetos
   } = useQuery<SenalObjeto[]>({
-    queryKey: ["/api/senalamiento/objetos"],
-    refetchOnWindowFocus: false,
+    queryKey: ["/api/senalamientos/objetos"],
   });
-
-  // Mutations para crear/editar personas
-  const personaMutation = useMutation({
-    mutationFn: async (data: PersonaForm) => {
-      if (editingPersona) {
-        const res = await apiRequest("PUT", `/api/senalamiento/personas/${editingPersona.id}`, data);
-        return await res.json();
-      } else {
-        const res = await apiRequest("POST", "/api/senalamiento/personas", data);
-        return await res.json();
+  
+  // Mutación para crear persona
+  const createPersonaMutation = useMutation({
+    mutationFn: async (data: PersonaFormValues) => {
+      const response = await fetch("/api/senalamientos/personas", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Error al crear señalamiento de persona");
       }
+      
+      return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/senalamiento/personas"] });
       toast({
-        title: editingPersona ? "Señalamiento actualizado" : "Señalamiento creado",
-        description: editingPersona
-          ? "El señalamiento de persona ha sido actualizado exitosamente."
-          : "El señalamiento de persona ha sido creado exitosamente.",
+        title: "Señalamiento creado",
+        description: "El señalamiento de persona ha sido creado correctamente",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/senalamientos/personas"] });
       personaForm.reset();
       setIsPersonaDialogOpen(false);
-      setEditingPersona(null);
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       toast({
         title: "Error",
-        description: `Error al ${editingPersona ? "actualizar" : "crear"} el señalamiento: ${error.message}`,
+        description: `Error al crear señalamiento: ${error.message}`,
         variant: "destructive",
       });
     },
   });
-
-  // Mutations para crear/editar objetos
-  const objetoMutation = useMutation({
-    mutationFn: async (data: ObjetoForm) => {
-      if (editingObjeto) {
-        const res = await apiRequest("PUT", `/api/senalamiento/objetos/${editingObjeto.id}`, data);
-        return await res.json();
-      } else {
-        const res = await apiRequest("POST", "/api/senalamiento/objetos", data);
-        return await res.json();
+  
+  // Mutación para actualizar persona
+  const updatePersonaMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number, data: PersonaFormValues }) => {
+      const response = await fetch(`/api/senalamientos/personas/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Error al actualizar señalamiento de persona");
       }
+      
+      return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/senalamiento/objetos"] });
       toast({
-        title: editingObjeto ? "Señalamiento actualizado" : "Señalamiento creado",
-        description: editingObjeto
-          ? "El señalamiento de objeto ha sido actualizado exitosamente."
-          : "El señalamiento de objeto ha sido creado exitosamente.",
+        title: "Señalamiento actualizado",
+        description: "El señalamiento de persona ha sido actualizado correctamente",
       });
-      objetoForm.reset();
-      setIsObjetoDialogOpen(false);
-      setEditingObjeto(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/senalamientos/personas"] });
+      personaForm.reset();
+      setEditingPersona(null);
+      setIsPersonaDialogOpen(false);
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       toast({
         title: "Error",
-        description: `Error al ${editingObjeto ? "actualizar" : "crear"} el señalamiento: ${error.message}`,
+        description: `Error al actualizar señalamiento: ${error.message}`,
         variant: "destructive",
       });
     },
   });
-
-  // Mutation para eliminar personas
+  
+  // Mutación para eliminar persona
   const deletePersonaMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/senalamiento/personas/${id}`);
-      return await res.json();
+      const response = await fetch(`/api/senalamientos/personas/${id}`, {
+        method: "DELETE",
+      });
+      
+      if (!response.ok) {
+        throw new Error("Error al eliminar señalamiento de persona");
+      }
+      
+      return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/senalamiento/personas"] });
       toast({
         title: "Señalamiento eliminado",
-        description: "El señalamiento de persona ha sido eliminado exitosamente.",
+        description: "El señalamiento de persona ha sido eliminado correctamente",
       });
-      setDeleteAlertPersona(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/senalamientos/personas"] });
+      setDeleteConfirmDialog({ open: false, type: "persona", id: null });
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       toast({
         title: "Error",
-        description: `Error al eliminar el señalamiento: ${error.message}`,
+        description: `Error al eliminar señalamiento: ${error.message}`,
         variant: "destructive",
       });
     },
   });
-
-  // Mutation para eliminar objetos
+  
+  // Mutación para crear objeto
+  const createObjetoMutation = useMutation({
+    mutationFn: async (data: ObjetoFormValues) => {
+      const response = await fetch("/api/senalamientos/objetos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Error al crear señalamiento de objeto");
+      }
+      
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Señalamiento creado",
+        description: "El señalamiento de objeto ha sido creado correctamente",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/senalamientos/objetos"] });
+      objetoForm.reset();
+      setIsObjetoDialogOpen(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Error al crear señalamiento: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Mutación para actualizar objeto
+  const updateObjetoMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number, data: ObjetoFormValues }) => {
+      const response = await fetch(`/api/senalamientos/objetos/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Error al actualizar señalamiento de objeto");
+      }
+      
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Señalamiento actualizado",
+        description: "El señalamiento de objeto ha sido actualizado correctamente",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/senalamientos/objetos"] });
+      objetoForm.reset();
+      setEditingObjeto(null);
+      setIsObjetoDialogOpen(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Error al actualizar señalamiento: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Mutación para eliminar objeto
   const deleteObjetoMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/senalamiento/objetos/${id}`);
-      return await res.json();
+      const response = await fetch(`/api/senalamientos/objetos/${id}`, {
+        method: "DELETE",
+      });
+      
+      if (!response.ok) {
+        throw new Error("Error al eliminar señalamiento de objeto");
+      }
+      
+      return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/senalamiento/objetos"] });
       toast({
         title: "Señalamiento eliminado",
-        description: "El señalamiento de objeto ha sido eliminado exitosamente.",
+        description: "El señalamiento de objeto ha sido eliminado correctamente",
       });
-      setDeleteAlertObjeto(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/senalamientos/objetos"] });
+      setDeleteConfirmDialog({ open: false, type: "objeto", id: null });
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       toast({
         title: "Error",
-        description: `Error al eliminar el señalamiento: ${error.message}`,
+        description: `Error al eliminar señalamiento: ${error.message}`,
         variant: "destructive",
       });
     },
   });
-
-  // Handler para enviar el formulario de personas
-  const onSubmitPersona = (data: PersonaForm) => {
-    personaMutation.mutate(data);
+  
+  // Manejar envío del formulario de persona
+  const handlePersonaSubmit = async (data: PersonaFormValues) => {
+    if (editingPersona) {
+      updatePersonaMutation.mutate({ id: editingPersona.id, data });
+    } else {
+      createPersonaMutation.mutate(data);
+    }
   };
-
-  // Handler para enviar el formulario de objetos
-  const onSubmitObjeto = (data: ObjetoForm) => {
-    objetoMutation.mutate(data);
+  
+  // Manejar envío del formulario de objeto
+  const handleObjetoSubmit = async (data: ObjetoFormValues) => {
+    if (editingObjeto) {
+      updateObjetoMutation.mutate({ id: editingObjeto.id, data });
+    } else {
+      createObjetoMutation.mutate(data);
+    }
   };
-
-  // Handler para abrir el diálogo de edición de persona
+  
+  // Abrir diálogo de edición para persona
   const handleEditPersona = (persona: SenalPersona) => {
-    setEditingPersona(persona);
     personaForm.reset({
       nombre: persona.nombre,
-      dni: persona.dni,
-      motivo: persona.motivo,
+      documentoId: persona.documentoId,
+      notas: persona.notas,
+      estado: persona.estado,
+      nivelRiesgo: persona.nivelRiesgo
     });
+    setEditingPersona(persona);
     setIsPersonaDialogOpen(true);
   };
-
-  // Handler para abrir el diálogo de edición de objeto
+  
+  // Abrir diálogo de edición para objeto
   const handleEditObjeto = (objeto: SenalObjeto) => {
-    setEditingObjeto(objeto);
     objetoForm.reset({
       descripcion: objeto.descripcion,
-      grabaciones: objeto.grabaciones,
-      motivo: objeto.motivo,
+      grabacion: objeto.grabacion,
+      notas: objeto.notas,
+      estado: objeto.estado,
+      nivelRiesgo: objeto.nivelRiesgo
     });
+    setEditingObjeto(objeto);
     setIsObjetoDialogOpen(true);
   };
-
-  // Columnas para la tabla de personas
+  
+  // Verificar si el usuario puede editar/eliminar (solo el creador o SuperAdmin)
+  const canEditDelete = (createdById: number) => {
+    return user?.role === "SuperAdmin" || (user?.role === "Admin" && createdById === user?.id);
+  };
+  
+  // Columnas para tabla de personas
   const personasColumns = [
     {
       accessorKey: "nombre",
       header: ({ column }: any) => <SortableColumnHeader column={column} title="Nombre" />,
     },
     {
-      accessorKey: "dni",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="DNI" />,
+      accessorKey: "documentoId",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Documento" />,
     },
     {
-      accessorKey: "motivo",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Motivo" />,
-      cell: ({ row }: { row: Row<SenalPersona> }) => (
-        <div className="max-w-[200px] truncate" title={row.getValue("motivo")}>
-          {row.getValue("motivo")}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "creatorName",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Creado Por" />,
-    },
-    {
-      accessorKey: "createdAt",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha de Creación" />,
+      accessorKey: "estado",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Estado" />,
       cell: ({ row }: { row: Row<SenalPersona> }) => {
-        const date = new Date(row.getValue("createdAt"));
-        return <span>{date.toLocaleDateString('es-ES')}</span>;
+        const estado = row.getValue("estado") as string;
+        return (
+          <Badge variant={estado === "Activo" ? "default" : "secondary"}>
+            {estado}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "nivelRiesgo",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Riesgo" />,
+      cell: ({ row }: { row: Row<SenalPersona> }) => {
+        const riesgo = row.getValue("nivelRiesgo") as string;
+        let variant: "default" | "destructive" | "outline" = "default";
+        
+        if (riesgo === "Alto") variant = "destructive";
+        else if (riesgo === "Bajo") variant = "outline";
+        
+        return <Badge variant={variant}>{riesgo}</Badge>;
+      },
+    },
+    {
+      accessorKey: "creadoEn",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha" />,
+      cell: ({ row }: { row: Row<SenalPersona> }) => {
+        const fecha = new Date(row.getValue("creadoEn"));
+        return format(fecha, "dd/MM/yyyy", { locale: es });
       },
     },
     {
       id: "actions",
       cell: ({ row }: { row: Row<SenalPersona> }) => {
         const persona = row.original;
-        const canEdit = currentUser?.role === "SuperAdmin" || 
-                        (currentUser?.role === "Admin" && currentUser?.id === persona.createdBy);
+        
+        if (!canEditDelete(persona.creadoPor)) {
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" disabled>
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Solo el creador o SuperAdmin pueden editar</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        }
         
         return (
-          <div className="flex justify-end">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Abrir menú</span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4"
-                  >
-                    <circle cx="12" cy="12" r="1" />
-                    <circle cx="12" cy="5" r="1" />
-                    <circle cx="12" cy="19" r="1" />
-                  </svg>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {canEdit && (
-                  <>
-                    <DropdownMenuItem onClick={() => handleEditPersona(persona)}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setDeleteAlertPersona(persona)}>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Eliminar
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {!canEdit && (
-                  <DropdownMenuItem disabled>
-                    <AlertTriangle className="mr-2 h-4 w-4" />
-                    Sin permisos para editar
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="flex items-center space-x-2">
+            <Button variant="ghost" size="icon" onClick={() => handleEditPersona(persona)}>
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setDeleteConfirmDialog({ open: true, type: "persona", id: persona.id })}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
         );
       },
     },
   ];
-
-  // Columnas para la tabla de objetos
+  
+  // Columnas para tabla de objetos
   const objetosColumns = [
     {
       accessorKey: "descripcion",
       header: ({ column }: any) => <SortableColumnHeader column={column} title="Descripción" />,
-      cell: ({ row }: { row: Row<SenalObjeto> }) => (
-        <div className="max-w-[200px] truncate" title={row.getValue("descripcion")}>
-          {row.getValue("descripcion")}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "grabaciones",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Grabaciones" />,
-    },
-    {
-      accessorKey: "motivo",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Motivo" />,
-      cell: ({ row }: { row: Row<SenalObjeto> }) => (
-        <div className="max-w-[200px] truncate" title={row.getValue("motivo")}>
-          {row.getValue("motivo")}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "creatorName",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Creado Por" />,
-    },
-    {
-      accessorKey: "createdAt",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha de Creación" />,
       cell: ({ row }: { row: Row<SenalObjeto> }) => {
-        const date = new Date(row.getValue("createdAt"));
-        return <span>{date.toLocaleDateString('es-ES')}</span>;
+        const desc = row.getValue("descripcion") as string;
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="max-w-[300px] truncate">{desc}</div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="max-w-[400px]">{desc}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      },
+    },
+    {
+      accessorKey: "grabacion",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Grabación" />,
+    },
+    {
+      accessorKey: "estado",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Estado" />,
+      cell: ({ row }: { row: Row<SenalObjeto> }) => {
+        const estado = row.getValue("estado") as string;
+        return (
+          <Badge variant={estado === "Activo" ? "default" : "secondary"}>
+            {estado}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "nivelRiesgo",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Riesgo" />,
+      cell: ({ row }: { row: Row<SenalObjeto> }) => {
+        const riesgo = row.getValue("nivelRiesgo") as string;
+        let variant: "default" | "destructive" | "outline" = "default";
+        
+        if (riesgo === "Alto") variant = "destructive";
+        else if (riesgo === "Bajo") variant = "outline";
+        
+        return <Badge variant={variant}>{riesgo}</Badge>;
+      },
+    },
+    {
+      accessorKey: "creadoEn",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha" />,
+      cell: ({ row }: { row: Row<SenalObjeto> }) => {
+        const fecha = new Date(row.getValue("creadoEn"));
+        return format(fecha, "dd/MM/yyyy", { locale: es });
       },
     },
     {
       id: "actions",
       cell: ({ row }: { row: Row<SenalObjeto> }) => {
         const objeto = row.original;
-        const canEdit = currentUser?.role === "SuperAdmin" || 
-                        (currentUser?.role === "Admin" && currentUser?.id === objeto.createdBy);
+        
+        if (!canEditDelete(objeto.creadoPor)) {
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" disabled>
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Solo el creador o SuperAdmin pueden editar</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        }
         
         return (
-          <div className="flex justify-end">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Abrir menú</span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4"
-                  >
-                    <circle cx="12" cy="12" r="1" />
-                    <circle cx="12" cy="5" r="1" />
-                    <circle cx="12" cy="19" r="1" />
-                  </svg>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {canEdit && (
-                  <>
-                    <DropdownMenuItem onClick={() => handleEditObjeto(objeto)}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setDeleteAlertObjeto(objeto)}>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Eliminar
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {!canEdit && (
-                  <DropdownMenuItem disabled>
-                    <AlertTriangle className="mr-2 h-4 w-4" />
-                    Sin permisos para editar
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="flex items-center space-x-2">
+            <Button variant="ghost" size="icon" onClick={() => handleEditObjeto(objeto)}>
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setDeleteConfirmDialog({ open: true, type: "objeto", id: objeto.id })}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
         );
       },
     },
   ];
-
+  
   return (
     <MainLayout>
-      <div className="container mx-auto py-6 space-y-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold tracking-tight">Señalamientos</h1>
-          <div className="flex gap-2">
-            {(currentUser?.role === "SuperAdmin" || currentUser?.role === "Admin") && (
-              <>
-                <Button onClick={() => {
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Señalamientos</h2>
+            <p className="text-muted-foreground">
+              Gestione las personas y objetos que deben ser vigilados en los registros de compras
+            </p>
+          </div>
+          
+          {(user?.role === "SuperAdmin" || user?.role === "Admin") && (
+            <div className="flex space-x-2">
+              <Button 
+                onClick={() => { 
+                  setActiveTab("personas");
                   setEditingPersona(null);
                   personaForm.reset();
                   setIsPersonaDialogOpen(true);
-                }} className="bg-indigo-700 hover:bg-indigo-800" disabled={activeTab !== "personas"}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Nuevo Señalamiento de Persona
-                </Button>
-                <Button onClick={() => {
+                }}
+              >
+                <User className="mr-2 h-4 w-4" />
+                Añadir Persona
+              </Button>
+              <Button 
+                onClick={() => { 
+                  setActiveTab("objetos");
                   setEditingObjeto(null);
                   objetoForm.reset();
                   setIsObjetoDialogOpen(true);
-                }} className="bg-amber-600 hover:bg-amber-700" disabled={activeTab !== "objetos"}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Nuevo Señalamiento de Objeto
-                </Button>
-              </>
-            )}
-          </div>
+                }}
+              >
+                <Package className="mr-2 h-4 w-4" />
+                Añadir Objeto
+              </Button>
+            </div>
+          )}
         </div>
-
-        <p className="text-muted-foreground">
-          Gestione y monitoree señalamientos de personas y objetos de interés para el sistema.
-        </p>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="personas">Personas</TabsTrigger>
-            <TabsTrigger value="objetos">Objetos</TabsTrigger>
+        
+        <Tabs 
+          defaultValue="personas" 
+          value={activeTab} 
+          onValueChange={(value) => setActiveTab(value as "personas" | "objetos")}
+        >
+          <TabsList className="grid w-[400px] grid-cols-2">
+            <TabsTrigger value="personas">
+              <User className="mr-2 h-4 w-4" />
+              Personas ({personas.length})
+            </TabsTrigger>
+            <TabsTrigger value="objetos">
+              <Package className="mr-2 h-4 w-4" />
+              Objetos ({objetos.length})
+            </TabsTrigger>
           </TabsList>
-          <TabsContent value="personas">
+          
+          <TabsContent value="personas" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
                 <CardTitle>Señalamientos de Personas</CardTitle>
                 <CardDescription>
-                  Lista de personas señaladas en el sistema por nombre o DNI.
+                  Lista de personas que deben ser monitoreadas en las compras
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {loadingPersonas ? (
-                  <div className="flex justify-center items-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : errorPersonas ? (
-                  <div className="flex justify-center items-center h-64 text-destructive">
-                    <AlertTriangle className="h-8 w-8 mr-2" />
-                    Error al cargar datos. Intente nuevamente más tarde.
-                  </div>
-                ) : (
-                  <DataTable
-                    columns={personasColumns}
-                    data={personas || []}
-                    searchPlaceholder="Buscar por nombre o DNI..."
-                    searchColumn="nombre"
-                  />
-                )}
+                <DataTable 
+                  columns={personasColumns}
+                  data={personas}
+                  searchColumn="nombre"
+                  searchPlaceholder="Buscar por nombre..."
+                />
               </CardContent>
             </Card>
           </TabsContent>
-          <TabsContent value="objetos">
+          
+          <TabsContent value="objetos" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
                 <CardTitle>Señalamientos de Objetos</CardTitle>
                 <CardDescription>
-                  Lista de objetos señalados en el sistema por descripción o grabaciones.
+                  Lista de objetos que deben ser monitoreados en las compras
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {loadingObjetos ? (
-                  <div className="flex justify-center items-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : errorObjetos ? (
-                  <div className="flex justify-center items-center h-64 text-destructive">
-                    <AlertTriangle className="h-8 w-8 mr-2" />
-                    Error al cargar datos. Intente nuevamente más tarde.
-                  </div>
-                ) : (
-                  <DataTable
-                    columns={objetosColumns}
-                    data={objetos || []}
-                    searchPlaceholder="Buscar por descripción..."
-                    searchColumn="descripcion"
-                  />
-                )}
+                <DataTable 
+                  columns={objetosColumns}
+                  data={objetos}
+                  searchColumn="descripcion"
+                  searchPlaceholder="Buscar por descripción..."
+                />
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* Diálogo para crear/editar personas */}
+        
+        {/* Diálogo para añadir/editar persona */}
         <Dialog open={isPersonaDialogOpen} onOpenChange={setIsPersonaDialogOpen}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>
-                {editingPersona ? "Editar Señalamiento de Persona" : "Nuevo Señalamiento de Persona"}
+                {editingPersona ? "Editar persona" : "Añadir nueva persona"}
               </DialogTitle>
               <DialogDescription>
-                Complete el formulario para {editingPersona ? "actualizar" : "crear"} un señalamiento de persona.
+                {editingPersona 
+                  ? "Actualice los datos de la persona señalada" 
+                  : "Introduzca los datos de la persona a señalar"}
               </DialogDescription>
             </DialogHeader>
+            
             <Form {...personaForm}>
-              <form onSubmit={personaForm.handleSubmit(onSubmitPersona)} className="space-y-4">
+              <form onSubmit={personaForm.handleSubmit(handlePersonaSubmit)} className="space-y-4">
                 <FormField
                   control={personaForm.control}
                   name="nombre"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nombre</FormLabel>
+                      <FormLabel>Nombre completo</FormLabel>
                       <FormControl>
-                        <Input placeholder="Nombre completo" {...field} />
+                        <Input placeholder="Nombre de la persona" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                
                 <FormField
                   control={personaForm.control}
-                  name="dni"
+                  name="documentoId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>DNI</FormLabel>
+                      <FormLabel>Documento de identidad</FormLabel>
                       <FormControl>
-                        <Input placeholder="Número de DNI" {...field} />
+                        <Input 
+                          placeholder="DNI, NIE u otro documento" 
+                          {...field} 
+                          value={field.value || ""} 
+                        />
                       </FormControl>
+                      <FormDescription>
+                        Puede ser DNI, NIE u otro documento de identificación
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                
                 <FormField
                   control={personaForm.control}
-                  name="motivo"
+                  name="nivelRiesgo"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Motivo</FormLabel>
+                      <FormLabel>Nivel de riesgo</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar nivel de riesgo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Alto">Alto</SelectItem>
+                          <SelectItem value="Medio">Medio</SelectItem>
+                          <SelectItem value="Bajo">Bajo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={personaForm.control}
+                  name="estado"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estado</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar estado" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Activo">Activo</SelectItem>
+                          <SelectItem value="Inactivo">Inactivo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={personaForm.control}
+                  name="notas"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notas</FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder="Motivo del señalamiento"
-                          className="min-h-[100px]"
-                          {...field}
+                        <Textarea 
+                          placeholder="Notas adicionales" 
+                          {...field} 
+                          value={field.value || ""} 
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                
                 <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsPersonaDialogOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={personaMutation.isPending} className="bg-indigo-700 hover:bg-indigo-800">
-                    {personaMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="mr-2 h-4 w-4" />
-                        {editingPersona ? "Actualizar" : "Crear"}
-                      </>
-                    )}
+                  <Button type="submit">
+                    {editingPersona ? "Actualizar" : "Añadir"}
                   </Button>
                 </DialogFooter>
               </form>
             </Form>
           </DialogContent>
         </Dialog>
-
-        {/* Diálogo para crear/editar objetos */}
+        
+        {/* Diálogo para añadir/editar objeto */}
         <Dialog open={isObjetoDialogOpen} onOpenChange={setIsObjetoDialogOpen}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>
-                {editingObjeto ? "Editar Señalamiento de Objeto" : "Nuevo Señalamiento de Objeto"}
+                {editingObjeto ? "Editar objeto" : "Añadir nuevo objeto"}
               </DialogTitle>
               <DialogDescription>
-                Complete el formulario para {editingObjeto ? "actualizar" : "crear"} un señalamiento de objeto.
+                {editingObjeto 
+                  ? "Actualice los datos del objeto señalado" 
+                  : "Introduzca los datos del objeto a señalar"}
               </DialogDescription>
             </DialogHeader>
+            
             <Form {...objetoForm}>
-              <form onSubmit={objetoForm.handleSubmit(onSubmitObjeto)} className="space-y-4">
+              <form onSubmit={objetoForm.handleSubmit(handleObjetoSubmit)} className="space-y-4">
                 <FormField
                   control={objetoForm.control}
                   name="descripcion"
@@ -689,148 +858,154 @@ export default function Senalamientos() {
                     <FormItem>
                       <FormLabel>Descripción</FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder="Descripción detallada del objeto"
-                          className="min-h-[80px]"
-                          {...field}
+                        <Textarea 
+                          placeholder="Descripción detallada del objeto" 
+                          {...field} 
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                
                 <FormField
                   control={objetoForm.control}
-                  name="grabaciones"
+                  name="grabacion"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Grabaciones</FormLabel>
+                      <FormLabel>Grabación</FormLabel>
                       <FormControl>
-                        <Input placeholder="Grabaciones o marcas identificativas" {...field} />
+                        <Input 
+                          placeholder="Texto de grabación o marca" 
+                          {...field} 
+                          value={field.value || ""} 
+                        />
                       </FormControl>
+                      <FormDescription>
+                        Texto que pueda estar grabado o marcado en el objeto
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                
                 <FormField
                   control={objetoForm.control}
-                  name="motivo"
+                  name="nivelRiesgo"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Motivo</FormLabel>
+                      <FormLabel>Nivel de riesgo</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar nivel de riesgo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Alto">Alto</SelectItem>
+                          <SelectItem value="Medio">Medio</SelectItem>
+                          <SelectItem value="Bajo">Bajo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={objetoForm.control}
+                  name="estado"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estado</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar estado" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Activo">Activo</SelectItem>
+                          <SelectItem value="Inactivo">Inactivo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={objetoForm.control}
+                  name="notas"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notas</FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder="Motivo del señalamiento"
-                          className="min-h-[80px]"
-                          {...field}
+                        <Textarea 
+                          placeholder="Notas adicionales" 
+                          {...field} 
+                          value={field.value || ""} 
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                
                 <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsObjetoDialogOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={objetoMutation.isPending} className="bg-amber-600 hover:bg-amber-700">
-                    {objetoMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="mr-2 h-4 w-4" />
-                        {editingObjeto ? "Actualizar" : "Crear"}
-                      </>
-                    )}
+                  <Button type="submit">
+                    {editingObjeto ? "Actualizar" : "Añadir"}
                   </Button>
                 </DialogFooter>
               </form>
             </Form>
           </DialogContent>
         </Dialog>
-
-        {/* Alert Dialog para confirmar eliminación de personas */}
-        <AlertDialog open={!!deleteAlertPersona} onOpenChange={() => setDeleteAlertPersona(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Está seguro que desea eliminar este señalamiento?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta acción eliminará permanentemente el señalamiento de persona para{" "}
-                <span className="font-semibold">{deleteAlertPersona?.nombre}</span>.
-                Esta acción no se puede deshacer.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-red-500 hover:bg-red-600"
+        
+        {/* Diálogo de confirmación para eliminar */}
+        <Dialog 
+          open={deleteConfirmDialog.open} 
+          onOpenChange={(open) => setDeleteConfirmDialog({ ...deleteConfirmDialog, open })}
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Confirmar eliminación</DialogTitle>
+              <DialogDescription>
+                ¿Está seguro de que desea eliminar este señalamiento? Esta acción no se puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setDeleteConfirmDialog({ open: false, type: "persona", id: null })}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                variant="destructive"
                 onClick={() => {
-                  if (deleteAlertPersona) {
-                    deletePersonaMutation.mutate(deleteAlertPersona.id);
+                  if (deleteConfirmDialog.id === null) return;
+                  
+                  if (deleteConfirmDialog.type === "persona") {
+                    deletePersonaMutation.mutate(deleteConfirmDialog.id);
+                  } else {
+                    deleteObjetoMutation.mutate(deleteConfirmDialog.id);
                   }
                 }}
-                disabled={deletePersonaMutation.isPending}
               >
-                {deletePersonaMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Eliminando...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Eliminar
-                  </>
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Alert Dialog para confirmar eliminación de objetos */}
-        <AlertDialog open={!!deleteAlertObjeto} onOpenChange={() => setDeleteAlertObjeto(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Está seguro que desea eliminar este señalamiento?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta acción eliminará permanentemente el señalamiento de objeto con descripción{" "}
-                <span className="font-semibold">{deleteAlertObjeto?.descripcion}</span>.
-                Esta acción no se puede deshacer.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-red-500 hover:bg-red-600"
-                onClick={() => {
-                  if (deleteAlertObjeto) {
-                    deleteObjetoMutation.mutate(deleteAlertObjeto.id);
-                  }
-                }}
-                disabled={deleteObjetoMutation.isPending}
-              >
-                {deleteObjetoMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Eliminando...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Eliminar
-                  </>
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                Eliminar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

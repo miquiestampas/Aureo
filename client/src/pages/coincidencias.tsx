@@ -1,592 +1,667 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import {
+  Eye,
+  Check,
+  X,
+  AlertTriangle,
+  User,
+  Package,
+  FileText,
+  FileSpreadsheet,
+  ExternalLink,
+  Info
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { DataTable } from "@/components/ui/data-table";
-import { TableCell, TableRow } from "@/components/ui/table";
-import { Row } from "@tanstack/react-table";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { 
-  Loader2, 
-  AlertTriangle, 
-  Eye, 
-  CheckCircle2, 
-  AlertCircle, 
-  RefreshCw,
-  ExternalLink
-} from "lucide-react";
 import { SortableColumnHeader } from "@/components/ui/sortable-column-header";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Link, useLocation } from "wouter";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/data-table";
+import { Row } from "@tanstack/react-table";
 import MainLayout from "@/layouts/main-layout";
 
-// Interfaz para coincidencias
+// Definición de tipos para las coincidencias
 interface Coincidencia {
   id: number;
-  excelDataId: number;
-  senalTipo: "persona" | "objeto";
-  senalId: number;
-  porcentajeCoincidencia: number;
-  coincidenciaExacta: boolean;
-  campo: string;
-  valor: string;
-  senalValor: string;
-  leido: boolean;
-  createdAt: string;
-  
-  // Campos adicionales para mostrar información relacionada
-  nombreTienda?: string;
-  codigoTienda?: string;
-  compradorNombre?: string;
-  fechaCompra?: string;
-  senalNombre?: string; // Para personas
-  senalDescripcion?: string; // Para objetos
-  senalDNI?: string; // Para personas
-  senalGrabaciones?: string; // Para objetos
-  senalMotivo?: string;
+  estado: "NoLeido" | "Leido" | "Descartado";
+  creadoEn: string;
+  tipoCoincidencia: "Objeto" | "Persona";
+  idSenalPersona: number | null;
+  idSenalObjeto: number | null;
+  idExcelData: number;
+  nombrePersona?: string;
+  descripcionObjeto?: string;
+  puntuacionCoincidencia: number;
+  tipoMatch: "Exacto" | "Parcial";
+  campoCoincidente: string;
+  valorCoincidente: string;
+  ordenInfo: {
+    storeCode: string;
+    storeName: string;
+    orderNumber: string;
+    orderDate: string;
+    customerName: string;
+  };
+  revisadoPor: number | null;
+  revisadoEn: string | null;
+  notasRevision: string | null;
 }
 
-interface ExcelDataDetail {
-  id: number;
-  storeId: number;
-  storeName: string;
-  storeCode: string;
-  fecha: string;
-  comprador: string;
-  dni: string;
-  telefono: string;
-  direccion: string;
-  grabaciones: string;
-  articulo: string;
-  precio: string;
-  processingDate: string;
-}
+// Datos para las pestañas de filtro
+const tabsData = [
+  { value: "todas", label: "Todas" },
+  { value: "noleidas", label: "No leídas" },
+  { value: "leidas", label: "Leídas" },
+  { value: "descartadas", label: "Descartadas" },
+];
 
 export default function Coincidencias() {
+  const { user } = useAuth();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState("noLeidas");
-  const [selectedCoincidencia, setSelectedCoincidencia] = useState<Coincidencia | null>(null);
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
-  const [excelDataDetails, setExcelDataDetails] = useState<ExcelDataDetail | null>(null);
-
-  // Get current user
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const response = await fetch("/api/user");
-        if (response.ok) {
-          const userData = await response.json();
-          setCurrentUser(userData);
-        }
-      } catch (error) {
-        console.error("Error fetching current user:", error);
+  const [activeTab, setActiveTab] = useState<string>("noleidas");
+  const [viewingCoincidencia, setViewingCoincidencia] = useState<Coincidencia | null>(null);
+  const [reviewDialog, setReviewDialog] = useState<{ open: boolean, id: number | null, action: "marcar" | "descartar" }>({
+    open: false,
+    id: null,
+    action: "marcar"
+  });
+  const [reviewNotes, setReviewNotes] = useState("");
+  
+  // Cargar datos de coincidencias
+  const { 
+    data: coincidencias = [], 
+    isLoading: isLoadingCoincidencias,
+    isError: isErrorCoincidencias,
+    refetch: refetchCoincidencias
+  } = useQuery<Coincidencia[]>({
+    queryKey: ["/api/coincidencias", activeTab],
+    queryFn: async () => {
+      const res = await fetch(`/api/coincidencias?estado=${activeTab === "todas" ? "all" : activeTab}`);
+      if (!res.ok) throw new Error("Error al cargar coincidencias");
+      return res.json();
+    }
+  });
+  
+  // Mutación para marcar como leída
+  const markAsReadMutation = useMutation({
+    mutationFn: async ({id, notas}: {id: number, notas: string}) => {
+      const response = await fetch(`/api/coincidencias/${id}/leer`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ notasRevision: notas }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Error al marcar coincidencia como leída");
       }
-    };
-
-    fetchCurrentUser();
-  }, []);
-
-  // Queries para obtener coincidencias
-  const {
-    data: coincidenciasNoLeidas,
-    isLoading: loadingNoLeidas,
-    isError: errorNoLeidas,
-    refetch: refetchNoLeidas,
-  } = useQuery<Coincidencia[]>({
-    queryKey: ["/api/coincidencias/no-leidas"],
-    refetchOnWindowFocus: true,
-  });
-
-  const {
-    data: coincidenciasLeidas,
-    isLoading: loadingLeidas,
-    isError: errorLeidas,
-    refetch: refetchLeidas,
-  } = useQuery<Coincidencia[]>({
-    queryKey: ["/api/coincidencias/leidas"],
-    refetchOnWindowFocus: false,
-    enabled: activeTab === "leidas", // Solo cargar cuando la pestaña esté activa
-  });
-
-  // Mutation para marcar como leída
-  const marcarLeidaMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest("PUT", `/api/coincidencias/${id}/marcar-leida`);
-      return await res.json();
+      
+      return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/coincidencias/no-leidas"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/coincidencias/leidas"] });
       toast({
-        title: "Coincidencia actualizada",
-        description: "La coincidencia ha sido marcada como leída.",
+        title: "Coincidencia revisada",
+        description: "La coincidencia ha sido marcada como leída correctamente",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/coincidencias"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coincidencias/noleidas/count"] });
+      setReviewDialog({ open: false, id: null, action: "marcar" });
+      setReviewNotes("");
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       toast({
         title: "Error",
-        description: `Error al marcar como leída: ${error.message}`,
+        description: `Error al marcar coincidencia: ${error.message}`,
         variant: "destructive",
       });
     },
   });
-
-  // Función para ver detalles de la compra
-  const verDetallesCompra = async (coincidencia: Coincidencia) => {
-    setSelectedCoincidencia(coincidencia);
-    
-    try {
-      const res = await fetch(`/api/excel-data/${coincidencia.excelDataId}`);
-      if (res.ok) {
-        const datos = await res.json();
-        setExcelDataDetails(datos);
-        setDetailsDialogOpen(true);
-        
-        // Si la coincidencia no está leída, marcarla como leída
-        if (!coincidencia.leido) {
-          marcarLeidaMutation.mutate(coincidencia.id);
-        }
-      } else {
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los detalles de la compra.",
-          variant: "destructive",
-        });
+  
+  // Mutación para descartar
+  const dismissMutation = useMutation({
+    mutationFn: async ({id, notas}: {id: number, notas: string}) => {
+      const response = await fetch(`/api/coincidencias/${id}/descartar`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ notasRevision: notas }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Error al descartar coincidencia");
       }
-    } catch (error) {
-      console.error("Error al cargar detalles:", error);
+      
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Coincidencia descartada",
+        description: "La coincidencia ha sido descartada correctamente",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/coincidencias"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/coincidencias/noleidas/count"] });
+      setReviewDialog({ open: false, id: null, action: "descartar" });
+      setReviewNotes("");
+    },
+    onError: (error) => {
       toast({
         title: "Error",
-        description: "Ocurrió un error al intentar cargar los detalles.",
+        description: `Error al descartar coincidencia: ${error.message}`,
         variant: "destructive",
       });
-    }
-  };
-
-  // Función para actualizar manualmente las coincidencias
-  const actualizarCoincidencias = () => {
-    if (activeTab === "noLeidas") {
-      refetchNoLeidas();
-    } else {
-      refetchLeidas();
-    }
-    
-    toast({
-      title: "Actualizando",
-      description: "Actualizando lista de coincidencias...",
-    });
-  };
-
-  // Función para ir a la página de detalle de compra
-  const irADetalleCompra = (excelDataId: number) => {
-    setLocation(`/purchase-control/${excelDataId}`);
-  };
-
-  // Función para mostrar el tipo de coincidencia con un color
-  const getTipoCoincidenciaBadge = (coincidencia: Coincidencia) => {
-    if (coincidencia.senalTipo === "persona") {
-      return <Badge variant="outline" className="bg-indigo-100 text-indigo-800">Persona</Badge>;
-    } else {
-      return <Badge variant="outline" className="bg-amber-100 text-amber-800">Objeto</Badge>;
-    }
-  };
-
-  // Función para mostrar el nivel de coincidencia con color
-  const getNivelCoincidenciaBadge = (coincidencia: Coincidencia) => {
-    if (coincidencia.coincidenciaExacta) {
-      return <Badge className="bg-red-500">Exacta</Badge>;
-    } else {
-      return <Badge className="bg-amber-500">Parcial</Badge>;
-    }
-  };
-
+    },
+  });
+  
   // Columnas para la tabla de coincidencias
   const coincidenciasColumns = [
     {
-      accessorKey: "senalTipo",
+      accessorKey: "tipoCoincidencia",
       header: ({ column }: any) => <SortableColumnHeader column={column} title="Tipo" />,
-      cell: ({ row }: { row: Row<Coincidencia> }) => getTipoCoincidenciaBadge(row.original),
-    },
-    {
-      accessorKey: "nombreTienda",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Tienda" />,
-      cell: ({ row }: { row: Row<Coincidencia> }) => (
-        <div className="flex flex-col">
-          <span className="font-medium">{row.original.nombreTienda}</span>
-          <span className="text-xs text-muted-foreground">{row.original.codigoTienda}</span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: "fechaCompra",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha" />,
       cell: ({ row }: { row: Row<Coincidencia> }) => {
-        const date = row.original.fechaCompra ? new Date(row.original.fechaCompra) : null;
-        return date ? <span>{date.toLocaleDateString('es-ES')}</span> : <span>-</span>;
-      },
-    },
-    {
-      accessorKey: "campo",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Campo" />,
-    },
-    {
-      accessorKey: "valor",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Valor encontrado" />,
-      cell: ({ row }: { row: Row<Coincidencia> }) => (
-        <div className="max-w-[200px] truncate font-medium" title={row.getValue("valor")}>
-          {row.getValue("valor")}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "senalValor",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Señalamiento" />,
-      cell: ({ row }: { row: Row<Coincidencia> }) => {
-        const coincidencia = row.original;
-        let mainValue = "";
-        let secondaryValue = "";
-        
-        if (coincidencia.senalTipo === "persona") {
-          mainValue = coincidencia.senalNombre || "";
-          secondaryValue = coincidencia.senalDNI || "";
-        } else {
-          mainValue = coincidencia.senalDescripcion || "";
-          secondaryValue = coincidencia.senalGrabaciones || "";
-        }
-        
+        const tipo = row.getValue("tipoCoincidencia");
         return (
-          <div className="flex flex-col">
-            <span className="font-medium truncate max-w-[200px]" title={mainValue}>{mainValue}</span>
-            {secondaryValue && (
-              <span className="text-xs text-muted-foreground">{secondaryValue}</span>
+          <div className="flex items-center">
+            {tipo === "Persona" ? (
+              <User className="mr-2 h-4 w-4" />
+            ) : (
+              <Package className="mr-2 h-4 w-4" />
             )}
+            {tipo}
           </div>
         );
       },
     },
     {
-      accessorKey: "porcentajeCoincidencia",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Nivel" />,
-      cell: ({ row }: { row: Row<Coincidencia> }) => (
-        <div className="flex items-center gap-2">
-          {getNivelCoincidenciaBadge(row.original)}
-          <span className="text-sm">
-            {Math.round(row.original.porcentajeCoincidencia * 100)}%
-          </span>
-        </div>
-      ),
+      accessorKey: "valorCoincidente",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Valor encontrado" />,
+      cell: ({ row }: { row: Row<Coincidencia> }) => {
+        const valor = row.getValue("valorCoincidente") as string;
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="max-w-[250px] truncate">{valor}</div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{valor}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      },
     },
     {
-      accessorKey: "createdAt",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Detectado" />,
+      accessorKey: "tipoMatch",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Precisión" />,
       cell: ({ row }: { row: Row<Coincidencia> }) => {
-        const date = new Date(row.getValue("createdAt"));
-        return <span>{date.toLocaleDateString('es-ES')}</span>;
+        const tipoMatch = row.getValue("tipoMatch") as string;
+        const puntuacion = row.original.puntuacionCoincidencia;
+        
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant={tipoMatch === "Exacto" ? "destructive" : "default"}>
+                  {tipoMatch}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Puntuación: {(puntuacion * 100).toFixed(2)}%</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      },
+    },
+    {
+      accessorKey: "ordenInfo.storeCode",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Tienda" />,
+      cell: ({ row }: { row: Row<Coincidencia> }) => {
+        const storeCode = row.original.ordenInfo.storeCode;
+        const storeName = row.original.ordenInfo.storeName;
+        
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>{storeCode}</div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{storeName}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      },
+    },
+    {
+      accessorKey: "ordenInfo.orderNumber",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Nº Orden" />,
+    },
+    {
+      accessorKey: "creadoEn",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha" />,
+      cell: ({ row }: { row: Row<Coincidencia> }) => {
+        const fecha = new Date(row.getValue("creadoEn"));
+        return format(fecha, "dd/MM/yyyy", { locale: es });
+      },
+    },
+    {
+      accessorKey: "estado",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Estado" />,
+      cell: ({ row }: { row: Row<Coincidencia> }) => {
+        const estado = row.getValue("estado") as string;
+        let variant: "default" | "secondary" | "destructive" | "outline" = "default";
+        let label = "";
+        
+        switch (estado) {
+          case "NoLeido":
+            variant = "destructive";
+            label = "No leído";
+            break;
+          case "Leido":
+            variant = "default";
+            label = "Leído";
+            break;
+          case "Descartado":
+            variant = "secondary";
+            label = "Descartado";
+            break;
+        }
+        
+        return <Badge variant={variant}>{label}</Badge>;
       },
     },
     {
       id: "actions",
       cell: ({ row }: { row: Row<Coincidencia> }) => {
         const coincidencia = row.original;
+        const noLeida = coincidencia.estado === "NoLeido";
         
         return (
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => verDetallesCompra(coincidencia)}
-              title="Ver detalles"
-            >
+          <div className="flex items-center space-x-2">
+            <Button variant="ghost" size="icon" onClick={() => setViewingCoincidencia(coincidencia)}>
               <Eye className="h-4 w-4" />
             </Button>
-            {!coincidencia.leido && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => marcarLeidaMutation.mutate(coincidencia.id)}
-                title="Marcar como leída"
-                disabled={marcarLeidaMutation.isPending}
-              >
-                {marcarLeidaMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-              </Button>
+            {noLeida && (
+              <>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setReviewDialog({ 
+                    open: true, 
+                    id: coincidencia.id, 
+                    action: "marcar" 
+                  })}
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setReviewDialog({ 
+                    open: true, 
+                    id: coincidencia.id, 
+                    action: "descartar" 
+                  })}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </>
             )}
           </div>
         );
       },
     },
   ];
-
-  // Obtener datos según la pestaña activa
-  const getCoincidenciasActivas = () => {
-    if (activeTab === "noLeidas") {
-      return {
-        data: coincidenciasNoLeidas || [],
-        isLoading: loadingNoLeidas,
-        isError: errorNoLeidas,
-      };
-    } else {
-      return {
-        data: coincidenciasLeidas || [],
-        isLoading: loadingLeidas,
-        isError: errorLeidas,
-      };
+  
+  // Función para obtener el color del estado según su valor
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "NoLeido": return "text-destructive";
+      case "Leido": return "text-primary";
+      case "Descartado": return "text-muted-foreground";
+      default: return "";
     }
   };
-
-  const { data, isLoading, isError } = getCoincidenciasActivas();
-
+  
+  // Filtrar coincidencias según la pestaña activa
+  const filteredCoincidencias = coincidencias.filter(coincidencia => {
+    if (activeTab === "todas") return true;
+    if (activeTab === "noleidas") return coincidencia.estado === "NoLeido";
+    if (activeTab === "leidas") return coincidencia.estado === "Leido";
+    if (activeTab === "descartadas") return coincidencia.estado === "Descartado";
+    return true;
+  });
+  
   return (
     <MainLayout>
-      <div className="container mx-auto py-6 space-y-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold tracking-tight">Coincidencias</h1>
-            {coincidenciasNoLeidas && coincidenciasNoLeidas.length > 0 && (
-              <Badge className="bg-red-500">
-                {coincidenciasNoLeidas.length} no leídas
-              </Badge>
-            )}
-          </div>
-          <Button 
-            onClick={actualizarCoincidencias}
-            variant="outline"
-            className="gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Actualizar
-          </Button>
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Coincidencias</h2>
+          <p className="text-muted-foreground">
+            Revise y gestione las coincidencias detectadas en los registros de compras
+          </p>
         </div>
-
-        <p className="text-muted-foreground">
-          Revise las coincidencias detectadas entre compras y señalamientos registrados en el sistema.
-        </p>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="noLeidas" className="relative">
-              No leídas
-              {coincidenciasNoLeidas && coincidenciasNoLeidas.length > 0 && (
-                <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                  {coincidenciasNoLeidas.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="leidas">Leídas</TabsTrigger>
+        
+        <Tabs 
+          value={activeTab} 
+          onValueChange={setActiveTab}
+          className="w-full"
+        >
+          <TabsList className="grid grid-cols-4 mb-4">
+            {tabsData.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value}>
+                {tab.label}
+                {tab.value === "noleidas" && (
+                  <Badge className="ml-2 bg-destructive hover:bg-destructive text-white">
+                    {coincidencias.filter(c => c.estado === "NoLeido").length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            ))}
           </TabsList>
-          <TabsContent value="noLeidas">
-            <Card>
-              <CardHeader>
-                <CardTitle>Coincidencias Pendientes</CardTitle>
-                <CardDescription>
-                  Lista de coincidencias que aún no han sido revisadas.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="flex justify-center items-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : isError ? (
-                  <div className="flex justify-center items-center h-64 text-destructive">
-                    <AlertTriangle className="h-8 w-8 mr-2" />
-                    Error al cargar datos. Intente nuevamente más tarde.
-                  </div>
-                ) : data.length === 0 ? (
-                  <div className="flex flex-col justify-center items-center h-64 text-muted-foreground">
-                    <CheckCircle2 className="h-12 w-12 mb-4 text-green-500" />
-                    <p className="text-lg font-medium">No hay coincidencias pendientes</p>
-                    <p className="text-sm">Todas las coincidencias han sido revisadas.</p>
-                  </div>
-                ) : (
-                  <DataTable
+          
+          {tabsData.map((tab) => (
+            <TabsContent key={tab.value} value={tab.value} className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    {tab.label === "Todas" ? "Todas las coincidencias" : `Coincidencias ${tab.label.toLowerCase()}`}
+                  </CardTitle>
+                  <CardDescription>
+                    {tab.value === "noleidas" && "Coincidencias que requieren revisión"}
+                    {tab.value === "leidas" && "Coincidencias que han sido revisadas"}
+                    {tab.value === "descartadas" && "Coincidencias que han sido descartadas"}
+                    {tab.value === "todas" && "Todas las coincidencias detectadas en el sistema"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <DataTable 
                     columns={coincidenciasColumns}
-                    data={data}
-                    searchPlaceholder="Buscar coincidencias..."
-                    searchColumn="valor"
+                    data={filteredCoincidencias}
+                    searchColumn="valorCoincidente"
+                    searchPlaceholder="Buscar por valor coincidente..."
                   />
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="leidas">
-            <Card>
-              <CardHeader>
-                <CardTitle>Coincidencias Revisadas</CardTitle>
-                <CardDescription>
-                  Historial de coincidencias que ya han sido revisadas.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="flex justify-center items-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : isError ? (
-                  <div className="flex justify-center items-center h-64 text-destructive">
-                    <AlertTriangle className="h-8 w-8 mr-2" />
-                    Error al cargar datos. Intente nuevamente más tarde.
-                  </div>
-                ) : data.length === 0 ? (
-                  <div className="flex flex-col justify-center items-center h-64 text-muted-foreground">
-                    <AlertCircle className="h-12 w-12 mb-4 text-amber-500" />
-                    <p className="text-lg font-medium">No hay coincidencias revisadas</p>
-                    <p className="text-sm">Aún no se ha marcado ninguna coincidencia como leída.</p>
-                  </div>
-                ) : (
-                  <DataTable
-                    columns={coincidenciasColumns}
-                    data={data}
-                    searchPlaceholder="Buscar coincidencias..."
-                    searchColumn="valor"
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          ))}
         </Tabs>
-
-        {/* Diálogo para ver detalles de la compra */}
-        <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+        
+        {/* Diálogo para ver detalles de coincidencia */}
+        <Dialog open={!!viewingCoincidencia} onOpenChange={(open) => !open && setViewingCoincidencia(null)}>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
-              <DialogTitle>Detalles de la Compra</DialogTitle>
+              <DialogTitle>
+                Detalles de coincidencia
+              </DialogTitle>
               <DialogDescription>
-                Información completa de la compra asociada a esta coincidencia.
+                Información detallada sobre la coincidencia detectada
               </DialogDescription>
             </DialogHeader>
-            {excelDataDetails ? (
-              <div className="space-y-6">
+            
+            {viewingCoincidencia && (
+              <div className="space-y-4">
+                {/* Información general */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Tienda</h3>
-                    <p className="text-base">
-                      {excelDataDetails.storeName} ({excelDataDetails.storeCode})
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Fecha de compra</h3>
-                    <p className="text-base">
-                      {new Date(excelDataDetails.fecha).toLocaleDateString('es-ES')}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="border-t pt-4">
-                  <h3 className="text-base font-medium mb-2">Datos del comprador</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Nombre</h3>
-                      <p className="text-base">{excelDataDetails.comprador}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">DNI</h3>
-                      <p className="text-base">{excelDataDetails.dni || "No disponible"}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Teléfono</h3>
-                      <p className="text-base">{excelDataDetails.telefono || "No disponible"}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Dirección</h3>
-                      <p className="text-base">{excelDataDetails.direccion || "No disponible"}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t pt-4">
-                  <h3 className="text-base font-medium mb-2">Datos del artículo</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Artículo</h3>
-                      <p className="text-base">{excelDataDetails.articulo}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Precio</h3>
-                      <p className="text-base">{excelDataDetails.precio}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <h3 className="text-sm font-medium text-muted-foreground">Grabaciones</h3>
-                      <p className="text-base">{excelDataDetails.grabaciones || "No disponible"}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t pt-4">
-                  <h3 className="text-base font-medium mb-2">Señalamiento coincidente</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Tipo</h3>
-                      <p className="text-base">
-                        {selectedCoincidencia?.senalTipo === "persona" ? "Persona" : "Objeto"}
-                      </p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Coincidencia</h3>
-                      <p className="flex items-center gap-2">
-                        {selectedCoincidencia?.coincidenciaExacta ? (
-                          <Badge className="bg-red-500">Exacta</Badge>
-                        ) : (
-                          <Badge className="bg-amber-500">Parcial</Badge>
-                        )}
-                        <span>
-                          {Math.round((selectedCoincidencia?.porcentajeCoincidencia || 0) * 100)}%
+                    <h3 className="text-sm font-medium">Tipo</h3>
+                    <p className="text-sm mt-1">
+                      {viewingCoincidencia.tipoCoincidencia === "Persona" ? (
+                        <span className="flex items-center">
+                          <User className="mr-2 h-4 w-4" />
+                          Persona
                         </span>
-                      </p>
+                      ) : (
+                        <span className="flex items-center">
+                          <Package className="mr-2 h-4 w-4" />
+                          Objeto
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-sm font-medium">Estado</h3>
+                    <p className={`text-sm mt-1 ${getStatusColor(viewingCoincidencia.estado)}`}>
+                      {viewingCoincidencia.estado === "NoLeido" && "No leído"}
+                      {viewingCoincidencia.estado === "Leido" && "Leído"}
+                      {viewingCoincidencia.estado === "Descartado" && "Descartado"}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-sm font-medium">Fecha de detección</h3>
+                    <p className="text-sm mt-1">
+                      {format(new Date(viewingCoincidencia.creadoEn), "dd/MM/yyyy HH:mm", { locale: es })}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-sm font-medium">Precisión</h3>
+                    <p className="text-sm mt-1 flex items-center">
+                      <Badge variant={viewingCoincidencia.tipoMatch === "Exacto" ? "destructive" : "default"}>
+                        {viewingCoincidencia.tipoMatch}
+                      </Badge>
+                      <span className="ml-2">
+                        ({(viewingCoincidencia.puntuacionCoincidencia * 100).toFixed(2)}%)
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Información de señalamiento */}
+                <div className="border rounded-md p-3 bg-muted/50">
+                  <h3 className="text-sm font-medium mb-2">Señalamiento</h3>
+                  <div className="space-y-2">
+                    {viewingCoincidencia.tipoCoincidencia === "Persona" ? (
+                      <>
+                        <div>
+                          <span className="text-xs font-medium text-muted-foreground">Nombre:</span>
+                          <p className="text-sm">{viewingCoincidencia.nombrePersona || "N/A"}</p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <span className="text-xs font-medium text-muted-foreground">Descripción:</span>
+                          <p className="text-sm">{viewingCoincidencia.descripcionObjeto || "N/A"}</p>
+                        </div>
+                      </>
+                    )}
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Campo coincidente:</span>
+                      <p className="text-sm">{viewingCoincidencia.campoCoincidente}</p>
                     </div>
                     <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Campo</h3>
-                      <p className="text-base">{selectedCoincidencia?.campo}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Valor</h3>
-                      <p className="text-base">{selectedCoincidencia?.valor}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <h3 className="text-sm font-medium text-muted-foreground">Motivo</h3>
-                      <p className="text-base">{selectedCoincidencia?.senalMotivo}</p>
+                      <span className="text-xs font-medium text-muted-foreground">Valor encontrado:</span>
+                      <p className="text-sm">{viewingCoincidencia.valorCoincidente}</p>
                     </div>
                   </div>
                 </div>
-
-                <div className="flex justify-end gap-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setDetailsDialogOpen(false)}
-                  >
-                    Cerrar
-                  </Button>
-                  <Button
-                    className="gap-2"
-                    onClick={() => {
-                      setDetailsDialogOpen(false);
-                      irADetalleCompra(excelDataDetails.id);
-                    }}
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Ver en Control de Compras
-                  </Button>
+                
+                {/* Información de la orden */}
+                <div className="border rounded-md p-3 bg-muted/50">
+                  <h3 className="text-sm font-medium mb-2">Información de la orden</h3>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Tienda:</span>
+                      <p className="text-sm">
+                        {viewingCoincidencia.ordenInfo.storeCode} - {viewingCoincidencia.ordenInfo.storeName}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Nº Orden:</span>
+                      <p className="text-sm">{viewingCoincidencia.ordenInfo.orderNumber}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Fecha orden:</span>
+                      <p className="text-sm">
+                        {format(new Date(viewingCoincidencia.ordenInfo.orderDate), "dd/MM/yyyy", { locale: es })}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Cliente:</span>
+                      <p className="text-sm">{viewingCoincidencia.ordenInfo.customerName || "N/A"}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <Button variant="outline" size="sm" className="mt-2" asChild>
+                      <a href={`/purchase-control?orderNumber=${viewingCoincidencia.ordenInfo.orderNumber}`} target="_blank">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Ver en Control de Compras
+                      </a>
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="flex justify-center items-center h-48">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                
+                {/* Información de revisión */}
+                {(viewingCoincidencia.estado === "Leido" || viewingCoincidencia.estado === "Descartado") && (
+                  <div className="border rounded-md p-3 bg-muted/50">
+                    <h3 className="text-sm font-medium mb-2">Información de revisión</h3>
+                    <div className="space-y-2">
+                      <div>
+                        <span className="text-xs font-medium text-muted-foreground">Revisado por:</span>
+                        <p className="text-sm">ID: {viewingCoincidencia.revisadoPor}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium text-muted-foreground">Fecha de revisión:</span>
+                        <p className="text-sm">
+                          {viewingCoincidencia.revisadoEn 
+                            ? format(new Date(viewingCoincidencia.revisadoEn), "dd/MM/yyyy HH:mm", { locale: es })
+                            : "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium text-muted-foreground">Notas:</span>
+                        <p className="text-sm whitespace-pre-wrap">
+                          {viewingCoincidencia.notasRevision || "Sin notas"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Acciones */}
+                <DialogFooter className="gap-2">
+                  {viewingCoincidencia.estado === "NoLeido" && (
+                    <>
+                      <Button
+                        onClick={() => {
+                          setReviewDialog({ 
+                            open: true, 
+                            id: viewingCoincidencia.id, 
+                            action: "marcar" 
+                          });
+                          setViewingCoincidencia(null);
+                        }}
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Marcar como leída
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setReviewDialog({ 
+                            open: true, 
+                            id: viewingCoincidencia.id, 
+                            action: "descartar" 
+                          });
+                          setViewingCoincidencia(null);
+                        }}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Descartar
+                      </Button>
+                    </>
+                  )}
+                </DialogFooter>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+        
+        {/* Diálogo para marcar como leída o descartar */}
+        <Dialog 
+          open={reviewDialog.open} 
+          onOpenChange={(open) => !open && setReviewDialog({ open: false, id: null, action: "marcar" })}
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>
+                {reviewDialog.action === "marcar" ? "Marcar como leída" : "Descartar coincidencia"}
+              </DialogTitle>
+              <DialogDescription>
+                {reviewDialog.action === "marcar" 
+                  ? "Añada notas opcionales sobre esta coincidencia" 
+                  : "Explique por qué descarta esta coincidencia"}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Notas de revisión</h3>
+                <Textarea 
+                  placeholder="Ingrese notas sobre esta revisión (opcional)"
+                  value={reviewNotes}
+                  onChange={(e) => setReviewNotes(e.target.value)}
+                  rows={4}
+                />
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setReviewDialog({ open: false, id: null, action: "marcar" })}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (reviewDialog.id === null) return;
+                  
+                  if (reviewDialog.action === "marcar") {
+                    markAsReadMutation.mutate({ id: reviewDialog.id, notas: reviewNotes });
+                  } else {
+                    dismissMutation.mutate({ id: reviewDialog.id, notas: reviewNotes });
+                  }
+                }}
+              >
+                {reviewDialog.action === "marcar" ? "Marcar como leída" : "Descartar"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

@@ -36,6 +36,8 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   searchKey?: string;
+  searchColumn?: string;
+  searchPlaceholder?: string;
   searchFields?: { key: string, placeholder: string }[]; // Multiple search fields
   pageSizeOptions?: number[];
   showColumnToggle?: boolean;
@@ -72,6 +74,8 @@ export function DataTable<TData, TValue>({
   columns,
   data,
   searchKey,
+  searchColumn,
+  searchPlaceholder = "Buscar...",
   searchFields,
   pageSizeOptions = [10, 25, 50, 100],
   showColumnToggle = true,
@@ -155,6 +159,17 @@ export function DataTable<TData, TValue>({
               value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
               onChange={(event) =>
                 table.getColumn(searchKey)?.setFilterValue(event.target.value)
+              }
+              className="max-w-sm"
+            />
+          </div>
+        ) : searchColumn ? (
+          <div className="flex items-center">
+            <Input
+              placeholder={searchPlaceholder}
+              value={(table.getColumn(searchColumn)?.getFilterValue() as string) ?? ""}
+              onChange={(event) =>
+                table.getColumn(searchColumn)?.setFilterValue(event.target.value)
               }
               className="max-w-sm"
             />
