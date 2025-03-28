@@ -527,6 +527,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerContact,
         itemDetails,
         metals,
+        engravings,
+        stones,
         price,
         priceOperator = "=",
         onlyAlerts = false
@@ -553,6 +555,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (customerContact) filters.customerContact = customerContact;
         if (itemDetails) filters.itemDetails = itemDetails;
         if (metals) filters.metals = metals;
+        if (engravings) filters.engravings = engravings;
+        if (stones) filters.stones = stones;
         
         // Manejar filtrado de precios con operadores
         if (price && !isNaN(parseFloat(price))) {

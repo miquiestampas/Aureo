@@ -1554,6 +1554,14 @@ export class DatabaseStorage implements IStorage {
           sqlConditions.push(`metals ILIKE ${escapeLikePattern(filters.metals)}`);
         }
         
+        if (filters.engravings) {
+          sqlConditions.push(`engravings ILIKE ${escapeLikePattern(filters.engravings)}`);
+        }
+        
+        if (filters.stones) {
+          sqlConditions.push(`stones ILIKE ${escapeLikePattern(filters.stones)}`);
+        }
+        
         // Filtros de fecha
         if (filters.fromDate) {
           const fromDate = filters.fromDate instanceof Date 

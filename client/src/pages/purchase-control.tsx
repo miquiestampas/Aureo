@@ -543,7 +543,7 @@ export default function PurchaseControlPage() {
                   <div>
                     <Label htmlFor="engravings" className="flex items-center">
                       <Quote className="h-4 w-4 mr-1 text-primary" />
-                      <span>Grabados</span>
+                      <span>Grabaciones</span>
                     </Label>
                     <Input
                       id="engravings"
