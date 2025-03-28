@@ -55,6 +55,8 @@ interface SystemStatus {
   fileWatchingActive: boolean;
   lastSystemCheck: string;
   databaseSize: number; // Tamaño relativo de la BD en porcentaje (0-100)
+  personasActivas: number; // Número de señalamientos de personas activos
+  objetosActivos: number; // Número de señalamientos de objetos activos
 }
 
 interface FileActivity {
@@ -712,53 +714,53 @@ export default function DashboardPage() {
             </CardFooter>
           </Card>
           
-          {/* Excel Stores Card */}
+          {/* Personas Activas Card */}
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center">
                 <div className="flex-shrink-0 bg-green-600 rounded-md p-3">
-                  <FileSpreadsheet className="h-6 w-6 text-white" />
+                  <AlertCircle className="h-6 w-6 text-white" />
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Tiendas Excel</dt>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Señalamientos Personas</dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      {systemStatus?.excelStores ?? '...'}
+                      {systemStatus?.personasActivas ?? '...'}
                     </dd>
                   </dl>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="bg-gray-50 px-6 py-3">
-              <Link href="/excel-stores">
+              <Link href="/senalamientos">
                 <div className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer">
-                  Ver tiendas Excel
+                  Ver señalamientos personas
                 </div>
               </Link>
             </CardFooter>
           </Card>
           
-          {/* PDF Stores Card */}
+          {/* Objetos Activos Card */}
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center">
                 <div className="flex-shrink-0 bg-red-500 rounded-md p-3">
-                  <FileText className="h-6 w-6 text-white" />
+                  <AlertCircle className="h-6 w-6 text-white" />
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Tiendas PDF</dt>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Señalamientos Objetos</dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      {systemStatus?.pdfStores ?? '...'}
+                      {systemStatus?.objetosActivos ?? '...'}
                     </dd>
                   </dl>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="bg-gray-50 px-6 py-3">
-              <Link href="/pdf-stores">
+              <Link href="/senalamientos">
                 <div className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer">
-                  Ver tiendas PDF
+                  Ver señalamientos objetos
                 </div>
               </Link>
             </CardFooter>

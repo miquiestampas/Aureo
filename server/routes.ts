@@ -1036,11 +1036,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/system/status", async (req, res) => {
     try {
       // Get system stats
-      const [excelStores, pdfStores, recentActivities] = await Promise.all([
+      const [excelStores, pdfStores, recentActivities, personas, objetos] = await Promise.all([
         storage.getStoresByType('Excel'),
         storage.getStoresByType('PDF'),
-        storage.getRecentFileActivities(50)
+        storage.getRecentFileActivities(50),
+        storage.getSenalPersonas(false),
+        storage.getSenalObjetos(false)
       ]);
+      
+      // Calcular señalamientos activos
+      const personasActivas = personas.filter(p => p.estado === "Activo").length;
+      const objetosActivos = objetos.filter(o => o.estado === "Activo").length;
       
       // Calculate processed today count
       const today = new Date();
@@ -1091,7 +1097,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pendingFiles,
         fileWatchingActive,
         lastSystemCheck: new Date().toISOString(),
-        databaseSize
+        databaseSize,
+        personasActivas,
+        objetosActivos
       });
     } catch (err) {
       res.status(500).json({ message: "Error fetching system status" });
