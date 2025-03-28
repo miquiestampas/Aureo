@@ -38,6 +38,72 @@ import {
   Trash2
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
+
+// Lista de localidades de Madrid
+const MADRID_LOCALITIES = [
+  "Madrid",
+  "Ajalvir",
+  "Alcalá de Henares",
+  "Alcobendas",
+  "Alcorcón",
+  "Aldea del Fresno",
+  "Algete",
+  "Alpedrete",
+  "Aranjuez",
+  "Arganda del Rey",
+  "Arroyomolinos",
+  "Becerril de la Sierra",
+  "Boadilla del Monte",
+  "Brunete",
+  "Cercedilla",
+  "Ciempozuelos",
+  "Cobeña",
+  "Collado Mediano",
+  "Collado Villalba",
+  "Colmenar de Oreja",
+  "Colmenar Viejo",
+  "Coslada",
+  "Daganzo de Arriba",
+  "El Álamo",
+  "El Boalo",
+  "El Escorial",
+  "El Molar",
+  "Fuenlabrada",
+  "Fuente el Saz",
+  "Galapagar",
+  "Getafe",
+  "Griñón",
+  "Guadarrama",
+  "Hoyo de Manzanares",
+  "Humanes de Madrid",
+  "Las Rozas",
+  "Leganés",
+  "Loeches",
+  "Majadahonda",
+  "Manzanares el Real",
+  "Mejorada del Campo",
+  "Moraleja de Enmedio",
+  "Moralzarzal",
+  "Móstoles",
+  "Navalcarnero",
+  "Parla",
+  "Pinto",
+  "Pozuelo de Alarcón",
+  "Rivas-Vaciamadrid",
+  "San Agustín del Guadalix",
+  "San Fernando de Henares",
+  "San Lorenzo de El Escorial",
+  "San Martín de la Vega",
+  "San Sebastián de los Reyes",
+  "Sevilla la Nueva",
+  "Torrejón de Ardoz",
+  "Torrelodones",
+  "Tres Cantos",
+  "Valdemoro",
+  "Villanueva de la Cañada",
+  "Villanueva del Pardillo",
+  "Villaviciosa de Odón"
+];
 import { format } from "date-fns";
 import PdfViewer from "@/components/PdfViewer";
 import FileUploadModal from "@/components/FileUploadModal";
@@ -81,10 +147,11 @@ export default function PdfStoresPage() {
   const [storeData, setStoreData] = useState<PdfDocument[]>([]);
   const [isLoadingStoreData, setIsLoadingStoreData] = useState(false);
   
-  // Búsqueda por código, nombre o ubicación
+  // Búsqueda por código, nombre, distrito y localidad
   const [codeFilter, setCodeFilter] = useState('');
   const [nameFilter, setNameFilter] = useState('');
-  const [locationFilter, setLocationFilter] = useState('');
+  const [districtFilter, setDistrictFilter] = useState('');
+  const [localityFilter, setLocalityFilter] = useState('');
   
   // Obtener parámetros de la URL
   const searchParams = new URLSearchParams(window.location.search);
@@ -100,16 +167,18 @@ export default function PdfStoresPage() {
     const matchesCode = store.code.toLowerCase().includes(codeFilter.toLowerCase());
     const matchesName = store.name.toLowerCase().includes(nameFilter.toLowerCase());
     
-    // Buscar en location, district o locality
-    const matchesLocation = 
-      (store.location?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false) ||
-      (store.district?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false) ||
-      (store.locality?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false);
+    // Filtro por distrito y localidad
+    const matchesDistrict = districtFilter === '' || 
+      (store.district?.toLowerCase() === districtFilter.toLowerCase());
+    
+    const matchesLocality = localityFilter === '' || 
+      (store.locality?.toLowerCase() === localityFilter.toLowerCase());
     
     return (
       (codeFilter === '' || matchesCode) && 
       (nameFilter === '' || matchesName) && 
-      (locationFilter === '' || matchesLocation)
+      matchesDistrict &&
+      matchesLocality
     );
   });
   
@@ -408,7 +477,7 @@ export default function PdfStoresPage() {
             <CardDescription>Filtrar tiendas por código, nombre o ubicación</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="code-filter">Código</Label>
                 <Input
@@ -428,13 +497,42 @@ export default function PdfStoresPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="location-filter">Ubicación</Label>
-                <Input
-                  id="location-filter"
-                  placeholder="Filtrar por ubicación..."
-                  value={locationFilter}
-                  onChange={(e) => setLocationFilter(e.target.value)}
-                />
+                <Label htmlFor="distrito-filter">Distrito</Label>
+                <Select
+                  value={districtFilter}
+                  onValueChange={(value) => setDistrictFilter(value)}
+                >
+                  <SelectTrigger id="distrito-filter">
+                    <SelectValue placeholder="Todos los distritos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todos los distritos</SelectItem>
+                    <SelectItem value="Centro">Centro</SelectItem>
+                    <SelectItem value="Norte">Norte</SelectItem>
+                    <SelectItem value="Sur">Sur</SelectItem>
+                    <SelectItem value="Este">Este</SelectItem>
+                    <SelectItem value="Oeste">Oeste</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="localidad-filter">Localidad</Label>
+                <Select
+                  value={localityFilter}
+                  onValueChange={(value) => setLocalityFilter(value)}
+                >
+                  <SelectTrigger id="localidad-filter">
+                    <SelectValue placeholder="Todas las localidades" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px] overflow-y-auto">
+                    <SelectItem value="">Todas las localidades</SelectItem>
+                    {MADRID_LOCALITIES.map((locality) => (
+                      <SelectItem key={locality} value={locality}>
+                        {locality}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>
