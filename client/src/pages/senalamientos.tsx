@@ -467,8 +467,16 @@ export default function Senalamientos() {
       accessorKey: "creadoEn",
       header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha" />,
       cell: ({ row }: { row: Row<SenalPersona> }) => {
-        const fecha = new Date(row.getValue("creadoEn"));
-        return format(fecha, "dd/MM/yyyy", { locale: es });
+        const fechaStr = row.getValue("creadoEn");
+        if (!fechaStr) return "N/A";
+        try {
+          const fecha = new Date(fechaStr);
+          if (isNaN(fecha.getTime())) return "Fecha inválida";
+          return format(fecha, "dd/MM/yyyy", { locale: es });
+        } catch (error) {
+          console.error("Error al formatear fecha:", error);
+          return "Error de formato";
+        }
       },
     },
     {
@@ -565,8 +573,16 @@ export default function Senalamientos() {
       accessorKey: "creadoEn",
       header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha" />,
       cell: ({ row }: { row: Row<SenalObjeto> }) => {
-        const fecha = new Date(row.getValue("creadoEn"));
-        return format(fecha, "dd/MM/yyyy", { locale: es });
+        const fechaStr = row.getValue("creadoEn");
+        if (!fechaStr) return "N/A";
+        try {
+          const fecha = new Date(fechaStr);
+          if (isNaN(fecha.getTime())) return "Fecha inválida";
+          return format(fecha, "dd/MM/yyyy", { locale: es });
+        } catch (error) {
+          console.error("Error al formatear fecha:", error);
+          return "Error de formato";
+        }
       },
     },
     {
