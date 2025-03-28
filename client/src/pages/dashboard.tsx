@@ -265,6 +265,11 @@ export default function DashboardPage() {
     refetchInterval: 15000, // Refetch every 15 seconds
   });
   
+  // Fetch all stores for modals
+  const { data: stores = [] } = useQuery<Store[]>({
+    queryKey: ['/api/stores'],
+  });
+  
   // Refetch data when receiving socket events
   useEffect(() => {
     if (recentEvents.length > 0) {
@@ -285,16 +290,19 @@ export default function DashboardPage() {
   // Estado para filtros
   const [fileTypeFilter, setFileTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [dateRange, setDateRange] = useState<{
-    from: Date | null;
-    to: Date | null;
-  }>({
-    from: null,
-    to: null
+  interface DateRange {
+    from: Date | undefined;
+    to: Date | undefined;
+  }
+  
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: undefined,
+    to: undefined
   });
   
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isPdfUploadModalOpen, setIsPdfUploadModalOpen] = useState(false);
+  const [isExcelUploadModalOpen, setIsExcelUploadModalOpen] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [selectedActivities, setSelectedActivities] = useState<FileActivity[]>([]);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
@@ -859,11 +867,18 @@ export default function DashboardPage() {
             <h2 className="text-lg leading-6 font-medium text-gray-900">Actividad Reciente</h2>
             <div className="flex space-x-2">
               <Button 
-                className="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => setIsUploadModalOpen(true)}
+                className="inline-flex items-center bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => setIsPdfUploadModalOpen(true)}
               >
-                <Plus className="mr-2 h-5 w-5" />
-                Cargar Archivo
+                <FileText className="mr-2 h-5 w-5" />
+                Cargar PDF
+              </Button>
+              <Button 
+                className="inline-flex items-center bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => setIsExcelUploadModalOpen(true)}
+              >
+                <FileSpreadsheet className="mr-2 h-5 w-5" />
+                Cargar Excel
               </Button>
             </div>
           </div>
@@ -930,14 +945,14 @@ export default function DashboardPage() {
                       initialFocus
                       mode="range"
                       defaultMonth={new Date()}
-                      selected={{
+                      selected={dateRange.from && dateRange.to ? {
                         from: dateRange.from,
                         to: dateRange.to
-                      }}
+                      } : undefined}
                       onSelect={(range) => 
                         setDateRange({
-                          from: range?.from || null,
-                          to: range?.to || null
+                          from: range?.from,
+                          to: range?.to
                         })
                       }
                       numberOfMonths={2}
@@ -955,7 +970,7 @@ export default function DashboardPage() {
                   onClick={() => {
                     setFileTypeFilter("all");
                     setStatusFilter("all");
-                    setDateRange({ from: null, to: null });
+                    setDateRange({ from: undefined, to: undefined });
                   }}
                 >
                   Limpiar Filtros
@@ -1066,10 +1081,16 @@ export default function DashboardPage() {
       
       {/* Modales de carga de archivos */}
       <FileUploadModal 
-        isOpen={isUploadModalOpen} 
-        onClose={() => setIsUploadModalOpen(false)} 
-        storesByType={[]} 
+        isOpen={isPdfUploadModalOpen} 
+        onClose={() => setIsPdfUploadModalOpen(false)} 
+        storesByType={stores.filter(store => store.type === "PDF" && store.active)} 
         fileType="PDF" 
+      />
+      <FileUploadModal 
+        isOpen={isExcelUploadModalOpen} 
+        onClose={() => setIsExcelUploadModalOpen(false)} 
+        storesByType={stores.filter(store => store.type === "Excel" && store.active)} 
+        fileType="Excel" 
       />
     </div>
   );
