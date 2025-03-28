@@ -1638,20 +1638,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const data = req.body;
         
-        // Eliminada la validación de campos requeridos para permitir
-        // crear señalamientos con cualquier campo de forma independiente
+        // Validar datos requeridos
+        if (!data.nombre && !data.documentoId) {
+          return res.status(400).json({ error: "Debe proporcionar al menos un nombre o un documento de identidad" });
+        }
         
         // Agregar ID del usuario creador
         const senalPersona: InsertSenalPersona = {
           ...data,
           // Si el nombre es una cadena vacía, establecerlo como null para la base de datos
           nombre: data.nombre || null,
-          // Manejar la fecha de manera segura
-          fecha: data.fecha ? (typeof data.fecha === 'string' ? data.fecha : new Date(data.fecha).toISOString()) : null,
           creadoPor: req.user!.id
         };
-        
-        console.log("Persona a crear:", senalPersona);
         
         const nuevaPersona = await storage.createSenalPersona(senalPersona);
         res.status(201).json(nuevaPersona);
@@ -1704,20 +1702,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const data = req.body;
         
-        // Eliminada la validación de campos requeridos para permitir
-        // modificar señalamientos con cualquier campo de forma independiente
+        // Validar datos requeridos
+        if (!data.nombre && !data.documentoId) {
+          return res.status(400).json({ error: "Debe proporcionar al menos un nombre o un documento de identidad" });
+        }
         
         // Agregar ID del usuario que modifica
         const updates: Partial<SenalPersona> = {
           ...data,
           // Si el nombre es una cadena vacía, establecerlo como null para la base de datos
           nombre: data.nombre || null,
-          // Manejar la fecha de manera segura
-          fecha: data.fecha ? (typeof data.fecha === 'string' ? data.fecha : new Date(data.fecha).toISOString()) : null,
           modificadoPor: req.user!.id
         };
-        
-        console.log("Persona a actualizar:", updates);
         
         const personaActualizada = await storage.updateSenalPersona(id, updates);
         if (!personaActualizada) {
@@ -1799,20 +1795,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const data = req.body;
         
-        // Eliminada la validación de campos requeridos para permitir
-        // crear señalamientos con cualquier campo de forma independiente
+        // Validar que al menos uno de los campos tenga información
+        if (!data.descripcion && !data.grabacion && !data.notas) {
+          return res.status(400).json({ error: "Debe proporcionar al menos una descripción, grabación o notas" });
+        }
         
         // Agregar ID del usuario creador
         const senalObjeto: InsertSenalObjeto = {
           ...data,
           // Si la descripción es una cadena vacía, establecerla como null para la base de datos
           descripcion: data.descripcion || null,
-          // Manejar la fecha de manera segura
-          fecha: data.fecha ? (typeof data.fecha === 'string' ? data.fecha : new Date(data.fecha).toISOString()) : null,
           creadoPor: req.user!.id
         };
         
-        console.log("Objeto a crear:", senalObjeto);
         const nuevoObjeto = await storage.createSenalObjeto(senalObjeto);
         res.status(201).json(nuevoObjeto);
       } catch (error) {
@@ -1864,20 +1859,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const data = req.body;
         
-        // Eliminada la validación de campos requeridos para permitir
-        // modificar señalamientos con cualquier campo de forma independiente
+        // Validar que al menos uno de los campos tenga información
+        if (!data.descripcion && !data.grabacion && !data.notas) {
+          return res.status(400).json({ error: "Debe proporcionar al menos una descripción, grabación o notas" });
+        }
         
         // Agregar ID del usuario que modifica
         const updates: Partial<SenalObjeto> = {
           ...data,
           // Si la descripción es una cadena vacía, establecerla como null para la base de datos
           descripcion: data.descripcion || null,
-          // Manejar la fecha de manera segura
-          fecha: data.fecha ? (typeof data.fecha === 'string' ? data.fecha : new Date(data.fecha).toISOString()) : null,
           modificadoPor: req.user!.id
         };
         
-        console.log("Objeto a actualizar:", updates);
         const objetoActualizado = await storage.updateSenalObjeto(id, updates);
         if (!objetoActualizado) {
           return res.status(404).json({ error: "No se pudo actualizar el señalamiento" });

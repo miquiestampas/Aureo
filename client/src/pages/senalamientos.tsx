@@ -5,14 +5,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { CalendarIcon } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import {
   Edit,
   Trash2,
@@ -88,7 +80,6 @@ interface SenalPersona {
   nombre: string;
   documentoId: string | null;
   notas: string | null;
-  fecha: string | null;
   estado: "Activo" | "Inactivo";
   creadoPor: number;
   creadoEn: string;
@@ -101,7 +92,6 @@ interface SenalObjeto {
   descripcion: string;
   grabacion: string | null;
   notas: string | null;
-  fecha: string | null;
   estado: "Activo" | "Inactivo";
   creadoPor: number;
   creadoEn: string;
@@ -115,13 +105,19 @@ const personaSchema = z.object({
     z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
     z.literal("")
   ]).optional(),
-  documentoId: z.union([
-    z.string().min(3, "El documento debe tener al menos 3 caracteres"),
-    z.literal("")
-  ]).optional(),
+  documentoId: z.string().min(1, "El documento es requerido si no se proporciona nombre").optional(),
   notas: z.string().nullable().optional(),
-  fecha: z.date().optional().nullable(),
   estado: z.enum(["Activo", "Inactivo"])
+}).refine(data => {
+  // Si el nombre está vacío, debe tener documento
+  if (!data.nombre && !data.documentoId) {
+    return false;
+  }
+  // Si hay nombre, debe tener al menos 3 caracteres (ya validado arriba)
+  return true;
+}, {
+  message: "Debe proporcionar al menos un nombre o un documento de identidad",
+  path: ["documentoId"]
 });
 
 const objetoSchema = z.object({
@@ -131,8 +127,13 @@ const objetoSchema = z.object({
   ]),
   grabacion: z.string().nullable().optional(),
   notas: z.string().nullable().optional(),
-  fecha: z.date().optional().nullable(),
   estado: z.enum(["Activo", "Inactivo"])
+}).refine(data => {
+  // Al menos uno de los campos debe tener información
+  return !!data.descripcion || !!data.grabacion || !!data.notas;
+}, {
+  message: "Debe proporcionar al menos una descripción, grabación o notas",
+  path: ["descripcion"]
 });
 
 type PersonaFormValues = z.infer<typeof personaSchema>;
@@ -159,7 +160,6 @@ export default function Senalamientos() {
       nombre: "",
       documentoId: "",
       notas: "",
-      fecha: new Date(),
       estado: "Activo"
     }
   });
@@ -171,7 +171,6 @@ export default function Senalamientos() {
       descripcion: "",
       grabacion: "",
       notas: "",
-      fecha: new Date(),
       estado: "Activo"
     }
   });
@@ -197,18 +196,12 @@ export default function Senalamientos() {
   // Mutación para crear persona
   const createPersonaMutation = useMutation({
     mutationFn: async (data: PersonaFormValues) => {
-      // Convertir fecha a formato ISO string si existe
-      const formattedData = {
-        ...data,
-        fecha: data.fecha ? data.fecha.toISOString() : null
-      };
-      
       const response = await fetch("/api/senalamiento/personas", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formattedData),
+        body: JSON.stringify(data),
       });
       
       if (!response.ok) {
@@ -238,18 +231,12 @@ export default function Senalamientos() {
   // Mutación para actualizar persona
   const updatePersonaMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: PersonaFormValues }) => {
-      // Convertir fecha a formato ISO string si existe
-      const formattedData = {
-        ...data,
-        fecha: data.fecha ? data.fecha.toISOString() : null
-      };
-      
       const response = await fetch(`/api/senalamiento/personas/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formattedData),
+        body: JSON.stringify(data),
       });
       
       if (!response.ok) {
@@ -310,18 +297,12 @@ export default function Senalamientos() {
   // Mutación para crear objeto
   const createObjetoMutation = useMutation({
     mutationFn: async (data: ObjetoFormValues) => {
-      // Convertir fecha a formato ISO string si existe
-      const formattedData = {
-        ...data,
-        fecha: data.fecha ? data.fecha.toISOString() : null
-      };
-      
       const response = await fetch("/api/senalamiento/objetos", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formattedData),
+        body: JSON.stringify(data),
       });
       
       if (!response.ok) {
@@ -351,18 +332,12 @@ export default function Senalamientos() {
   // Mutación para actualizar objeto
   const updateObjetoMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: ObjetoFormValues }) => {
-      // Convertir fecha a formato ISO string si existe
-      const formattedData = {
-        ...data,
-        fecha: data.fecha ? data.fecha.toISOString() : null
-      };
-      
       const response = await fetch(`/api/senalamiento/objetos/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formattedData),
+        body: JSON.stringify(data),
       });
       
       if (!response.ok) {
@@ -444,7 +419,6 @@ export default function Senalamientos() {
       nombre: persona.nombre || undefined,
       documentoId: persona.documentoId || undefined,
       notas: persona.notas || undefined,
-      fecha: persona.fecha ? new Date(persona.fecha) : new Date(),
       estado: persona.estado
     });
     setEditingPersona(persona);
@@ -457,7 +431,6 @@ export default function Senalamientos() {
       descripcion: objeto.descripcion,
       grabacion: objeto.grabacion || undefined,
       notas: objeto.notas || undefined,
-      fecha: objeto.fecha ? new Date(objeto.fecha) : new Date(),
       estado: objeto.estado
     });
     setEditingObjeto(objeto);
@@ -491,25 +464,10 @@ export default function Senalamientos() {
         );
       },
     },
-    {
-      accessorKey: "fecha",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha registro" />,
-      cell: ({ row }: { row: Row<SenalPersona> }) => {
-        const fechaStr = row.getValue("fecha") as string;
-        if (!fechaStr) return "N/A";
-        try {
-          const fecha = new Date(fechaStr);
-          if (isNaN(fecha.getTime())) return "Fecha inválida";
-          return format(fecha, "dd/MM/yyyy", { locale: es });
-        } catch (error) {
-          console.error("Error al formatear fecha:", error);
-          return "Error de formato";
-        }
-      },
-    },
+
     {
       accessorKey: "creadoEn",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha creación" />,
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha" />,
       cell: ({ row }: { row: Row<SenalPersona> }) => {
         const fechaStr = row.getValue("creadoEn") as string;
         if (!fechaStr) return "N/A";
@@ -600,25 +558,10 @@ export default function Senalamientos() {
         );
       },
     },
-    {
-      accessorKey: "fecha",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha registro" />,
-      cell: ({ row }: { row: Row<SenalObjeto> }) => {
-        const fechaStr = row.getValue("fecha") as string;
-        if (!fechaStr) return "N/A";
-        try {
-          const fecha = new Date(fechaStr);
-          if (isNaN(fecha.getTime())) return "Fecha inválida";
-          return format(fecha, "dd/MM/yyyy", { locale: es });
-        } catch (error) {
-          console.error("Error al formatear fecha:", error);
-          return "Error de formato";
-        }
-      },
-    },
+
     {
       accessorKey: "creadoEn",
-      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha creación" />,
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Fecha" />,
       cell: ({ row }: { row: Row<SenalObjeto> }) => {
         const fechaStr = row.getValue("creadoEn") as string;
         if (!fechaStr) return "N/A";
@@ -817,48 +760,7 @@ export default function Senalamientos() {
                   )}
                 />
                 
-                <FormField
-                  control={personaForm.control}
-                  name="fecha"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Fecha</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "dd/MM/yyyy", { locale: es })
-                              ) : (
-                                <span>Seleccione una fecha</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormDescription>
-                        Fecha de registro (por defecto: hoy)
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
+
                 
                 <FormField
                   control={personaForm.control}
@@ -968,48 +870,7 @@ export default function Senalamientos() {
                   )}
                 />
                 
-                <FormField
-                  control={objetoForm.control}
-                  name="fecha"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Fecha</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "dd/MM/yyyy", { locale: es })
-                              ) : (
-                                <span>Seleccione una fecha</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormDescription>
-                        Fecha de registro (por defecto: hoy)
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
+
                 
                 <FormField
                   control={objetoForm.control}
