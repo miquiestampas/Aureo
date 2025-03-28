@@ -72,7 +72,8 @@ export default function ActivityControlPage() {
   const { toast } = useToast();
   const [codeFilter, setCodeFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
-  const [locationFilter, setLocationFilter] = useState("");
+  const [localityFilter, setLocalityFilter] = useState("");
+  const [districtFilter, setDistrictFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [stores, setStores] = useState<Store[]>([]);
@@ -158,11 +159,9 @@ export default function ActivityControlPage() {
     const matchesCode = store.code.toLowerCase().includes(codeFilter.toLowerCase());
     const matchesName = store.name.toLowerCase().includes(nameFilter.toLowerCase());
     
-    // Buscar en location, district o locality
-    const matchesLocation = 
-      (store.location?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false) ||
-      (store.district?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false) ||
-      (store.locality?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false);
+    // Filtrado por localidad y distrito
+    const matchesLocality = localityFilter === "" || (store.locality?.toLowerCase().includes(localityFilter.toLowerCase()) ?? false);
+    const matchesDistrict = districtFilter === "" || (store.district?.toLowerCase().includes(districtFilter.toLowerCase()) ?? false);
     
     const matchesType = typeFilter === "all" || store.type === typeFilter;
     const matchesStatus = statusFilter === "all" || item.status === statusFilter;
@@ -170,7 +169,8 @@ export default function ActivityControlPage() {
     return (
       (codeFilter === "" || matchesCode) && 
       (nameFilter === "" || matchesName) && 
-      (locationFilter === "" || matchesLocation) &&
+      matchesLocality &&
+      matchesDistrict &&
       matchesType &&
       matchesStatus
     );
@@ -444,7 +444,7 @@ export default function ActivityControlPage() {
               Filtros
             </CardTitle>
             <CardDescription>
-              Filtrar tiendas por código, nombre, ubicación, tipo o estado de actividad
+              Filtrar tiendas por código, nombre, distrito, localidad o tipo
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -468,12 +468,21 @@ export default function ActivityControlPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="location-filter">Ubicación</Label>
+                <Label htmlFor="distrito-filter">Distrito</Label>
                 <Input
-                  id="location-filter"
-                  placeholder="Filtrar por ubicación..."
-                  value={locationFilter}
-                  onChange={(e) => setLocationFilter(e.target.value)}
+                  id="distrito-filter"
+                  placeholder="Filtrar por distrito..."
+                  value={districtFilter}
+                  onChange={(e) => setDistrictFilter(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="localidad-filter">Localidad</Label>
+                <Input
+                  id="localidad-filter"
+                  placeholder="Filtrar por localidad..."
+                  value={localityFilter}
+                  onChange={(e) => setLocalityFilter(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -489,41 +498,6 @@ export default function ActivityControlPage() {
                     <SelectItem value="all">Todos los tipos</SelectItem>
                     <SelectItem value="Excel">Excel</SelectItem>
                     <SelectItem value="PDF">PDF</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="status-filter">Estado</Label>
-                <Select
-                  value={statusFilter}
-                  onValueChange={(value) => setStatusFilter(value)}
-                >
-                  <SelectTrigger id="status-filter" className={
-                    statusFilter === "active" ? "bg-green-50 border-green-300 text-green-800" :
-                    statusFilter === "warning" ? "bg-yellow-50 border-yellow-300 text-yellow-800" :
-                    statusFilter === "danger" ? "bg-red-50 border-red-300 text-red-800" :
-                    statusFilter === "inactive" ? "bg-gray-50 border-gray-300 text-gray-800" : ""
-                  }>
-                    <SelectValue placeholder="Todos los estados" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los estados</SelectItem>
-                    <SelectItem value="active" className="text-green-700 font-medium flex items-center">
-                      <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
-                      Activa
-                    </SelectItem>
-                    <SelectItem value="warning" className="text-yellow-700 font-medium flex items-center">
-                      <Clock className="h-4 w-4 mr-2 text-yellow-500" />
-                      Retrasada
-                    </SelectItem>
-                    <SelectItem value="danger" className="text-red-700 font-medium flex items-center">
-                      <AlertCircle className="h-4 w-4 mr-2 text-red-500" />
-                      Crítica
-                    </SelectItem>
-                    <SelectItem value="inactive" className="text-gray-700 font-medium flex items-center">
-                      <AlertCircle className="h-4 w-4 mr-2 text-gray-500" />
-                      Inactiva
-                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
