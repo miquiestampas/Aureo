@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useSocketStore } from "@/lib/socket";
+import { Column } from "@tanstack/react-table";
 import { 
   Card, CardContent, CardFooter, CardHeader, CardTitle, 
 } from "@/components/ui/card";
+
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -34,7 +37,10 @@ import {
   Plus,
   Upload,
   Calendar as CalendarIcon,
-  X
+  X,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from "lucide-react";
 import FileUploadModal from "@/components/FileUploadModal";
 import { ColumnDef } from "@tanstack/react-table";
@@ -386,7 +392,23 @@ export default function DashboardPage() {
   const columns: ColumnDef<FileActivity>[] = [
     {
       accessorKey: "filename",
-      header: "Archivo",
+      header: ({ column }) => {
+        return (
+          <div
+            className="flex items-center cursor-pointer select-none"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Archivo
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
+            )}
+          </div>
+        )
+      },
       cell: ({ row }) => {
         const filename = row.original.filename;
         return (
@@ -394,11 +416,28 @@ export default function DashboardPage() {
             <div className="text-sm font-medium text-gray-900">{filename}</div>
           </div>
         );
-      }
+      },
+      enableSorting: true
     },
     {
       accessorKey: "storeCode",
-      header: "Tienda",
+      header: ({ column }) => {
+        return (
+          <div
+            className="flex items-center cursor-pointer select-none"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Tienda
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
+            )}
+          </div>
+        )
+      },
       cell: ({ row }) => {
         const storeCode = row.original.storeCode;
         return (
@@ -406,11 +445,28 @@ export default function DashboardPage() {
             <div className="text-sm font-medium text-gray-900">{storeCode}</div>
           </div>
         );
-      }
+      },
+      enableSorting: true
     },
     {
       accessorKey: "fileType",
-      header: "Tipo de Archivo",
+      header: ({ column }) => {
+        return (
+          <div
+            className="flex items-center cursor-pointer select-none"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Tipo de Archivo
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
+            )}
+          </div>
+        )
+      },
       cell: ({ row }) => {
         const fileType = row.original.fileType;
         return (
@@ -423,11 +479,28 @@ export default function DashboardPage() {
             <span className="text-sm text-gray-900">{fileType}</span>
           </div>
         );
-      }
+      },
+      enableSorting: true
     },
     {
       accessorKey: "processingDate",
-      header: "Fecha",
+      header: ({ column }) => {
+        return (
+          <div
+            className="flex items-center cursor-pointer select-none"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Fecha
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
+            )}
+          </div>
+        )
+      },
       cell: ({ row }) => {
         const date = new Date(row.original.processingDate);
         return (
@@ -435,11 +508,33 @@ export default function DashboardPage() {
             {format(date, "MMM d, h:mm a")}
           </div>
         );
+      },
+      enableSorting: true,
+      sortingFn: (rowA, rowB, columnId) => {
+        const dateA = new Date(rowA.getValue(columnId) as string).getTime();
+        const dateB = new Date(rowB.getValue(columnId) as string).getTime();
+        return dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
       }
     },
     {
       accessorKey: "status",
-      header: "Estado",
+      header: ({ column }) => {
+        return (
+          <div
+            className="flex items-center cursor-pointer select-none"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Estado
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
+            )}
+          </div>
+        )
+      },
       cell: ({ row }) => {
         const status = row.original.status;
         
@@ -475,14 +570,32 @@ export default function DashboardPage() {
               </Badge>
             );
         }
-      }
+      },
+      enableSorting: true
     },
     {
       accessorKey: "processedBy",
-      header: "Procesado Por",
+      header: ({ column }) => {
+        return (
+          <div
+            className="flex items-center cursor-pointer select-none"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Procesado Por
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
+            )}
+          </div>
+        )
+      },
       cell: ({ row }) => {
         return <div className="text-sm text-gray-500">{row.original.processedBy}</div>;
-      }
+      },
+      enableSorting: true
     },
     {
       id: "actions",

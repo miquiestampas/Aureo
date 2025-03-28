@@ -29,7 +29,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronLeft, ChevronRight, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, SlidersHorizontal, Trash2 } from "lucide-react";
 import { Checkbox } from "./checkbox";
 
 interface DataTableProps<TData, TValue> {
@@ -41,6 +41,31 @@ interface DataTableProps<TData, TValue> {
   showColumnToggle?: boolean;
   enableRowSelection?: boolean;
   onDeleteSelected?: (selectedRows: TData[]) => void;
+}
+
+// Componente auxiliar para renderizar encabezados de columna ordenables
+export function SortableColumnHeader({
+  column,
+  title,
+}: {
+  column: any;
+  title: string;
+}) {
+  return (
+    <div
+      className="flex items-center cursor-pointer select-none"
+      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+    >
+      {title}
+      {column.getIsSorted() === "asc" ? (
+        <ArrowUp className="ml-2 h-4 w-4" />
+      ) : column.getIsSorted() === "desc" ? (
+        <ArrowDown className="ml-2 h-4 w-4" />
+      ) : (
+        <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
+      )}
+    </div>
+  );
 }
 
 export function DataTable<TData, TValue>({
