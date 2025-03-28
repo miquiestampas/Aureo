@@ -2479,7 +2479,7 @@ export class DatabaseStorage implements IStorage {
       .update(watchlistPersons)
       .set({ 
         status: "Inactivo",
-        lastUpdated: new Date().toISOString() 
+        lastUpdated: new Date() // Usar objeto Date directamente, no convertir a string
       })
       .where(eq(watchlistPersons.id, id))
       .returning();
@@ -2554,7 +2554,7 @@ export class DatabaseStorage implements IStorage {
     // Actualizar la fecha de última modificación
     const updateData = {
       ...itemUpdate,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date() // Usar objeto Date directamente, no convertir a string
     };
     
     const [updatedItem] = await db
@@ -2571,7 +2571,7 @@ export class DatabaseStorage implements IStorage {
       .update(watchlistItems)
       .set({ 
         status: "Inactivo",
-        lastUpdated: new Date().toISOString() 
+        lastUpdated: new Date() // Usar objeto Date directamente, no convertir a string
       })
       .where(eq(watchlistItems.id, id))
       .returning();
@@ -2648,7 +2648,7 @@ export class DatabaseStorage implements IStorage {
     const updateData: Partial<Alert> = { 
       status: status as "Nueva" | "Revisada" | "Falsa",
       reviewedBy,
-      resolvedAt: new Date().toISOString()
+      resolvedAt: new Date() // Usar objeto Date directamente, no convertir a string
     };
     
     if (notes) {
@@ -2759,7 +2759,7 @@ export class DatabaseStorage implements IStorage {
   // Métodos para gestionar Señalamientos de Personas
   async createSenalPersona(persona: InsertSenalPersona): Promise<SenalPersona> {
     try {
-      const now = new Date().toISOString();
+      const now = new Date(); // No convertir a string, dejarlo como objeto Date
       const values = {
         ...persona,
         creadoEn: now
@@ -2818,7 +2818,7 @@ export class DatabaseStorage implements IStorage {
     try {
       const updateData = {
         ...updates,
-        modificadoEn: new Date().toISOString()
+        modificadoEn: new Date() // No convertir a string, dejarlo como objeto Date
       };
       
       const [updated] = await db
@@ -2842,7 +2842,7 @@ export class DatabaseStorage implements IStorage {
         .set({
           estado: "Inactivo",
           modificadoPor: userId,
-          modificadoEn: new Date().toISOString()
+          modificadoEn: new Date() // No convertir a string, dejarlo como objeto Date
         })
         .where(eq(senalPersonas.id, id))
         .returning();
@@ -2879,7 +2879,7 @@ export class DatabaseStorage implements IStorage {
   // Métodos para gestionar Señalamientos de Objetos
   async createSenalObjeto(objeto: InsertSenalObjeto): Promise<SenalObjeto> {
     try {
-      const now = new Date().toISOString();
+      const now = new Date(); // Usar objeto Date directamente, no convertir a string
       const values = {
         ...objeto,
         creadoEn: now
@@ -2938,7 +2938,7 @@ export class DatabaseStorage implements IStorage {
     try {
       const updateData = {
         ...updates,
-        modificadoEn: new Date().toISOString()
+        modificadoEn: new Date() // No convertir a string, dejarlo como objeto Date
       };
       
       const [updated] = await db
@@ -2962,7 +2962,7 @@ export class DatabaseStorage implements IStorage {
         .set({
           estado: "Inactivo",
           modificadoPor: userId,
-          modificadoEn: new Date().toISOString()
+          modificadoEn: new Date() // No convertir a string, dejarlo como objeto Date
         })
         .where(eq(senalObjetos.id, id))
         .returning();
@@ -2999,7 +2999,7 @@ export class DatabaseStorage implements IStorage {
   // Métodos para gestionar Coincidencias
   async createCoincidencia(coincidencia: InsertCoincidencia): Promise<Coincidencia> {
     try {
-      const now = new Date().toISOString();
+      const now = new Date(); // Usar objeto Date directamente, no convertir a string
       const values = {
         ...coincidencia,
         creadoEn: now
@@ -3067,7 +3067,7 @@ export class DatabaseStorage implements IStorage {
       const updateData: Partial<Coincidencia> = {
         estado,
         revisadoPor: userId,
-        revisadoEn: new Date().toISOString()
+        revisadoEn: new Date() // Usar objeto Date directamente, no convertir a string
       };
       
       if (notas) {
