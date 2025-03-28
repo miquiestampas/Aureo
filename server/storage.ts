@@ -1291,7 +1291,7 @@ export class DatabaseStorage implements IStorage {
     storeCodes: string[], 
     dateFrom?: Date, 
     dateTo?: Date 
-  }): Promise<PdfDocument[]> {
+  }, limit?: number, orderDirection: 'asc' | 'desc' = 'desc'): Promise<PdfDocument[]> {
     let query = db
       .select()
       .from(pdfDocuments)
@@ -1311,8 +1311,17 @@ export class DatabaseStorage implements IStorage {
       query = query.where(lte(pdfDocuments.uploadDate, params.dateTo));
     }
     
-    // Ordenar por fecha (más reciente primero)
-    query = query.orderBy(desc(pdfDocuments.uploadDate));
+    // Ordenar por fecha
+    if (orderDirection === 'asc') {
+      query = query.orderBy(asc(pdfDocuments.uploadDate));
+    } else {
+      query = query.orderBy(desc(pdfDocuments.uploadDate));
+    }
+    
+    // Aplicar límite si se proporciona
+    if (limit && limit > 0) {
+      query = query.limit(limit);
+    }
     
     const results = await query;
     return results;
