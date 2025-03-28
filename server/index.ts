@@ -65,6 +65,15 @@ app.use((req, res, next) => {
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`Server running at http://0.0.0.0:${port}`);
+    // Mostrar todas las IPs disponibles para facilitar el acceso
+    const networkInterfaces = require('os').networkInterfaces();
+    Object.keys(networkInterfaces).forEach((interfaceName) => {
+      networkInterfaces[interfaceName].forEach((interface) => {
+        if (interface.family === 'IPv4' && !interface.internal) {
+          log(`Available on network at: http://${interface.address}:${port}`);
+        }
+      });
+    });
   });
 })();
