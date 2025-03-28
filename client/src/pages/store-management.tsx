@@ -643,20 +643,19 @@ export default function StoreManagementPage() {
       }
     },
     {
-      id: "ubicacion",
-      header: "Ubicación",
+      id: "locality",
+      header: "Localidad",
       cell: ({ row }) => {
         const store = row.original;
-        if (store.district || store.locality) {
-          return (
-            <div>
-              {store.district && <div>{store.district}</div>}
-              {store.locality && <div className="text-gray-500 text-sm">{store.locality}</div>}
-            </div>
-          );
-        } else {
-          return store.location || "—";
-        }
+        return store.locality || (store.location || "—");
+      }
+    },
+    {
+      id: "district",
+      header: "Distrito",
+      cell: ({ row }) => {
+        const store = row.original;
+        return store.district || "—";
       }
     },
     {
@@ -1723,16 +1722,12 @@ export default function StoreManagementPage() {
                         </span>
                       </div>
                       <div>
-                        <span className="font-medium">Ubicación:</span> 
-                        <span className="ml-2">{selectedStore.location || "—"}</span>
+                        <span className="font-medium">Localidad:</span> 
+                        <span className="ml-2">{selectedStore.locality || (selectedStore.location || "—")}</span>
                       </div>
                       <div>
                         <span className="font-medium">Distrito:</span> 
                         <span className="ml-2">{selectedStore.district || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Localidad:</span> 
-                        <span className="ml-2">{selectedStore.locality || "—"}</span>
                       </div>
                       <div>
                         <span className="font-medium">Estado:</span> 
