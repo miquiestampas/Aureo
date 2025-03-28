@@ -15,8 +15,6 @@ import Navbar from "@/components/Navbar";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import DashboardPage from "@/pages/dashboard";
-import ExcelStoresPage from "@/pages/excel-stores";
-import PdfStoresPage from "@/pages/pdf-stores";
 import StoreManagementPage from "@/pages/store-management";
 import UserManagementPage from "@/pages/user-management";
 import SystemConfigPage from "@/pages/system-config";
@@ -88,24 +86,6 @@ function Router() {
         component={() => (
           <AppLayout>
             <DashboardPage />
-          </AppLayout>
-        )} 
-      />
-      
-      <ProtectedRoute 
-        path="/excel-stores" 
-        component={() => (
-          <AppLayout>
-            <ExcelStoresPage />
-          </AppLayout>
-        )} 
-      />
-      
-      <ProtectedRoute 
-        path="/pdf-stores" 
-        component={() => (
-          <AppLayout>
-            <PdfStoresPage />
           </AppLayout>
         )} 
       />

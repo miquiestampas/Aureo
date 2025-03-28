@@ -158,19 +158,7 @@ export default function Sidebar() {
             userRole={user?.role}
           />
           
-          <NavItem
-            href="/excel-stores"
-            icon={<FileSpreadsheet size={20} />}
-            label="Tiendas Excel"
-            active={location === '/excel-stores'}
-          />
-          
-          <NavItem
-            href="/pdf-stores"
-            icon={<FileText size={20} />}
-            label="Tiendas PDF"
-            active={location === '/pdf-stores'}
-          />
+
           
           {/* Sistema Section */}
           <div className="mt-6 mb-2">
