@@ -24,6 +24,72 @@ const getPdfParser = async () => {
 };
 
 // Función para verificar si hay coincidencias con la lista de vigilancia
+// Función para normalizar texto eliminando caracteres especiales, espacios extras y convirtiendo a minúsculas
+function normalizeText(text: string): string {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .normalize('NFD') // Normaliza caracteres acentuados
+    .replace(/[\u0300-\u036f]/g, '') // Elimina diacríticos
+    .replace(/[^a-z0-9\s]/g, '') // Elimina caracteres especiales y guiones
+    .replace(/\s+/g, ' ') // Reemplaza múltiples espacios con uno solo
+    .trim(); // Elimina espacios al inicio y final
+}
+
+// Función para calcular la similitud entre dos textos
+function calculateSimilarity(text1: string, text2: string): { score: number, isExact: boolean } {
+  // Normaliza ambos textos
+  const normalizedText1 = normalizeText(text1);
+  const normalizedText2 = normalizeText(text2);
+  
+  // Si alguno de los textos está vacío después de normalizar, retorna 0
+  if (!normalizedText1 || !normalizedText2) {
+    return { score: 0, isExact: false };
+  }
+  
+  // Verificar si hay una coincidencia exacta después de normalizar
+  if (normalizedText1 === normalizedText2) {
+    return { score: 1, isExact: true };
+  }
+  
+  // Verificar si uno está contenido en el otro
+  if (normalizedText1.includes(normalizedText2) || normalizedText2.includes(normalizedText1)) {
+    // La puntuación depende de la longitud relativa
+    const longerText = normalizedText1.length > normalizedText2.length ? normalizedText1 : normalizedText2;
+    const shorterText = normalizedText1.length <= normalizedText2.length ? normalizedText1 : normalizedText2;
+    
+    // Si el texto más corto es menos del 30% del más largo, reducir la puntuación
+    const lengthRatio = shorterText.length / longerText.length;
+    if (lengthRatio < 0.3) {
+      return { 
+        score: 0.7 + (0.25 * lengthRatio), // entre 0.7 y 0.95
+        isExact: false 
+      };
+    }
+    
+    return { score: 0.95, isExact: false };
+  }
+  
+  // Calcular similitud por palabras compartidas
+  const words1 = normalizedText1.split(' ').filter(w => w.length > 2); // Ignorar palabras muy cortas
+  const words2 = normalizedText2.split(' ').filter(w => w.length > 2);
+  
+  if (words1.length === 0 || words2.length === 0) {
+    return { score: 0, isExact: false };
+  }
+  
+  // Contar palabras compartidas
+  const sharedWords = words1.filter(word => words2.some(w2 => w2 === word || w2.includes(word) || word.includes(w2)));
+  
+  // Calcular puntuación basada en palabras compartidas
+  const score = sharedWords.length / Math.max(words1.length, words2.length);
+  
+  return { 
+    score: Math.min(0.9, score), // Máximo 0.9 para coincidencias parciales por palabras
+    isExact: false 
+  };
+}
+
 async function checkWatchlistMatches(excelData: ExcelData) {
   try {
     // 1. Verificar coincidencias de personas
@@ -37,17 +103,14 @@ async function checkWatchlistMatches(excelData: ExcelData) {
     
     // Verificar coincidencias por nombre
     for (const person of watchlistPersons) {
-      // Si el nombre de la persona está en la lista de vigilancia
-      if (excelData.customerName && 
-          person.fullName && 
-          excelData.customerName.toLowerCase().includes(person.fullName.toLowerCase())) {
+      if (excelData.customerName && person.fullName) {
+        // Calcular similitud de nombre usando la nueva función
+        const nameSimilarity = calculateSimilarity(excelData.customerName, person.fullName);
         
-        // Calcular nivel de confianza (simple, basado en la longitud del nombre)
-        // Un valor más alto significa mayor confianza en la coincidencia
-        const confidence = (person.fullName.length / excelData.customerName.length) * 100;
-        
-        // Crear alerta solo si la confianza es mayor al 50%
-        if (confidence > 50) {
+        // Crear alerta si la similitud es suficiente (mayor a 0.7 o 70%)
+        if (nameSimilarity.score >= 0.7) {
+          const confidence = nameSimilarity.score * 100;
+          
           const alert: InsertAlert = {
             excelDataId: excelData.id,
             watchlistPersonId: person.id,
@@ -59,29 +122,61 @@ async function checkWatchlistMatches(excelData: ExcelData) {
             reviewNotes: null
           };
           
+          // Crear coincidencia en el sistema con información detallada
+          const coincidencia = {
+            tipoCoincidencia: "Persona",
+            idSenalPersona: person.id,
+            idSenalObjeto: null,
+            idExcelData: excelData.id,
+            puntuacionCoincidencia: confidence,
+            tipoMatch: nameSimilarity.isExact ? "Exacto" : "Parcial",
+            campoCoincidente: "nombre",
+            valorCoincidente: person.fullName
+          };
+          
+          await storage.createCoincidencia(coincidencia);
           await storage.createAlert(alert);
-          console.log(`🚨 Alerta creada: Coincidencia de persona "${person.fullName}" con confianza ${confidence.toFixed(2)}%`);
+          
+          console.log(`🚨 Alerta creada: Coincidencia de persona "${person.fullName}" con confianza ${confidence.toFixed(2)}% (${nameSimilarity.isExact ? 'Exacta' : 'Parcial'})`);
         }
       }
       
       // También verificar por número de identificación si está disponible
-      if (excelData.customerContact && 
-          person.identificationNumber && 
-          excelData.customerContact.includes(person.identificationNumber)) {
+      if (excelData.customerContact && person.identificationNumber) {
+        // Calcular similitud para el número de identificación
+        const idSimilarity = calculateSimilarity(excelData.customerContact, person.identificationNumber);
         
-        const alert: InsertAlert = {
-          excelDataId: excelData.id,
-          watchlistPersonId: person.id,
-          watchlistItemId: null,
-          alertType: "Persona",
-          status: "Nueva",
-          matchConfidence: 95, // Alta confianza para coincidencias de ID
-          reviewedBy: null,
-          reviewNotes: null
-        };
-        
-        await storage.createAlert(alert);
-        console.log(`🚨 Alerta creada: Coincidencia de ID "${person.identificationNumber}" con confianza 95%`);
+        if (idSimilarity.score >= 0.8) { // Mayor umbral para IDs
+          const confidence = idSimilarity.score * 100;
+          
+          const alert: InsertAlert = {
+            excelDataId: excelData.id,
+            watchlistPersonId: person.id,
+            watchlistItemId: null,
+            alertType: "Persona",
+            status: "Nueva",
+            matchConfidence: confidence,
+            reviewedBy: null,
+            reviewNotes: null
+          };
+          
+          // Crear coincidencia en el sistema con información detallada
+          const coincidencia = {
+            tipoCoincidencia: "Persona",
+            idSenalPersona: person.id,
+            idSenalObjeto: null,
+            idExcelData: excelData.id,
+            puntuacionCoincidencia: confidence,
+            tipoMatch: idSimilarity.isExact ? "Exacto" : "Parcial",
+            campoCoincidente: "documento",
+            valorCoincidente: person.identificationNumber
+          };
+          
+          await storage.createCoincidencia(coincidencia);
+          await storage.createAlert(alert);
+          
+          console.log(`🚨 Alerta creada: Coincidencia de ID "${person.identificationNumber}" con confianza ${confidence.toFixed(2)}% (${idSimilarity.isExact ? 'Exacta' : 'Parcial'})`);
+        }
       }
     }
     
@@ -95,15 +190,13 @@ async function checkWatchlistMatches(excelData: ExcelData) {
     }
     
     for (const item of watchlistItems) {
-      // Verificar si la descripción del artículo está en los detalles del pedido
-      if (excelData.itemDetails && 
-          item.description && 
-          excelData.itemDetails.toLowerCase().includes(item.description.toLowerCase())) {
+      // Verificar similitud de la descripción del artículo
+      if (excelData.itemDetails && item.description) {
+        const descSimilarity = calculateSimilarity(excelData.itemDetails, item.description);
         
-        // Calcular nivel de confianza
-        const confidence = (item.description.length / excelData.itemDetails.length) * 100;
-        
-        if (confidence > 40) {  // Umbral más bajo para artículos
+        if (descSimilarity.score >= 0.65) { // Umbral más bajo para artículos
+          const confidence = descSimilarity.score * 100;
+          
           const alert: InsertAlert = {
             excelDataId: excelData.id,
             watchlistPersonId: null,
@@ -115,29 +208,60 @@ async function checkWatchlistMatches(excelData: ExcelData) {
             reviewNotes: null
           };
           
+          // Crear coincidencia en el sistema con información detallada
+          const coincidencia = {
+            tipoCoincidencia: "Objeto",
+            idSenalPersona: null,
+            idSenalObjeto: item.id,
+            idExcelData: excelData.id,
+            puntuacionCoincidencia: confidence,
+            tipoMatch: descSimilarity.isExact ? "Exacto" : "Parcial",
+            campoCoincidente: "descripcion",
+            valorCoincidente: item.description
+          };
+          
+          await storage.createCoincidencia(coincidencia);
           await storage.createAlert(alert);
-          console.log(`🚨 Alerta creada: Coincidencia de artículo "${item.description}" con confianza ${confidence.toFixed(2)}%`);
+          
+          console.log(`🚨 Alerta creada: Coincidencia de artículo "${item.description}" con confianza ${confidence.toFixed(2)}% (${descSimilarity.isExact ? 'Exacta' : 'Parcial'})`);
         }
       }
       
       // También verificar por número de serie si está disponible
-      if (excelData.itemDetails && 
-          item.serialNumber && 
-          excelData.itemDetails.includes(item.serialNumber)) {
+      if (excelData.itemDetails && item.serialNumber) {
+        const serialSimilarity = calculateSimilarity(excelData.itemDetails, item.serialNumber);
         
-        const alert: InsertAlert = {
-          excelDataId: excelData.id,
-          watchlistPersonId: null,
-          watchlistItemId: item.id,
-          alertType: "Objeto",
-          status: "Nueva",
-          matchConfidence: 98, // Alta confianza para coincidencias de serie
-          reviewedBy: null,
-          reviewNotes: null
-        };
-        
-        await storage.createAlert(alert);
-        console.log(`🚨 Alerta creada: Coincidencia de número de serie "${item.serialNumber}" con confianza 98%`);
+        if (serialSimilarity.score >= 0.85) { // Mayor umbral para números de serie
+          const confidence = serialSimilarity.score * 100;
+          
+          const alert: InsertAlert = {
+            excelDataId: excelData.id,
+            watchlistPersonId: null,
+            watchlistItemId: item.id,
+            alertType: "Objeto",
+            status: "Nueva",
+            matchConfidence: confidence,
+            reviewedBy: null,
+            reviewNotes: null
+          };
+          
+          // Crear coincidencia en el sistema con información detallada
+          const coincidencia = {
+            tipoCoincidencia: "Objeto",
+            idSenalPersona: null,
+            idSenalObjeto: item.id,
+            idExcelData: excelData.id,
+            puntuacionCoincidencia: confidence,
+            tipoMatch: serialSimilarity.isExact ? "Exacto" : "Parcial",
+            campoCoincidente: "serial",
+            valorCoincidente: item.serialNumber
+          };
+          
+          await storage.createCoincidencia(coincidencia);
+          await storage.createAlert(alert);
+          
+          console.log(`🚨 Alerta creada: Coincidencia de número de serie "${item.serialNumber}" con confianza ${confidence.toFixed(2)}% (${serialSimilarity.isExact ? 'Exacta' : 'Parcial'})`);
+        }
       }
     }
     
