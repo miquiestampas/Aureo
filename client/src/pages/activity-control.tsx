@@ -36,72 +36,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Lista de localidades de Madrid
-const MADRID_LOCALITIES = [
-  "Madrid",
-  "Ajalvir",
-  "Alcalá de Henares",
-  "Alcobendas",
-  "Alcorcón",
-  "Aldea del Fresno",
-  "Algete",
-  "Alpedrete",
-  "Aranjuez",
-  "Arganda del Rey",
-  "Arroyomolinos",
-  "Becerril de la Sierra",
-  "Boadilla del Monte",
-  "Brunete",
-  "Cercedilla",
-  "Ciempozuelos",
-  "Cobeña",
-  "Collado Mediano",
-  "Collado Villalba",
-  "Colmenar de Oreja",
-  "Colmenar Viejo",
-  "Coslada",
-  "Daganzo de Arriba",
-  "El Álamo",
-  "El Boalo",
-  "El Escorial",
-  "El Molar",
-  "Fuenlabrada",
-  "Fuente el Saz",
-  "Galapagar",
-  "Getafe",
-  "Griñón",
-  "Guadarrama",
-  "Hoyo de Manzanares",
-  "Humanes de Madrid",
-  "Las Rozas",
-  "Leganés",
-  "Loeches",
-  "Majadahonda",
-  "Manzanares el Real",
-  "Mejorada del Campo",
-  "Moraleja de Enmedio",
-  "Moralzarzal",
-  "Móstoles",
-  "Navalcarnero",
-  "Parla",
-  "Pinto",
-  "Pozuelo de Alarcón",
-  "Rivas-Vaciamadrid",
-  "San Agustín del Guadalix",
-  "San Fernando de Henares",
-  "San Lorenzo de El Escorial",
-  "San Martín de la Vega",
-  "San Sebastián de los Reyes",
-  "Sevilla la Nueva",
-  "Torrejón de Ardoz",
-  "Torrelodones",
-  "Tres Cantos",
-  "Valdemoro",
-  "Villanueva de la Cañada",
-  "Villanueva del Pardillo",
-  "Villaviciosa de Odón"
-];
-
 // Definición del tipo para Store
 type StoreType = "Excel" | "PDF";
 
@@ -561,41 +495,21 @@ export default function ActivityControlPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="distrito-filter">Distrito</Label>
-                <Select
+                <Input
+                  id="distrito-filter"
+                  placeholder="Filtrar por distrito..."
                   value={districtFilter}
-                  onValueChange={(value) => setDistrictFilter(value)}
-                >
-                  <SelectTrigger id="distrito-filter">
-                    <SelectValue placeholder="Todos los distritos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Todos los distritos</SelectItem>
-                    <SelectItem value="Centro">Centro</SelectItem>
-                    <SelectItem value="Norte">Norte</SelectItem>
-                    <SelectItem value="Sur">Sur</SelectItem>
-                    <SelectItem value="Este">Este</SelectItem>
-                    <SelectItem value="Oeste">Oeste</SelectItem>
-                  </SelectContent>
-                </Select>
+                  onChange={(e) => setDistrictFilter(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="localidad-filter">Localidad</Label>
-                <Select
+                <Input
+                  id="localidad-filter"
+                  placeholder="Filtrar por localidad..."
                   value={localityFilter}
-                  onValueChange={(value) => setLocalityFilter(value)}
-                >
-                  <SelectTrigger id="localidad-filter">
-                    <SelectValue placeholder="Todas las localidades" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px] overflow-y-auto">
-                    <SelectItem value="">Todas las localidades</SelectItem>
-                    {MADRID_LOCALITIES.map((locality) => (
-                      <SelectItem key={locality} value={locality}>
-                        {locality}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(e) => setLocalityFilter(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="type-filter">Tipo</Label>

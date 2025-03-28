@@ -7,13 +7,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { DataTable } from "@/components/ui/data-table";
 import {
   Dialog,
@@ -76,8 +69,7 @@ export default function ExcelStoresPage() {
   // Búsqueda por código, nombre o ubicación
   const [codeFilter, setCodeFilter] = useState('');
   const [nameFilter, setNameFilter] = useState('');
-  const [districtFilter, setDistrictFilter] = useState('');
-  const [localityFilter, setLocalityFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
   
   // Obtener parámetros de la URL
   const searchParams = new URLSearchParams(window.location.search);
@@ -93,18 +85,16 @@ export default function ExcelStoresPage() {
     const matchesCode = store.code.toLowerCase().includes(codeFilter.toLowerCase());
     const matchesName = store.name.toLowerCase().includes(nameFilter.toLowerCase());
     
-    // Filtro por distrito y localidad
-    const matchesDistrict = districtFilter === '' || 
-      (store.district?.toLowerCase().includes(districtFilter.toLowerCase()) ?? false);
-    
-    const matchesLocality = localityFilter === '' || 
-      (store.locality?.toLowerCase().includes(localityFilter.toLowerCase()) ?? false);
+    // Buscar en location, district o locality
+    const matchesLocation = 
+      (store.location?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false) ||
+      (store.district?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false) ||
+      (store.locality?.toLowerCase().includes(locationFilter.toLowerCase()) ?? false);
     
     return (
       (codeFilter === '' || matchesCode) && 
       (nameFilter === '' || matchesName) && 
-      matchesDistrict && 
-      matchesLocality
+      (locationFilter === '' || matchesLocation)
     );
   });
   
@@ -343,7 +333,7 @@ export default function ExcelStoresPage() {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Buscar Tiendas</CardTitle>
-            <CardDescription>Filtrar tiendas por código, nombre, distrito o localidad</CardDescription>
+            <CardDescription>Filtrar tiendas por código, nombre o ubicación</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -366,21 +356,12 @@ export default function ExcelStoresPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="distrito-filter">Distrito</Label>
+                <Label htmlFor="location-filter">Ubicación</Label>
                 <Input
-                  id="distrito-filter"
-                  placeholder="Filtrar por distrito..."
-                  value={districtFilter}
-                  onChange={(e) => setDistrictFilter(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="localidad-filter">Localidad</Label>
-                <Input
-                  id="localidad-filter"
-                  placeholder="Filtrar por localidad..."
-                  value={localityFilter}
-                  onChange={(e) => setLocalityFilter(e.target.value)}
+                  id="location-filter"
+                  placeholder="Filtrar por ubicación..."
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
                 />
               </div>
             </div>
