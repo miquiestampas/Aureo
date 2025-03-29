@@ -1369,7 +1369,6 @@ export default function StoreManagementPage() {
             </Dialog>
           )
         }
-        </div>
 
         {/* Advanced Filter and Export */}
         <Card className="mb-6">

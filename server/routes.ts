@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
@@ -6,6 +6,8 @@ import { setupSocketIO, initializeFileWatchers, stopFileWatchers } from "./fileW
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import os from "os";
+import XLSX from "xlsx";
 import { processExcelFile, processPdfFile } from "./fileProcessors";
 import { 
   InsertSearchHistory, User, 
@@ -204,6 +206,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
+  // Importación de tiendas desde Excel
+  app.post("/api/import-stores", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // @ts-ignore - req.files es añadido por express-fileupload
+        if (!req.files || !req.files.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+        
+        // @ts-ignore - req.files es añadido por express-fileupload
+        const file = req.files.file;
+        if (Array.isArray(file)) {
+          return res.status(400).json({ message: "Multiple files not supported" });
+        }
+        
+        if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+          return res.status(400).json({ message: "Invalid file format. Only Excel files are supported." });
+        }
+        
+        // Crear un archivo temporal para procesar
+        const tempFilePath = path.join(os.tmpdir(), `import_${Date.now()}_${file.name}`);
+        await fs.promises.writeFile(tempFilePath, file.data);
+        
+        // Procesar el archivo Excel
+        const workbook = XLSX.readFile(tempFilePath);
+        const worksheet = workbook.Sheets[workbook.SheetNames.find(name => name === 'Tiendas') || workbook.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+        
+        // Validar y procesar los datos
+        const importResults = {
+          imported: 0,
+          errors: [] as string[],
+          skipped: 0
+        };
+        
+        for (const row of data) {
+          try {
+            // Verificar campos obligatorios
+            const storeCode = row['Código*'] as string;
+            const storeName = row['Nombre*'] as string;
+            const storeType = row['Tipo*'] as string;
+            const storeActive = row['Activa*'] as string;
+            
+            if (!storeCode || !storeName || !storeType) {
+              importResults.errors.push(`Fila con datos incompletos: ${JSON.stringify(row)}`);
+              importResults.skipped++;
+              continue;
+            }
+            
+            // Verificar si la tienda ya existe
+            const existingStore = await storage.getStoreByCode(storeCode);
+            if (existingStore) {
+              importResults.errors.push(`Tienda con código ${storeCode} ya existe`);
+              importResults.skipped++;
+              continue;
+            }
+            
+            // Convertir valores a formato esperado
+            const isActive = storeActive?.toLowerCase() === 'sí' || 
+                             storeActive?.toLowerCase() === 'si' || 
+                             storeActive?.toLowerCase() === 'yes' ||
+                             storeActive?.toLowerCase() === 'true';
+            
+            let startDate = null;
+            if (row['Fecha Inicio']) {
+              // Convertir formato DD/MM/YYYY a Date
+              const parts = (row['Fecha Inicio'] as string).split('/');
+              if (parts.length === 3) {
+                startDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+              }
+            }
+            
+            let endDate = null;
+            if (row['Fecha Cese']) {
+              // Convertir formato DD/MM/YYYY a Date
+              const parts = (row['Fecha Cese'] as string).split('/');
+              if (parts.length === 3) {
+                endDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+              }
+            }
+            
+            // Crear la tienda
+            const newStore = {
+              code: storeCode,
+              name: storeName,
+              type: storeType as "Excel" | "PDF",
+              active: isActive,
+              district: (row['Distrito'] as string) || null,
+              locality: (row['Localidad'] as string) || null,
+              address: (row['Dirección'] as string) || null,
+              phone: (row['Teléfono'] as string) || null,
+              email: (row['Email'] as string) || null,
+              cif: (row['CIF'] as string) || null,
+              businessName: (row['Razón Social'] as string) || null,
+              ownerName: (row['Nombre Propietario'] as string) || null,
+              ownerIdNumber: (row['DNI Propietario'] as string) || null,
+              startDate: startDate ? startDate.toISOString() : null,
+              endDate: endDate ? endDate.toISOString() : null,
+              notes: (row['Anotaciones'] as string) || null
+            };
+            
+            await storage.createStore(newStore);
+            importResults.imported++;
+            
+          } catch (error) {
+            importResults.errors.push(`Error al procesar fila: ${error instanceof Error ? error.message : String(error)}`);
+            importResults.skipped++;
+          }
+        }
+        
+        // Limpiar el archivo temporal
+        await fs.promises.unlink(tempFilePath);
+        
+        res.status(200).json({
+          imported: importResults.imported,
+          skipped: importResults.skipped,
+          errors: importResults.errors
+        });
+        
+      } catch (err) {
+        console.error('Error processing import:', err);
+        next(err);
+      }
+    });
+  });
+  
   // System configuration routes
   app.get("/api/config", (req, res, next) => {
     req.authorize(["SuperAdmin"])(req, res, async () => {
@@ -331,7 +459,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           code: newStoreCode,
           name: `Tienda ${newStoreCode}`,
           type: activity.fileType,
-          location: "",
+          district: "",
+          locality: "",
           active: true
         });
         
@@ -1047,7 +1176,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const {
         storeCode,
         storeName,
-        location,
         district,
         locality,
         dateFrom,
@@ -1068,10 +1196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           store.name.toLowerCase().includes((storeName as string).toLowerCase()));
       }
       
-      if (location) {
-        matchingStores = matchingStores.filter(store => 
-          store.location && store.location.toLowerCase().includes((location as string).toLowerCase()));
-      }
+      // location ya no se usa, se filtran por district y locality
       
       if (district) {
         matchingStores = matchingStores.filter(store => 
@@ -1104,7 +1229,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return {
           ...doc,
           storeName: store?.name || 'Desconocida',
-          storeLocation: store?.location || null,
           storeDistrict: store?.district || null,
           storeLocality: store?.locality || null
         };
