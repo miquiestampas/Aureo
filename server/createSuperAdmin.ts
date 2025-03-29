@@ -1,13 +1,16 @@
-// Script para restablecer la contraseña del SuperAdmin (versión ESM)
-import { db } from './server/db';
-import { users } from './shared/schema';
+// Script para crear o restablecer el usuario SuperAdmin
+import { db } from './db';
+import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
-import crypto from 'crypto';
+import { scrypt, randomBytes } from 'crypto';
+import { promisify } from 'util';
 
-// Función para generar hash de contraseña
-async function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const buf = crypto.scryptSync(password, salt, 64);
+// Función para generar hash de contraseña de forma asíncrona
+const scryptAsync = promisify(scrypt);
+
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
 }
 
@@ -28,8 +31,7 @@ async function resetSuperAdminPassword() {
           name: 'Administrador del Sistema',
           role: 'SuperAdmin'
         })
-        .where(eq(users.id, existingUser[0].id))
-        .returning();
+        .where(eq(users.id, existingUser[0].id));
       
       console.log('Contraseña del SuperAdmin restablecida correctamente.');
     } else {
@@ -40,8 +42,7 @@ async function resetSuperAdminPassword() {
           password: hashedPassword,
           name: 'Administrador del Sistema',
           role: 'SuperAdmin'
-        })
-        .returning();
+        });
       
       console.log('Usuario SuperAdmin creado correctamente.');
     }
@@ -50,9 +51,14 @@ async function resetSuperAdminPassword() {
     console.log('Contraseña: SuperAdmin');
   } catch (error) {
     console.error('Error configurando SuperAdmin:', error);
-  } finally {
-    process.exit(0);
   }
 }
 
-resetSuperAdminPassword();
+// Ejecutar la función
+resetSuperAdminPassword().then(() => {
+  console.log('Proceso completado.');
+  process.exit(0);
+}).catch(err => {
+  console.error('Error en el proceso:', err);
+  process.exit(1);
+});

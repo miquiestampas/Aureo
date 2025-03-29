@@ -12,25 +12,44 @@ async function hashPassword(password) {
 }
 
 async function resetSuperAdminPassword() {
-  console.log('Restableciendo contraseña del SuperAdmin...');
+  console.log('Configurando el usuario SuperAdmin...');
 
   try {
     const hashedPassword = await hashPassword('SuperAdmin');
     
-    // Actualizar el usuario con ID 1 (SuperAdmin)
-    await db.update(users)
-      .set({ 
-        password: hashedPassword,
-        name: 'Administrador del Sistema'
-      })
-      .where(eq(users.id, 1))
-      .returning();
+    // Buscar si existe el usuario SuperAdmin
+    const existingUser = await db.select().from(users).where(eq(users.username, '117020'));
     
-    console.log('Contraseña del SuperAdmin restablecida correctamente.');
+    if (existingUser && existingUser.length > 0) {
+      // Actualizar el usuario existente
+      await db.update(users)
+        .set({ 
+          password: hashedPassword,
+          name: 'Administrador del Sistema',
+          role: 'SuperAdmin'
+        })
+        .where(eq(users.id, existingUser[0].id))
+        .returning();
+      
+      console.log('Contraseña del SuperAdmin restablecida correctamente.');
+    } else {
+      // Crear nuevo usuario SuperAdmin
+      await db.insert(users)
+        .values({
+          username: '117020',
+          password: hashedPassword,
+          name: 'Administrador del Sistema',
+          role: 'SuperAdmin'
+        })
+        .returning();
+      
+      console.log('Usuario SuperAdmin creado correctamente.');
+    }
+    
     console.log('Usuario: 117020');
     console.log('Contraseña: SuperAdmin');
   } catch (error) {
-    console.error('Error restableciendo contraseña:', error);
+    console.error('Error configurando SuperAdmin:', error);
   }
 }
 
