@@ -3185,12 +3185,11 @@ export class DatabaseStorage implements IStorage {
   
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     try {
-      const result = await db.execute(
-        `SELECT COUNT(*) as count FROM coincidencias WHERE estado = 'NoLeido'`
-      );
+      const result = await db.select({ count: count() }).from(coincidencias)
+        .where(eq(coincidencias.estado, 'NoLeido'));
       
-      if (result && result.rows && result.rows.length > 0) {
-        return parseInt(result.rows[0].count) || 0;
+      if (result && result.length > 0) {
+        return result[0].count || 0;
       }
       
       return 0;

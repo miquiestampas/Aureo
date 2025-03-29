@@ -146,9 +146,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Store code already exists" });
         }
         
-        const store = await storage.createStore(req.body);
+        // Preprocesar datos para asegurar compatibilidad con SQLite
+        const storeData = {
+          ...req.body,
+          // Asegurar que active es number (1 o 0) para SQLite
+          active: req.body.active === true || req.body.active === 1 ? 1 : 0,
+          // Convertir fechas y otros campos cuando sea necesario
+          createdAt: new Date().toISOString(),
+          startDate: req.body.startDate || null,
+          endDate: req.body.endDate || null,
+          // Asegurar que los campos opcionales sean string o null
+          district: req.body.district || null,
+          locality: req.body.locality || null,
+          address: req.body.address || null,
+          phone: req.body.phone || null,
+          email: req.body.email || null,
+          cif: req.body.cif || null,
+          businessName: req.body.businessName || null,
+          ownerName: req.body.ownerName || null,
+          ownerIdNumber: req.body.ownerIdNumber || null,
+          notes: req.body.notes || null
+        };
+        
+        const store = await storage.createStore(storeData);
         res.status(201).json(store);
       } catch (err) {
+        console.error('Error creating store:', err);
         next(err);
       }
     });
@@ -164,19 +187,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Store not found" });
         }
         
-        // Preparar los datos de actualización - tratar fechas vacías
-        const updateData = { ...req.body };
+        // Preprocesar datos para asegurar compatibilidad con SQLite
+        const storeData = {
+          ...req.body,
+          // Asegurar que active es number (1 o 0) para SQLite
+          active: req.body.active === true || req.body.active === 1 ? 1 : 0,
+          // Convertir fechas y otros campos cuando sea necesario
+          startDate: req.body.startDate === "" ? null : req.body.startDate,
+          endDate: req.body.endDate === "" ? null : req.body.endDate,
+          // Asegurar que los campos opcionales sean string o null
+          district: req.body.district || null,
+          locality: req.body.locality || null,
+          address: req.body.address || null,
+          phone: req.body.phone || null,
+          email: req.body.email || null,
+          cif: req.body.cif || null,
+          businessName: req.body.businessName || null,
+          ownerName: req.body.ownerName || null,
+          ownerIdNumber: req.body.ownerIdNumber || null,
+          notes: req.body.notes || null
+        };
         
-        // Convertir fechas vacías a null
-        if (updateData.startDate === "") {
-          updateData.startDate = null;
-        }
-        
-        if (updateData.endDate === "") {
-          updateData.endDate = null;
-        }
-        
-        const updatedStore = await storage.updateStore(storeId, updateData);
+        const updatedStore = await storage.updateStore(storeId, storeData);
         
         if (!updatedStore) {
           return res.status(500).json({ message: "Failed to update store" });
@@ -184,6 +216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         res.json(updatedStore);
       } catch (err) {
+        console.error('Error updating store:', err);
         next(err);
       }
     });
