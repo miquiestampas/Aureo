@@ -1039,14 +1039,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         district,
         locality,
         dateFrom,
-        dateTo,
-        limit,
-        sort
+        dateTo
       } = req.query;
-      
-      // Obtener parámetros para límite y ordenación
-      const limitNumber = limit ? parseInt(limit as string) : undefined;
-      const orderDirection = sort === 'newest' ? 'desc' : 'asc';
       
       // Obtener primero las tiendas que coinciden con los criterios
       let matchingStores = await storage.getStores();
@@ -1080,44 +1074,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extraer los códigos de tienda que coinciden
       const storeCodesArray = matchingStores.map(store => store.code);
       
-      // También verificar los storeCodes del parámetro query (JSON)
-      const { storeCodes: storeCodesParam } = req.query;
-      if (storeCodesParam) {
-        try {
-          const parsedStoreCodes = JSON.parse(storeCodesParam as string);
-          // Si hay códigos válidos, usarlos en lugar de los filtrados
-          if (Array.isArray(parsedStoreCodes) && parsedStoreCodes.length > 0) {
-            // Si no se filtró por otros criterios, usar directamente los códigos proporcionados
-            if (!storeCode && !storeName && !location && !district && !locality) {
-              // Usar directamente los códigos proporcionados
-              const documents = await storage.searchPdfDocuments({
-                storeCodes: parsedStoreCodes,
-                dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
-                dateTo: dateTo ? new Date(dateTo as string) : undefined
-              }, limitNumber, orderDirection);
-              
-              // Enriquecer los resultados con información de tienda
-              const enrichedDocuments = await Promise.all(
-                documents.map(async (doc) => {
-                  const store = await storage.getStoreByCode(doc.storeCode);
-                  return {
-                    ...doc,
-                    storeName: store?.name || 'Desconocida',
-                    storeLocation: store?.location || null,
-                    storeDistrict: store?.district || null,
-                    storeLocality: store?.locality || null
-                  };
-                })
-              );
-              
-              return res.json(enrichedDocuments);
-            }
-          }
-        } catch (e) {
-          console.error("Error al parsear códigos de tienda:", e);
-        }
-      }
-      
       // Si no hay tiendas coincidentes, devolver array vacío
       if (storeCodesArray.length === 0) {
         return res.json([]);
@@ -1128,7 +1084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storeCodes: storeCodesArray,
         dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
         dateTo: dateTo ? new Date(dateTo as string) : undefined
-      }, limitNumber, orderDirection);
+      });
       
       // Enriquecer los resultados con información de tienda
       const enrichedDocuments = documents.map(doc => {

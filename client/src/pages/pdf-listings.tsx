@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -9,8 +9,7 @@ import {
   Download, 
   Eye, 
   Search,
-  X,
-  RefreshCw
+  X
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -63,11 +62,10 @@ export default function PdfListingsPage() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [isSearching, setIsSearching] = useState(false);
-  const [showLatest, setShowLatest] = useState(true); // Para mostrar los últimos 10 documentos
   const { toast } = useToast();
 
   // Construir los parámetros de búsqueda
-  const buildSearchParams = (limit?: number) => {
+  const buildSearchParams = () => {
     const params = new URLSearchParams();
     
     // Construir array de códigos de tienda para la búsqueda
@@ -82,18 +80,15 @@ export default function PdfListingsPage() {
     if (dateFrom) params.append('dateFrom', dateFrom.toISOString());
     if (dateTo) params.append('dateTo', dateTo.toISOString());
     
-    // Agregar límite si está presente
-    if (limit) params.append('limit', limit.toString());
-    
     return params.toString();
   };
 
-  // Consulta de documentos PDF según búsqueda
+  // Consulta de documentos PDF
   const {
     data: pdfDocuments,
-    isLoading: isSearchLoading,
-    error: searchError,
-    refetch: refetchSearch
+    isLoading,
+    error,
+    refetch
   } = useQuery<PdfDocument[]>({
     queryKey: ["/api/pdf-documents/search", buildSearchParams()],
     queryFn: async () => {
@@ -105,29 +100,6 @@ export default function PdfListingsPage() {
     },
     enabled: isSearching, // Solo realizar la consulta cuando se busca
   });
-
-  // Consulta para los últimos 10 documentos
-  const {
-    data: latestDocuments,
-    isLoading: isLatestLoading,
-    error: latestError,
-    refetch: refetchLatest
-  } = useQuery<PdfDocument[]>({
-    queryKey: ["/api/pdf-documents/latest"],
-    queryFn: async () => {
-      const response = await fetch(`/api/pdf-documents/search?${buildSearchParams(10)}&sort=newest`);
-      if (!response.ok) {
-        throw new Error("Error al cargar los últimos documentos");
-      }
-      return response.json();
-    },
-    enabled: showLatest // Solo realizar la consulta cuando se quieren mostrar los últimos
-  });
-
-  // Cargar los últimos documentos al iniciar
-  useEffect(() => {
-    setShowLatest(true);
-  }, []);
 
   // Filtrar documentos por criterios adicionales en el frontend
   const filterDocuments = (docs: PdfDocument[] | undefined) => {
@@ -150,18 +122,15 @@ export default function PdfListingsPage() {
     });
   };
 
-  // Documentos filtrados según el modo actual
-  const filteredDocs = isSearching 
-    ? filterDocuments(pdfDocuments) 
-    : showLatest ? latestDocuments || [] : [];
+  // Documentos filtrados
+  const filteredDocs = filterDocuments(pdfDocuments);
 
   // Manejar la búsqueda
   const handleSearch = () => {
     setIsSearching(true);
-    setShowLatest(false);
   };
 
-  // Limpiar filtros y volver a mostrar los últimos 10
+  // Limpiar filtros
   const clearFilters = () => {
     setStoreCode("");
     setStoreName("");
@@ -171,7 +140,6 @@ export default function PdfListingsPage() {
     setDateFrom(undefined);
     setDateTo(undefined);
     setIsSearching(false);
-    setShowLatest(true);
   };
 
   // Visualizar PDF
@@ -201,11 +169,6 @@ export default function PdfListingsPage() {
     if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
     return `${(size / (1024 * 1024)).toFixed(2)} MB`;
   };
-
-  // Determinar estado de carga y error
-  const isLoading = isSearching ? isSearchLoading : isLatestLoading;
-  const error = isSearching ? searchError : latestError;
-  const refetch = isSearching ? refetchSearch : refetchLatest;
 
   return (
     <div className="container mx-auto py-6 px-4 space-y-8 max-w-7xl">
@@ -353,33 +316,12 @@ export default function PdfListingsPage() {
       {/* Sección de Resultados */}
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>
-                {showLatest && !isSearching ? 
-                  "Últimos documentos" : 
-                  "Resultados de búsqueda"}
-              </CardTitle>
-              <CardDescription>
-                {isSearching && !isLoading && pdfDocuments ? 
-                  `${filteredDocs.length} documentos encontrados` : 
-                  showLatest && !isLatestLoading && latestDocuments ?
-                  `Mostrando los últimos ${latestDocuments.length} documentos` :
-                  "Cargando documentos..."}
-              </CardDescription>
-            </div>
-            {showLatest && !isSearching && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => refetchLatest()}
-                disabled={isLatestLoading}
-                title="Actualizar lista"
-              >
-                <RefreshCw className={`h-4 w-4 ${isLatestLoading ? 'animate-spin' : ''}`} />
-              </Button>
-            )}
-          </div>
+          <CardTitle>Resultados</CardTitle>
+          <CardDescription>
+            {isSearching && !isLoading && pdfDocuments ? 
+              `${filteredDocs.length} documentos encontrados` : 
+              "Utilice los filtros para buscar documentos"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -403,70 +345,74 @@ export default function PdfListingsPage() {
                 Reintentar
               </Button>
             </div>
-          ) : filteredDocs.length > 0 ? (
-            // Tabla de resultados
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tienda</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Ubicación</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Tamaño</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredDocs.map((doc) => (
-                    <TableRow key={doc.id}>
-                      <TableCell>
-                        <div className="font-medium">{doc.storeCode}</div>
-                        <div className="text-sm text-muted-foreground">{doc.storeName || '-'}</div>
-                      </TableCell>
-                      <TableCell>{doc.title || "Sin título"}</TableCell>
-                      <TableCell>
-                        <div>{doc.storeLocation || '-'}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {[doc.storeDistrict, doc.storeLocality].filter(Boolean).join(', ') || '-'}
-                        </div>
-                      </TableCell>
-                      <TableCell>{formatDate(doc.uploadDate)}</TableCell>
-                      <TableCell>{formatFileSize(doc.fileSize)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => viewPdf(doc.fileActivityId)}
-                            title="Ver documento"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => downloadPdf(doc.fileActivityId, doc.title || "documento.pdf")}
-                            title="Descargar documento"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+          ) : isSearching && pdfDocuments ? (
+            filteredDocs.length > 0 ? (
+              // Tabla de resultados
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tienda</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Ubicación</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Tamaño</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            // Sin resultados
-            <div className="text-center py-16 text-muted-foreground">
-              <FileText className="mx-auto h-12 w-12 mb-4 opacity-20" />
-              {isSearching ? (
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDocs.map((doc) => (
+                      <TableRow key={doc.id}>
+                        <TableCell>
+                          <div className="font-medium">{doc.storeCode}</div>
+                          <div className="text-sm text-muted-foreground">{doc.storeName || '-'}</div>
+                        </TableCell>
+                        <TableCell>{doc.title || "Sin título"}</TableCell>
+                        <TableCell>
+                          <div>{doc.storeLocation || '-'}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {[doc.storeDistrict, doc.storeLocality].filter(Boolean).join(', ') || '-'}
+                          </div>
+                        </TableCell>
+                        <TableCell>{formatDate(doc.uploadDate)}</TableCell>
+                        <TableCell>{formatFileSize(doc.fileSize)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => viewPdf(doc.fileActivityId)}
+                              title="Ver documento"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => downloadPdf(doc.fileActivityId, doc.title || "documento.pdf")}
+                              title="Descargar documento"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              // Sin resultados
+              <div className="text-center py-16 text-muted-foreground">
+                <FileText className="mx-auto h-12 w-12 mb-4 opacity-20" />
                 <p>No se encontraron documentos con los criterios seleccionados</p>
-              ) : (
-                <p>No hay documentos disponibles</p>
-              )}
+              </div>
+            )
+          ) : (
+            // Estado inicial (sin búsqueda)
+            <div className="text-center py-16 text-muted-foreground">
+              <Calendar className="mx-auto h-12 w-12 mb-4 opacity-20" />
+              <p>Use los filtros de búsqueda para encontrar documentos PDF</p>
             </div>
           )}
         </CardContent>
