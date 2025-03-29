@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import * as schema from "@shared/schema";
 import * as fs from 'fs';
 import * as path from 'path';
+import { sql } from 'drizzle-orm';
 
 // Ruta donde se creará la base de datos SQLite
 const DB_PATH = './aureo_app';
@@ -21,3 +22,6 @@ console.log(`Base de datos SQLite inicializada en: ${FULL_PATH}`);
 
 // Crear la instancia de Drizzle ORM
 export const db = drizzle(sqlite, { schema });
+
+// Exportar el cliente SQLite directamente para consultas SQL puras
+export { sqlite };

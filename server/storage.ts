@@ -2834,9 +2834,10 @@ export class DatabaseStorage implements IStorage {
       sql += ` ORDER BY createdat DESC LIMIT $${params.length + 1}`;
       params.push(limit);
       
-      // Ejecutar la consulta SQL directa
-      const result = await db.execute(sql, params);
-      return result.rows as Alert[];
+      // Ejecutar la consulta SQL directa con sqlite
+      const stmt = sqlite.prepare(sql);
+      const result = stmt.all(...params);
+      return result as Alert[];
     } catch (error) {
       console.error("Error al obtener alertas:", error);
       // En caso de error, devolver array vacío para evitar que falle la aplicación
@@ -2916,20 +2917,21 @@ export class DatabaseStorage implements IStorage {
   async addSearchHistory(searchHistory: InsertSearchHistory): Promise<SearchHistory> {
     try {
       // Insertar directamente usando SQL para evitar problemas con TypeScript
-      const result = await db.execute(
+      const stmt = sqlite.prepare(
         `INSERT INTO search_history (user_id, search_type, search_terms, search_date, result_count, filters) 
-         VALUES ($1, $2, $3, NOW(), $4, $5) RETURNING *`,
-        [
-          searchHistory.userId, 
-          searchHistory.searchType, 
-          searchHistory.searchTerms, 
-          searchHistory.resultCount,
-          searchHistory.filters || null
-        ]
+         VALUES (?, ?, ?, datetime('now'), ?, ?) RETURNING *`
       );
       
-      if (result && result.rows && result.rows[0]) {
-        return result.rows[0] as SearchHistory;
+      const result = stmt.get(
+        searchHistory.userId, 
+        searchHistory.searchType, 
+        searchHistory.searchTerms, 
+        searchHistory.resultCount,
+        searchHistory.filters || null
+      );
+      
+      if (result) {
+        return result as SearchHistory;
       }
       
       throw new Error("No se pudo insertar el historial de búsqueda");
@@ -2942,14 +2944,15 @@ export class DatabaseStorage implements IStorage {
   
   async getRecentSearches(userId: number, limit: number = 10): Promise<SearchHistory[]> {
     try {
-      // Usar SQL directo para evitar problemas de TypeScript
-      const result = await db.execute(
-        `SELECT * FROM "search_history" WHERE "user_id" = $1 ORDER BY "search_date" DESC LIMIT $2`,
-        [userId, limit]
+      // Usar SQL directo con sqlite
+      const stmt = sqlite.prepare(
+        `SELECT * FROM search_history WHERE user_id = ? ORDER BY search_date DESC LIMIT ?`
       );
       
-      if (result && result.rows && Array.isArray(result.rows)) {
-        return result.rows.map(row => {
+      const results = stmt.all(userId, limit);
+      
+      if (results && Array.isArray(results)) {
+        return results.map(row => {
           return {
             id: row.id,
             userId: row.user_id,
@@ -3223,20 +3226,24 @@ export class DatabaseStorage implements IStorage {
   async getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit: number = 50): Promise<Coincidencia[]> {
     try {
       let query = `SELECT * FROM coincidencias`;
-      const params: any[] = [];
       
       if (estado) {
-        query += ` WHERE estado = $1`;
-        params.push(estado);
+        query += ` WHERE estado = ?`;
       }
       
-      query += ` ORDER BY creado_en DESC LIMIT $${params.length + 1}`;
-      params.push(limit);
+      query += ` ORDER BY creado_en DESC LIMIT ?`;
       
-      const result = await db.execute(query, params);
+      const stmt = sqlite.prepare(query);
+      let results;
       
-      if (result && result.rows && Array.isArray(result.rows)) {
-        return result.rows.map(row => row as Coincidencia);
+      if (estado) {
+        results = stmt.all(estado, limit);
+      } else {
+        results = stmt.all(limit);
+      }
+      
+      if (results && Array.isArray(results)) {
+        return results.map(row => row as Coincidencia);
       }
       
       return [];
@@ -3292,13 +3299,14 @@ export class DatabaseStorage implements IStorage {
   
   async getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]> {
     try {
-      const result = await db.execute(
-        `SELECT * FROM coincidencias WHERE id_excel_data = $1 ORDER BY creado_en DESC`,
-        [excelDataId]
+      const stmt = sqlite.prepare(
+        `SELECT * FROM coincidencias WHERE id_excel_data = ? ORDER BY creado_en DESC`
       );
       
-      if (result && result.rows && Array.isArray(result.rows)) {
-        return result.rows.map(row => row as Coincidencia);
+      const results = stmt.all(excelDataId);
+      
+      if (results && Array.isArray(results)) {
+        return results.map(row => row as Coincidencia);
       }
       
       return [];
@@ -3310,16 +3318,18 @@ export class DatabaseStorage implements IStorage {
   
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     try {
-      // Usar la función SQL count para contar las filas
-      const result = await db.select({ count: sql`count(*)` }).from(coincidencias)
-        .where(eq(coincidencias.estado, 'NoLeido'));
+      // Usar SQL directo con sqlite para contar
+      const stmt = sqlite.prepare(
+        `SELECT COUNT(*) as count FROM coincidencias WHERE estado = ?`
+      );
       
-      if (result && result.length > 0) {
+      const result = stmt.get('NoLeido');
+      
+      if (result && result.count !== undefined) {
         // Asegurarse de que se convierta a número
-        const count = typeof result[0].count === 'number' 
-          ? result[0].count 
-          : Number(result[0].count);
-        return count || 0;
+        return typeof result.count === 'number' 
+          ? result.count 
+          : Number(result.count);
       }
       
       return 0;
