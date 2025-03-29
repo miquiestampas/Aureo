@@ -1942,109 +1942,94 @@ export class DatabaseStorage implements IStorage {
     console.log("DatabaseStorage.searchExcelData - Parámetros:", { query, filters });
     
     try {
-      // Usaremos consultas literales en lugar de paramétricas para evitar problemas con los $N
-      // Construiremos la consulta de forma segura escapando manualmente los valores
-      
-      // Función para escapar strings para SQL (prevenir inyección)
-      function escapeSQLString(str: string) {
-        if (str === null || str === undefined) return "NULL";
-        return "'" + str.replace(/'/g, "''") + "'";
+      // Si no hay términos de búsqueda ni filtros, devolver los 100 registros más recientes
+      if (!query && (!filters || Object.keys(filters).length === 0)) {
+        console.log("Búsqueda simple: retornando los 100 registros más recientes");
+        const results = await db
+          .select()
+          .from(excelData)
+          .orderBy(desc(excelData.orderDate))
+          .limit(100);
+        return results;
       }
-      
-      // Función para escapar patrones LIKE
-      function escapeLikePattern(str: string) {
-        if (str === null || str === undefined) return "NULL";
-        // Escapar caracteres especiales en LIKE: %, _, [, ], ^, -
-        const escaped = str.replace(/[%_[\]^-]/g, '\\$&');
-        return "'%" + escaped.replace(/'/g, "''") + "%'";
-      }
-      
-      let sqlConditions: string[] = [];
       
       // Determinar si es una búsqueda simple (sólo query sin filtros) o avanzada
       const isSimpleSearch = query && (!filters || Object.keys(filters).length === 0);
       console.log("Tipo de búsqueda:", isSimpleSearch ? "Simple" : "Avanzada");
       
+      // Condiciones para construir el query
+      const conditions: SQL<unknown>[] = [];
+      
       // Procesar la consulta general si existe
       if (query && query.trim() !== '') {
-        const searchTermEscaped = escapeLikePattern(query.trim());
-        const isNumericQuery = !isNaN(Number(query.trim()));
+        const searchTerm = query.trim();
+        const isNumericQuery = !isNaN(Number(searchTerm));
         
-        // Siempre incluir condiciones de texto
-        const textConditions = [
-          `customer_name ILIKE ${searchTermEscaped}`,
-          `customer_contact ILIKE ${searchTermEscaped}`,
-          `order_number ILIKE ${searchTermEscaped}`,
-          `item_details ILIKE ${searchTermEscaped}`,
-          `metals ILIKE ${searchTermEscaped}`,
-          `engravings ILIKE ${searchTermEscaped}`,
-          `stones ILIKE ${searchTermEscaped}`,
-          `pawn_ticket ILIKE ${searchTermEscaped}`
-        ];
+        // Condiciones de texto para la búsqueda
+        const textCondition = or(
+          like(excelData.customerName, `%${searchTerm}%`),
+          like(excelData.customerContact, `%${searchTerm}%`),
+          like(excelData.orderNumber, `%${searchTerm}%`),
+          like(excelData.itemDetails, `%${searchTerm}%`),
+          like(excelData.metals, `%${searchTerm}%`),
+          like(excelData.engravings, `%${searchTerm}%`),
+          like(excelData.stones, `%${searchTerm}%`),
+          like(excelData.pawnTicket, `%${searchTerm}%`)
+        );
         
-        // Si es numérico, añadir condiciones numéricas
+        conditions.push(textCondition);
+        
+        // Si es numérico, agregar condiciones adicionales para comparaciones exactas
         if (isNumericQuery) {
-          const numericValue = Number(query.trim());
-          const exactValue = escapeSQLString(query.trim());
+          const numericValue = Number(searchTerm);
           
-          const numericConditions = [
-            `order_number = ${exactValue}`,
-            `customer_contact = ${exactValue}`
-          ];
-          
-          // Añadir condición de precio sólo si el valor es mayor que cero
+          // Solo agregar condición de precio si el valor es mayor que cero
           if (numericValue > 0) {
-            // Usamos una expresión CASE para prevenir errores con valores no numéricos
-            numericConditions.push(`(
-              NULLIF(price, '') IS NOT NULL 
-              AND TRIM(price) != '' 
-              AND CASE 
-                WHEN TRIM(price) ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(price AS DECIMAL) = ${numericValue}
-                ELSE false
-              END
-            )`);
+            conditions.push(
+              sql`(${excelData.price} IS NOT NULL AND TRIM(${excelData.price}) != '' AND CAST(${excelData.price} AS REAL) = ${numericValue})`
+            );
           }
           
-          sqlConditions.push(`(${textConditions.join(' OR ')} OR ${numericConditions.join(' OR ')})`);
-        } else {
-          sqlConditions.push(`(${textConditions.join(' OR ')})`);
+          // Condiciones exactas para campos numéricos
+          conditions.push(eq(excelData.orderNumber, searchTerm));
+          conditions.push(eq(excelData.customerContact, searchTerm));
         }
       }
       
-      // Aplicar filtros adicionales
+      // Aplicar filtros adicionales si se proporcionan
       if (filters) {
         // Filtro por tienda
         if (filters.storeCode && filters.storeCode !== "all") {
-          sqlConditions.push(`store_code = ${escapeSQLString(filters.storeCode)}`);
+          conditions.push(eq(excelData.storeCode, filters.storeCode));
         }
         
         // Filtros específicos por campo de texto
         if (filters.customerName) {
-          sqlConditions.push(`customer_name ILIKE ${escapeLikePattern(filters.customerName)}`);
+          conditions.push(like(excelData.customerName, `%${filters.customerName}%`));
         }
         
         if (filters.customerContact) {
-          sqlConditions.push(`customer_contact ILIKE ${escapeLikePattern(filters.customerContact)}`);
+          conditions.push(like(excelData.customerContact, `%${filters.customerContact}%`));
         }
         
         if (filters.orderNumber) {
-          sqlConditions.push(`order_number ILIKE ${escapeLikePattern(filters.orderNumber)}`);
+          conditions.push(like(excelData.orderNumber, `%${filters.orderNumber}%`));
         }
         
         if (filters.itemDetails) {
-          sqlConditions.push(`item_details ILIKE ${escapeLikePattern(filters.itemDetails)}`);
+          conditions.push(like(excelData.itemDetails, `%${filters.itemDetails}%`));
         }
         
         if (filters.metals) {
-          sqlConditions.push(`metals ILIKE ${escapeLikePattern(filters.metals)}`);
+          conditions.push(like(excelData.metals, `%${filters.metals}%`));
         }
         
         if (filters.engravings) {
-          sqlConditions.push(`engravings ILIKE ${escapeLikePattern(filters.engravings)}`);
+          conditions.push(like(excelData.engravings, `%${filters.engravings}%`));
         }
         
         if (filters.stones) {
-          sqlConditions.push(`stones ILIKE ${escapeLikePattern(filters.stones)}`);
+          conditions.push(like(excelData.stones, `%${filters.stones}%`));
         }
         
         // Filtros de fecha
@@ -2052,116 +2037,59 @@ export class DatabaseStorage implements IStorage {
           const fromDate = filters.fromDate instanceof Date 
             ? filters.fromDate.toISOString() 
             : new Date(filters.fromDate).toISOString();
-          sqlConditions.push(`order_date >= ${escapeSQLString(fromDate)}`);
+          conditions.push(gte(excelData.orderDate, fromDate));
         }
         
         if (filters.toDate) {
           const toDate = filters.toDate instanceof Date 
             ? filters.toDate.toISOString() 
             : new Date(filters.toDate).toISOString();
-          sqlConditions.push(`order_date <= ${escapeSQLString(toDate)}`);
+          conditions.push(lte(excelData.orderDate, toDate));
         }
         
-        // Filtros de precio - manejar todos los casos posibles
+        // Filtros de precio para SQLite
         if (filters.priceExact && !isNaN(parseFloat(filters.priceExact))) {
           const price = parseFloat(filters.priceExact);
-          sqlConditions.push(`(
-            NULLIF(price, '') IS NOT NULL 
-            AND TRIM(price) != '' 
-            AND CASE 
-              WHEN TRIM(price) ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(price AS DECIMAL) = ${price}
-              ELSE false
-            END
-          )`);
+          conditions.push(
+            sql`(${excelData.price} IS NOT NULL AND TRIM(${excelData.price}) != '' AND CAST(${excelData.price} AS REAL) = ${price})`
+          );
         } else {
           if (filters.priceMin && !isNaN(parseFloat(filters.priceMin))) {
             const minPrice = parseFloat(filters.priceMin);
-            if (filters.priceIncludeEqual) {
-              sqlConditions.push(`(
-                NULLIF(price, '') IS NOT NULL 
-                AND TRIM(price) != '' 
-                AND CASE 
-                  WHEN TRIM(price) ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(price AS DECIMAL) >= ${minPrice}
-                  ELSE false
-                END
-              )`);
-            } else {
-              sqlConditions.push(`(
-                NULLIF(price, '') IS NOT NULL 
-                AND TRIM(price) != '' 
-                AND CASE 
-                  WHEN TRIM(price) ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(price AS DECIMAL) > ${minPrice}
-                  ELSE false
-                END
-              )`);
-            }
+            const operator = filters.priceIncludeEqual ? '>=' : '>';
+            conditions.push(
+              sql`(${excelData.price} IS NOT NULL AND TRIM(${excelData.price}) != '' AND CAST(${excelData.price} AS REAL) ${sql.raw(operator)} ${minPrice})`
+            );
           }
           
           if (filters.priceMax && !isNaN(parseFloat(filters.priceMax))) {
             const maxPrice = parseFloat(filters.priceMax);
-            if (filters.priceIncludeEqual) {
-              sqlConditions.push(`(
-                NULLIF(price, '') IS NOT NULL 
-                AND TRIM(price) != '' 
-                AND CASE 
-                  WHEN TRIM(price) ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(price AS DECIMAL) <= ${maxPrice}
-                  ELSE false
-                END
-              )`);
-            } else {
-              sqlConditions.push(`(
-                NULLIF(price, '') IS NOT NULL 
-                AND TRIM(price) != '' 
-                AND CASE 
-                  WHEN TRIM(price) ~ '^[0-9]+(\.[0-9]+)?$' THEN CAST(price AS DECIMAL) < ${maxPrice}
-                  ELSE false
-                END
-              )`);
-            }
+            const operator = filters.priceIncludeEqual ? '<=' : '<';
+            conditions.push(
+              sql`(${excelData.price} IS NOT NULL AND TRIM(${excelData.price}) != '' AND CAST(${excelData.price} AS REAL) ${sql.raw(operator)} ${maxPrice})`
+            );
           }
         }
       }
       
-      // Construir la consulta completa
-      let sql = 'SELECT * FROM excel_data';
+      // Construir consulta completa con drizzle
+      let query = db.select().from(excelData);
       
-      if (sqlConditions.length > 0) {
-        sql += ' WHERE ' + sqlConditions.join(' AND ');
+      // Aplicar condiciones OR o AND según sea apropiado
+      if (isSimpleSearch && conditions.length > 0) {
+        // Para búsqueda simple, usamos OR entre todas las condiciones
+        query = query.where(or(...conditions));
+      } else if (conditions.length > 0) {
+        // Para búsqueda avanzada, usamos AND entre todas las condiciones
+        query = query.where(and(...conditions));
       }
       
       // Ordenar por fecha de orden descendente
-      sql += ' ORDER BY order_date DESC';
+      query = query.orderBy(desc(excelData.orderDate));
       
-      console.log("SQL Query:", sql);
-      
-      // Ejecutar la consulta SIN parámetros posicionales
-      const result = await db.execute(sql);
-      
-      if (!result.rows || !Array.isArray(result.rows)) {
-        console.log("No se encontraron resultados o formato de respuesta inesperado");
-        return [];
-      }
-      
-      // Mapear los resultados a objetos ExcelData
-      const results = result.rows.map(row => {
-        return {
-          id: row.id,
-          storeCode: row.store_code,
-          orderNumber: row.order_number,
-          orderDate: new Date(row.order_date),
-          customerName: row.customer_name,
-          customerContact: row.customer_contact,
-          itemDetails: row.item_details,
-          metals: row.metals,
-          engravings: row.engravings,
-          stones: row.stones,
-          carats: row.carats,
-          price: row.price,
-          pawnTicket: row.pawn_ticket,
-          saleDate: row.sale_date ? new Date(row.sale_date) : null,
-          fileActivityId: row.file_activity_id
-        } as ExcelData;
-      });
+      // Ejecutar la consulta
+      console.log("Ejecutando búsqueda con Drizzle ORM");
+      const results = await query;
       
       console.log(`DatabaseStorage.searchExcelData - Resultados: ${results.length}`);
       return results;
@@ -2604,33 +2532,26 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getWatchlistPersons(includeInactive: boolean = false): Promise<WatchlistPerson[]> {
-    // Usar SQL directo ya que hay problemas con la correspondencia de columnas
-    const sql = includeInactive
-      ? `SELECT * FROM watchlist_persons ORDER BY createdat DESC`
-      : `SELECT * FROM watchlist_persons WHERE status = 'Activo' ORDER BY createdat DESC`;
-    
-    const result = await db.execute(sql);
-    
-    // Transformar el resultado en un array de WatchlistPerson
-    if (result && result.rows && Array.isArray(result.rows)) {
-      return result.rows.map(row => {
-        return {
-          id: row.id,
-          fullName: row.fullname,
-          identificationNumber: row.identificationnumber,
-          phone: row.phone,
-          notes: row.notes,
-          riskLevel: row.risklevel,
-          status: row.status,
-          createdAt: row.createdat,
-          createdBy: row.createdby,
-          lastUpdated: row.lastupdated
-        } as WatchlistPerson;
-      });
+    try {
+      // Usar la API de Drizzle en lugar de SQL directo
+      let query = db.select().from(watchlistPersons);
+      
+      // Filtrar por status si es necesario
+      if (!includeInactive) {
+        query = query.where(eq(watchlistPersons.status, 'Activo'));
+      }
+      
+      // Ordenar por fecha de creación descendente
+      query = query.orderBy(desc(watchlistPersons.createdAt));
+      
+      // Ejecutar la consulta
+      const results = await query;
+      
+      return results;
+    } catch (error) {
+      console.error("Error obteniendo personas de la lista de vigilancia:", error);
+      return [];
     }
-    
-    // Si no hay resultados, devolver un array vacío
-    return [];
   }
   
   async getWatchlistPerson(id: number): Promise<WatchlistPerson | undefined> {
@@ -2670,40 +2591,30 @@ export class DatabaseStorage implements IStorage {
   }
   
   async searchWatchlistPersons(query: string): Promise<WatchlistPerson[]> {
-    const searchQuery = `%${query}%`;
-    // Usar SQL directo para evitar problemas con nombres de columnas
-    const sql = `
-      SELECT * FROM watchlist_persons
-      WHERE status = 'Activo' AND (
-        fullname ILIKE $1 OR
-        identificationnumber ILIKE $1 OR
-        phone ILIKE $1
-      )
-      ORDER BY createdat DESC
-    `;
-    
-    const result = await db.execute(sql, [searchQuery]);
-    
-    // Transformar el resultado en un array de WatchlistPerson
-    if (result && result.rows && Array.isArray(result.rows)) {
-      return result.rows.map(row => {
-        return {
-          id: row.id,
-          fullName: row.fullname,
-          identificationNumber: row.identificationnumber,
-          phone: row.phone,
-          notes: row.notes,
-          riskLevel: row.risklevel,
-          status: row.status,
-          createdAt: row.createdat,
-          createdBy: row.createdby,
-          lastUpdated: row.lastupdated
-        } as WatchlistPerson;
-      });
+    try {
+      const searchTerm = `%${query}%`;
+      
+      // Usar la API de Drizzle en lugar de SQL directo
+      const results = await db
+        .select()
+        .from(watchlistPersons)
+        .where(
+          and(
+            eq(watchlistPersons.status, 'Activo'),
+            or(
+              like(watchlistPersons.fullName, searchTerm),
+              like(watchlistPersons.identificationNumber, searchTerm),
+              like(watchlistPersons.phone, searchTerm)
+            )
+          )
+        )
+        .orderBy(desc(watchlistPersons.createdAt));
+      
+      return results;
+    } catch (error) {
+      console.error("Error buscando personas en lista de vigilancia:", error);
+      return [];
     }
-    
-    // Si no hay resultados, devolver un array vacío
-    return [];
   }
   
   // Watchlist Item methods
