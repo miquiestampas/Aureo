@@ -17,7 +17,7 @@ import {
 import session from "express-session";
 import createMemoryStore from "memorystore";
 // No necesitamos connectPg para SQLite
-import { db } from "./db";
+import { db, sqlite } from "./db";
 import { eq, desc, like, or, and, gte, lte, inArray, sql } from "drizzle-orm";
 // SQLite no necesita pool
 
@@ -3319,6 +3319,7 @@ export class DatabaseStorage implements IStorage {
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     try {
       // Usar SQL directo con sqlite para contar
+      // La variable sqlite está importada desde "./db"
       const stmt = sqlite.prepare(
         `SELECT COUNT(*) as count FROM coincidencias WHERE estado = ?`
       );
