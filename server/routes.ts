@@ -292,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               code: storeCode,
               name: storeName,
               type: storeType as "Excel" | "PDF",
-              active: isActive,
+              active: isActive ? 1 : 0,
               district: (row['Distrito'] as string) || null,
               locality: (row['Localidad'] as string) || null,
               address: (row['Dirección'] as string) || null,
@@ -461,7 +461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: activity.fileType,
           district: "",
           locality: "",
-          active: true
+          active: 1
         });
         
         targetStoreCode = newStore.code;

@@ -1,14 +1,14 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, date, doublePrecision } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // User model
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
-  role: text("role", { enum: ["SuperAdmin", "Admin", "User"] }).notNull().default("User"),
+  role: text("role").notNull().default("User"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -22,15 +22,15 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 // Store model
-export const stores = pgTable("stores", {
-  id: serial("id").primaryKey(),
+export const stores = sqliteTable("stores", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   code: text("code").notNull().unique(),
   name: text("name").notNull(),
-  type: text("type", { enum: ["Excel", "PDF"] }).notNull(),
+  type: text("type").notNull(), // Excel o PDF
   district: text("district"), // Campo DISTRITO
   locality: text("locality"), // Campo LOCALIDAD
-  active: boolean("active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(), // Fecha de grabación en el sistema
+  active: integer("active").notNull().default(1), // 1 = true, 0 = false
+  createdAt: text("created_at").notNull().default(String(new Date().toISOString())), // Fecha de grabación en el sistema
   // Campos adicionales
   address: text("address"),
   phone: text("phone"),
@@ -39,8 +39,8 @@ export const stores = pgTable("stores", {
   businessName: text("business_name"), // Razón social
   ownerName: text("owner_name"), // Nombre del propietario
   ownerIdNumber: text("owner_id_number"), // DNI del propietario
-  startDate: date("start_date"), // Fecha inicio actividad
-  endDate: date("end_date"), // Fecha cese para las no activas
+  startDate: text("start_date"), // Fecha inicio actividad
+  endDate: text("end_date"), // Fecha cese para las no activas
   notes: text("notes"), // Anotaciones adicionales
 });
 
@@ -67,8 +67,8 @@ export type InsertStore = z.infer<typeof insertStoreSchema>;
 export type Store = typeof stores.$inferSelect;
 
 // System Config model
-export const systemConfigs = pgTable("system_configs", {
-  id: serial("id").primaryKey(),
+export const systemConfigs = sqliteTable("system_configs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   key: text("key").notNull().unique(),
   value: text("value").notNull(),
   description: text("description"),
@@ -84,16 +84,16 @@ export type InsertSystemConfig = z.infer<typeof insertSystemConfigSchema>;
 export type SystemConfig = typeof systemConfigs.$inferSelect;
 
 // FileActivity model for tracking processed files
-export const fileActivities = pgTable("file_activities", {
-  id: serial("id").primaryKey(),
+export const fileActivities = sqliteTable("file_activities", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   filename: text("filename").notNull(),
   storeCode: text("store_code").notNull(),
-  fileType: text("file_type", { enum: ["Excel", "PDF"] }).notNull(),
-  status: text("status", { enum: ["Pending", "Processing", "Processed", "Failed", "PendingStoreAssignment"] }).notNull(),
-  processingDate: timestamp("processing_date").notNull().defaultNow(),
+  fileType: text("file_type").notNull(), // "Excel" o "PDF"
+  status: text("status").notNull(), // "Pending", "Processing", "Processed", "Failed", "PendingStoreAssignment"
+  processingDate: text("processing_date").notNull().default(String(new Date().toISOString())),
   processedBy: text("processed_by").notNull(),
   errorMessage: text("error_message"),
-  metadata: jsonb("metadata"),
+  metadata: text("metadata"), // Guardado como JSON stringificado
   // Campo para almacenar el código de tienda detectado pero pendiente de confirmar
   detectedStoreCode: text("detected_store_code"),
 });
@@ -114,11 +114,11 @@ export type InsertFileActivity = z.infer<typeof insertFileActivitySchema>;
 export type FileActivity = typeof fileActivities.$inferSelect;
 
 // Excel data model for processed excel files
-export const excelData = pgTable("excel_data", {
-  id: serial("id").primaryKey(),
+export const excelData = sqliteTable("excel_data", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   storeCode: text("store_code").notNull(),
   orderNumber: text("order_number").notNull(),
-  orderDate: timestamp("order_date").notNull(),
+  orderDate: text("order_date").notNull(), // ISO date string
   customerName: text("customer_name"),
   customerContact: text("customer_contact"),
   itemDetails: text("item_details"),
@@ -128,7 +128,7 @@ export const excelData = pgTable("excel_data", {
   carats: text("carats"),
   price: text("price"),
   pawnTicket: text("pawn_ticket"),
-  saleDate: timestamp("sale_date"),
+  saleDate: text("sale_date"), // ISO date string
   fileActivityId: integer("file_activity_id").notNull(),
 });
 
@@ -153,13 +153,13 @@ export type InsertExcelData = z.infer<typeof insertExcelDataSchema>;
 export type ExcelData = typeof excelData.$inferSelect;
 
 // PDF document model for processed PDF files
-export const pdfDocuments = pgTable("pdf_documents", {
-  id: serial("id").primaryKey(),
+export const pdfDocuments = sqliteTable("pdf_documents", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   storeCode: text("store_code").notNull(),
   documentType: text("document_type"),
   title: text("title"),
   path: text("path").notNull(),
-  uploadDate: timestamp("upload_date").notNull().defaultNow(),
+  uploadDate: text("upload_date").notNull().default(String(new Date().toISOString())),
   fileSize: integer("file_size"),
   fileActivityId: integer("file_activity_id").notNull(),
 });
@@ -178,17 +178,17 @@ export type InsertPdfDocument = z.infer<typeof insertPdfDocumentSchema>;
 export type PdfDocument = typeof pdfDocuments.$inferSelect;
 
 // Persona de interés (Watchlist)
-export const watchlistPersons = pgTable("watchlist_persons", {
-  id: serial("id").primaryKey(),
+export const watchlistPersons = sqliteTable("watchlist_persons", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   fullName: text("fullname").notNull(),
   identificationNumber: text("identificationnumber"), // Número de identificación como DUI, pasaporte, etc.
   phone: text("phone"),
   notes: text("notes"),
-  riskLevel: text("risklevel", { enum: ["Alto", "Medio", "Bajo"] }).notNull().default("Medio"),
-  status: text("status", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
-  createdAt: timestamp("createdat").notNull().defaultNow(),
+  riskLevel: text("risklevel").notNull().default("Medio"), // "Alto", "Medio", "Bajo"
+  status: text("status").notNull().default("Activo"), // "Activo", "Inactivo"
+  createdAt: text("createdat").notNull().default(String(new Date().toISOString())),
   createdBy: integer("createdby").notNull(), // ID del usuario que agregó el registro
-  lastUpdated: timestamp("lastupdated"),
+  lastUpdated: text("lastupdated"),
 });
 
 export const insertWatchlistPersonSchema = createInsertSchema(watchlistPersons).pick({
@@ -205,8 +205,8 @@ export type InsertWatchlistPerson = z.infer<typeof insertWatchlistPersonSchema>;
 export type WatchlistPerson = typeof watchlistPersons.$inferSelect;
 
 // Objeto de interés (Watchlist de artículos)
-export const watchlistItems = pgTable("watchlist_items", {
-  id: serial("id").primaryKey(),
+export const watchlistItems = sqliteTable("watchlist_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   itemType: text("itemtype").notNull(), // Tipo de joya, electrónico, etc.
   description: text("description").notNull(),
   serialNumber: text("serialnumber"),
@@ -214,11 +214,11 @@ export const watchlistItems = pgTable("watchlist_items", {
   model: text("model"),
   brand: text("brand"),
   notes: text("notes"),
-  riskLevel: text("risklevel", { enum: ["Alto", "Medio", "Bajo"] }).notNull().default("Medio"),
-  status: text("status", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
-  createdAt: timestamp("createdat").notNull().defaultNow(),
+  riskLevel: text("risklevel").notNull().default("Medio"), // "Alto", "Medio", "Bajo"
+  status: text("status").notNull().default("Activo"), // "Activo", "Inactivo"
+  createdAt: text("createdat").notNull().default(String(new Date().toISOString())),
   createdBy: integer("createdby").notNull(), // ID del usuario que agregó el registro
-  lastUpdated: timestamp("lastupdated"),
+  lastUpdated: text("lastupdated"),
 });
 
 export const insertWatchlistItemSchema = createInsertSchema(watchlistItems).pick({
@@ -238,18 +238,18 @@ export type InsertWatchlistItem = z.infer<typeof insertWatchlistItemSchema>;
 export type WatchlistItem = typeof watchlistItems.$inferSelect;
 
 // Alertas generadas
-export const alerts = pgTable("alerts", {
-  id: serial("id").primaryKey(),
-  alertType: text("alert_type", { enum: ["Persona", "Objeto"] }).notNull(),
+export const alerts = sqliteTable("alerts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  alertType: text("alert_type").notNull(), // "Persona", "Objeto"
   excelDataId: integer("excel_data_id").notNull(), // ID del registro de excelData que generó la alerta
   watchlistPersonId: integer("watchlist_person_id"), // ID de la persona en watchlist (si es alerta de persona)
   watchlistItemId: integer("watchlist_item_id"), // ID del objeto en watchlist (si es alerta de objeto)
   matchConfidence: integer("match_confidence").notNull(), // Porcentaje de confianza en la coincidencia (0-100)
-  status: text("status", { enum: ["Nueva", "Revisada", "Falsa"] }).notNull().default("Nueva"),
+  status: text("status").notNull().default("Nueva"), // "Nueva", "Revisada", "Falsa"
   reviewedBy: integer("reviewed_by"), // ID del usuario que revisó la alerta
   reviewNotes: text("review_notes"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  resolvedAt: timestamp("resolved_at"),
+  createdAt: text("created_at").notNull().default(String(new Date().toISOString())),
+  resolvedAt: text("resolved_at"),
 });
 
 export const insertAlertSchema = createInsertSchema(alerts).pick({
@@ -267,12 +267,12 @@ export type InsertAlert = z.infer<typeof insertAlertSchema>;
 export type Alert = typeof alerts.$inferSelect;
 
 // Historial de búsquedas
-export const searchHistory = pgTable("search_history", {
-  id: serial("id").primaryKey(),
+export const searchHistory = sqliteTable("search_history", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").notNull(),
-  searchType: text("search_type", { enum: ["Cliente", "Artículo", "Orden", "General"] }).notNull(),
+  searchType: text("search_type").notNull(), // "Cliente", "Artículo", "Orden", "General"
   searchTerms: text("search_terms").notNull(),
-  searchDate: timestamp("search_date").notNull().defaultNow(),
+  searchDate: text("search_date").notNull().default(String(new Date().toISOString())),
   resultCount: integer("result_count").notNull(),
 });
 
@@ -287,16 +287,16 @@ export type InsertSearchHistory = z.infer<typeof insertSearchHistorySchema>;
 export type SearchHistory = typeof searchHistory.$inferSelect;
 
 // Nuevo modelo para señalamientos/alertas sobre personas
-export const senalPersonas = pgTable("senal_personas", {
-  id: serial("id").primaryKey(),
+export const senalPersonas = sqliteTable("senal_personas", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   nombre: text("nombre"),  // Ya no es notNull para permitir registros con solo DNI
   documentoId: text("documento_id"),  // DNI, NIE, pasaporte
   notas: text("notas"),
-  estado: text("estado", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
+  estado: text("estado").notNull().default("Activo"), // "Activo", "Inactivo"
   creadoPor: integer("creado_por").notNull(), // ID del usuario creador
-  creadoEn: timestamp("creado_en").notNull().defaultNow(),
+  creadoEn: text("creado_en").notNull().default(String(new Date().toISOString())),
   modificadoPor: integer("modificado_por"), // ID del usuario que modificó
-  modificadoEn: timestamp("modificado_en"),
+  modificadoEn: text("modificado_en"),
 });
 
 export const insertSenalPersonaSchema = createInsertSchema(senalPersonas).pick({
@@ -312,16 +312,16 @@ export type InsertSenalPersona = z.infer<typeof insertSenalPersonaSchema>;
 export type SenalPersona = typeof senalPersonas.$inferSelect;
 
 // Nuevo modelo para señalamientos/alertas sobre objetos
-export const senalObjetos = pgTable("senal_objetos", {
-  id: serial("id").primaryKey(),
+export const senalObjetos = sqliteTable("senal_objetos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   descripcion: text("descripcion"),  // Ya no es notNull para permitir registros con otros campos
   grabacion: text("grabacion"),  // Grabados específicos
   notas: text("notas"),
-  estado: text("estado", { enum: ["Activo", "Inactivo"] }).notNull().default("Activo"),
+  estado: text("estado").notNull().default("Activo"), // "Activo", "Inactivo"
   creadoPor: integer("creado_por").notNull(), // ID del usuario creador
-  creadoEn: timestamp("creado_en").notNull().defaultNow(),
+  creadoEn: text("creado_en").notNull().default(String(new Date().toISOString())),
   modificadoPor: integer("modificado_por"), // ID del usuario que modificó
-  modificadoEn: timestamp("modificado_en"),
+  modificadoEn: text("modificado_en"),
 });
 
 export const insertSenalObjetoSchema = createInsertSchema(senalObjetos).pick({
@@ -337,21 +337,21 @@ export type InsertSenalObjeto = z.infer<typeof insertSenalObjetoSchema>;
 export type SenalObjeto = typeof senalObjetos.$inferSelect;
 
 // Modelo para coincidencias detectadas entre señalamientos y registros
-export const coincidencias = pgTable("coincidencias", {
-  id: serial("id").primaryKey(),
-  tipoCoincidencia: text("tipo_coincidencia", { enum: ["Persona", "Objeto"] }).notNull(),
+export const coincidencias = sqliteTable("coincidencias", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  tipoCoincidencia: text("tipo_coincidencia").notNull(), // "Persona", "Objeto"
   idSenalPersona: integer("id_senal_persona"),
   idSenalObjeto: integer("id_senal_objeto"),
   idExcelData: integer("id_excel_data").notNull(),
   puntuacionCoincidencia: integer("puntuacion_coincidencia").notNull(), // 0-100
-  tipoMatch: text("tipo_match", { enum: ["Exacto", "Parcial"] }).notNull(),
+  tipoMatch: text("tipo_match").notNull(), // "Exacto", "Parcial"
   campoCoincidente: text("campo_coincidente").notNull(), // nombre, documento, descripcion, grabacion
   valorCoincidente: text("valor_coincidente").notNull(), // El valor que coincidió
-  estado: text("estado", { enum: ["NoLeido", "Leido", "Descartado"] }).notNull().default("NoLeido"),
+  estado: text("estado").notNull().default("NoLeido"), // "NoLeido", "Leido", "Descartado"
   revisadoPor: integer("revisado_por"), // ID del usuario que revisó
   notasRevision: text("notas_revision"),
-  creadoEn: timestamp("creado_en").notNull().defaultNow(),
-  revisadoEn: timestamp("revisado_en"),
+  creadoEn: text("creado_en").notNull().default(String(new Date().toISOString())),
+  revisadoEn: text("revisado_en"),
 });
 
 export const insertCoincidenciaSchema = createInsertSchema(coincidencias).pick({

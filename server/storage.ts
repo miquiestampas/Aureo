@@ -16,13 +16,13 @@ import {
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import connectPg from "connect-pg-simple";
+// No necesitamos connectPg para SQLite
 import { db } from "./db";
 import { eq, desc, like, or, and, gte, lte, inArray, sql } from "drizzle-orm";
-import { pool } from "./db";
+// SQLite no necesita pool
 
 const MemoryStore = createMemoryStore(session);
-const PostgresSessionStore = connectPg(session);
+// SQLite usa MemoryStore para las sesiones
 
 // Extend the interface with CRUD methods
 export interface IStorage {
@@ -1281,9 +1281,9 @@ export class DatabaseStorage implements IStorage {
   sessionStore: any;
 
   constructor() {
-    this.sessionStore = new PostgresSessionStore({
-      pool,
-      createTableIfMissing: true
+    // En SQLite usamos MemoryStore para las sesiones
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000, // prune expired entries every 24h
     });
   }
   

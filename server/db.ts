@@ -1,15 +1,23 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import Database from 'better-sqlite3';
 import * as schema from "@shared/schema";
+import * as fs from 'fs';
+import * as path from 'path';
 
-neonConfig.webSocketConstructor = ws;
+// Ruta donde se creará la base de datos SQLite
+const DB_PATH = './aureo_app';
+const DB_FILE = 'datos.sqlite';
+const FULL_PATH = path.join(DB_PATH, DB_FILE);
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+// Crear el directorio si no existe
+if (!fs.existsSync(DB_PATH)) {
+  fs.mkdirSync(DB_PATH, { recursive: true });
+  console.log(`Directorio creado: ${DB_PATH}`);
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+// Crear la conexión a la base de datos SQLite
+const sqlite = new Database(FULL_PATH);
+console.log(`Base de datos SQLite inicializada en: ${FULL_PATH}`);
+
+// Crear la instancia de Drizzle ORM
+export const db = drizzle(sqlite, { schema });
