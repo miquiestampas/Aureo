@@ -924,7 +924,7 @@ export default function StoreManagementPage() {
             <p className="text-gray-500 mt-1">Administre sus tiendas de Excel y PDF</p>
           </div>
 
-          {canModify && (
+          {canModify && 
             <div className="flex space-x-2">
               <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogTrigger asChild>
@@ -1019,7 +1019,7 @@ export default function StoreManagementPage() {
                 </DialogContent>
               </Dialog>
             </div>
-          )}
+          }
 
           {/* Dialog para crear tienda */}
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -1367,8 +1367,7 @@ export default function StoreManagementPage() {
                 </Form>
               </DialogContent>
             </Dialog>
-          )
-        }
+          
         </div>
 
         {/* Advanced Filter and Export */}
