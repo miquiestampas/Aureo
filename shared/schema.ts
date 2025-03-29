@@ -27,11 +27,10 @@ export const stores = pgTable("stores", {
   code: text("code").notNull().unique(),
   name: text("name").notNull(),
   type: text("type", { enum: ["Excel", "PDF"] }).notNull(),
-  location: text("location"), // Campo antiguo (mantenido para compatibilidad)
-  district: text("district"), // Nuevo campo DISTRITO
-  locality: text("locality"), // Nuevo campo LOCALIDAD
+  district: text("district"), // Campo DISTRITO
+  locality: text("locality"), // Campo LOCALIDAD
   active: boolean("active").notNull().default(true),
-  // Nuevos campos
+  // Campos adicionales
   address: text("address"),
   phone: text("phone"),
   email: text("email"),
@@ -48,7 +47,6 @@ export const insertStoreSchema = createInsertSchema(stores).pick({
   code: true,
   name: true,
   type: true,
-  location: true,
   district: true,
   locality: true,
   active: true,

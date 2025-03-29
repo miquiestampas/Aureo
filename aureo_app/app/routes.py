@@ -54,7 +54,6 @@ def create_store():
         code=data['code'],
         name=data['name'],
         type=data['type'],
-        location=data.get('location'),
         district=data.get('district'),
         locality=data.get('locality'),
         active=data.get('active', True),
@@ -97,8 +96,6 @@ def update_store(id):
         store.name = data['name']
     if 'type' in data:
         store.type = data['type']
-    if 'location' in data:
-        store.location = data['location']
     if 'district' in data:
         store.district = data['district']
     if 'locality' in data:

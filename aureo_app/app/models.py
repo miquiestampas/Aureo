@@ -30,7 +30,6 @@ class Store(db.Model):
     code = db.Column(db.String(20), unique=True, nullable=False)
     name = db.Column(db.String(120), nullable=False)
     type = db.Column(db.String(10), nullable=False)  # "Excel" o "PDF"
-    location = db.Column(db.String(120), nullable=True)
     district = db.Column(db.String(120), nullable=True)
     locality = db.Column(db.String(120), nullable=True)
     active = db.Column(db.Boolean, default=True)
@@ -51,7 +50,6 @@ class Store(db.Model):
             'code': self.code,
             'name': self.name,
             'type': self.type,
-            'location': self.location,
             'district': self.district,
             'locality': self.locality,
             'active': self.active,

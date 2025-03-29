@@ -156,11 +156,10 @@ interface StoreData {
   code: string;
   name: string;
   type: string;
-  location: string;
-  district?: string; // Nuevo campo DISTRITO
-  locality?: string; // Nuevo campo LOCALIDAD
+  district?: string; // Campo DISTRITO
+  locality?: string; // Campo LOCALIDAD
   active: boolean;
-  // Nuevos campos añadidos
+  // Campos adicionales
   address?: string;
   phone?: string;
   email?: string;
@@ -178,11 +177,10 @@ const storeFormSchema = z.object({
   code: z.string().min(2, "El código debe tener al menos 2 caracteres").max(20, "El código debe tener máximo 20 caracteres"),
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   type: z.enum(["Excel", "PDF"]),
-  location: z.string().optional(), // Campo antiguo (mantenido para compatibilidad)
-  district: z.string().optional(), // Nuevo campo DISTRITO
-  locality: z.string().optional(), // Nuevo campo LOCALIDAD
+  district: z.string().optional(), // Campo DISTRITO
+  locality: z.string().optional(), // Campo LOCALIDAD
   active: z.boolean().default(true),
-  // Nuevos campos
+  // Campos adicionales
   address: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email("Formato de correo inválido").optional(),
@@ -241,14 +239,12 @@ export default function StoreManagementPage() {
       return false;
     }
 
-    // Filtro por localidad (incluye búsqueda en locality y location para compatibilidad)
+    // Filtro por localidad
     if (localityFilter && localityFilter !== "_empty") {
       const matchesLocality = store.locality && 
         store.locality.toLowerCase().includes(localityFilter.toLowerCase());
-      const matchesLocation = store.location && 
-        store.location.toLowerCase().includes(localityFilter.toLowerCase());
 
-      if (!matchesLocality && !matchesLocation) {
+      if (!matchesLocality) {
         return false;
       }
     }
@@ -321,7 +317,7 @@ export default function StoreManagementPage() {
         store.code,
         store.name,
         store.type,
-        store.locality || (store.location || "—"),
+        store.locality || "—",
         store.district || "—",
         store.active ? "Activa" : "Inactiva"
       ]),
@@ -354,7 +350,7 @@ export default function StoreManagementPage() {
       "Código": store.code,
       "Nombre": store.name,
       "Tipo": store.type,
-      "Localidad": store.locality || (store.location || "—"),
+      "Localidad": store.locality || "—",
       "Distrito": store.district || "—",
       "Estado": store.active ? "Activa" : "Inactiva",
       "Dirección": store.address || "—",
@@ -402,7 +398,6 @@ export default function StoreManagementPage() {
       code: "",
       name: "",
       type: "Excel",
-      location: "",
       district: "",
       locality: "",
       active: true,
@@ -424,7 +419,6 @@ export default function StoreManagementPage() {
       code: "",
       name: "",
       type: "Excel",
-      location: "",
       district: "",
       locality: "",
       active: true,
@@ -446,7 +440,6 @@ export default function StoreManagementPage() {
         code: selectedStore.code,
         name: selectedStore.name,
         type: selectedStore.type as "Excel" | "PDF",
-        location: selectedStore.location || "",
         district: selectedStore.district || "",
         locality: selectedStore.locality || "",
         active: selectedStore.active,
@@ -647,11 +640,11 @@ export default function StoreManagementPage() {
     },
     {
       id: "locality",
-      accessorFn: (row) => row.locality || (row.location || "—"),
+      accessorFn: (row) => row.locality || "—",
       header: ({ column }) => <SortableColumnHeader column={column} title="Localidad" />,
       cell: ({ row }) => {
         const store = row.original;
-        return store.locality || (store.location || "—");
+        return store.locality || "—";
       },
       enableSorting: true
     },
@@ -1731,7 +1724,7 @@ export default function StoreManagementPage() {
                       </div>
                       <div>
                         <span className="font-medium">Localidad:</span> 
-                        <span className="ml-2">{selectedStore.locality || (selectedStore.location || "—")}</span>
+                        <span className="ml-2">{selectedStore.locality || "—"}</span>
                       </div>
                       <div>
                         <span className="font-medium">Distrito:</span> 
