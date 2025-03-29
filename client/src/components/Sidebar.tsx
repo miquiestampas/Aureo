@@ -118,6 +118,13 @@ export default function Sidebar() {
           />
           
           <NavItem
+            href="/pdf-listings"
+            icon={<FileText size={20} />}
+            label="Listados PDF"
+            active={location === '/pdf-listings'}
+          />
+          
+          <NavItem
             href="/senalamientos"
             icon={<AlertTriangle size={20} />}
             label="Señalamientos"
@@ -133,13 +140,6 @@ export default function Sidebar() {
             active={location === '/coincidencias'}
             requiredRoles={["SuperAdmin", "Admin"]}
             userRole={user?.role}
-          />
-          
-          <NavItem
-            href="/pdf-listings"
-            icon={<FileText size={20} />}
-            label="Listados PDF"
-            active={location === '/pdf-listings'}
           />
 
           {/* Administración Section */}
