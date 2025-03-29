@@ -608,16 +608,17 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         const activity = await storage.getFileActivity(activityId);
         if (activity) {
           try {
-            // Actualiza la actividad con el nuevo código de tienda
-            await storage.updateFileActivityStatus(activityId, 'Processing');
-            
             // IMPORTANTE: También actualizamos la variable storeCode para que los datos se procesen con el código correcto
             storeCode = excelStore.code;
             
             console.log(`Updated file activity ${activityId} with correct store code: ${excelStore.code}`);
             
             // Actualizar el registro de actividad con el método apropiado
-            await storage.updateFileActivity(activityId, { storeCode: excelStore.code });
+            await storage.updateFileActivity(activityId, { 
+              storeCode: excelStore.code,
+              status: 'Processing' 
+            });
+            
             console.log(`Updated file activity in database with store code: ${excelStore.code}`);
           } catch (updateError) {
             console.error(`Error updating file activity with correct store code:`, updateError);
@@ -629,10 +630,41 @@ export async function processExcelFile(filePath: string, activityId: number, sto
           row.storeCode = excelStore.code;
         }
       } else {
-        console.warn(`Store code ${excelStoreCode} from Excel file does not exist in database, using default: ${storeCode}`);
+        // Si el código existe en el Excel pero no está en la base de datos,
+        // marcar como pendiente de asignación para que el usuario pueda crear la tienda manualmente
+        console.warn(`Store code ${excelStoreCode} from Excel file does not exist in database.`);
+        console.log(`Marking file activity ${activityId} as PendingStoreAssignment with detected code: ${excelStoreCode}`);
+        
+        try {
+          await storage.updateFileActivity(activityId, {
+            status: 'PendingStoreAssignment',
+            detectedStoreCode: excelStoreCode
+          });
+        } catch (updateError) {
+          console.error(`Error updating file activity to PendingStoreAssignment:`, updateError);
+        }
+        
+        // Lanzar excepción para detener el procesamiento hasta que se asigne una tienda
+        throw new Error(`El código de tienda ${excelStoreCode} no existe. Se ha marcado el archivo como pendiente de asignación.`);
       }
     } else {
       console.log(`No store code found in Excel file, using default: ${storeCode}`);
+      
+      // Si el storeCode es PENDIENTE y no hay código en el Excel, marcar para asignación manual
+      if (storeCode === 'PENDIENTE') {
+        console.log(`Marking file activity ${activityId} as PendingStoreAssignment because no store code was found.`);
+        
+        try {
+          await storage.updateFileActivity(activityId, {
+            status: 'PendingStoreAssignment'
+          });
+        } catch (updateError) {
+          console.error(`Error updating file activity to PendingStoreAssignment:`, updateError);
+        }
+        
+        // Lanzar excepción para detener el procesamiento hasta que se asigne una tienda
+        throw new Error(`No se detectó código de tienda en el archivo. Se ha marcado como pendiente de asignación.`);
+      }
     }
     
     // Guardar todos los datos extraídos y verificar coincidencias con la lista de vigilancia
@@ -772,7 +804,10 @@ export async function processPdfFile(filePath: string, activityId: number, store
             console.log(`Updated PDF file activity ${activityId} with correct store code: ${pdfStore.code}`);
             
             // Actualizar el registro de actividad con el método apropiado
-            await storage.updateFileActivity(activityId, { storeCode: pdfStore.code });
+            await storage.updateFileActivity(activityId, { 
+              storeCode: pdfStore.code, 
+              status: 'Processing'
+            });
             console.log(`Updated PDF activity in database with store code: ${pdfStore.code}`);
           } catch (updateError) {
             console.error(`Error updating PDF activity with correct store code:`, updateError);

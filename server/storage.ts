@@ -1830,11 +1830,27 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getPendingStoreAssignmentActivities(): Promise<FileActivity[]> {
-    return await db
-      .select()
-      .from(fileActivities)
-      .where(eq(fileActivities.status, 'PendingStoreAssignment'))
-      .orderBy(desc(fileActivities.processingDate));
+    console.log("Buscando actividades pendientes de asignación de tienda...");
+    
+    // Verificar también actividades con storeCode = 'PENDIENTE'
+    try {
+      const pendingActivities = await db
+        .select()
+        .from(fileActivities)
+        .where(
+          or(
+            eq(fileActivities.status, 'PendingStoreAssignment'),
+            eq(fileActivities.storeCode, 'PENDIENTE')
+          )
+        )
+        .orderBy(desc(fileActivities.processingDate));
+      
+      console.log(`Encontradas ${pendingActivities.length} actividades pendientes de asignación de tienda`);
+      return pendingActivities;
+    } catch (error) {
+      console.error("Error al buscar actividades pendientes de asignación:", error);
+      return [];
+    }
   }
   
   async getFileActivitiesByStore(storeCode: string): Promise<FileActivity[]> {
