@@ -16,8 +16,27 @@ async function main() {
       ALTER COLUMN nombre DROP NOT NULL;
     `;
     console.log("Modificación completada exitosamente.");
+
+    // Comprobar si la columna created_at ya existe en la tabla stores
+    const columnCheck = await client`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'stores' AND column_name = 'created_at';
+    `;
+
+    // Si la columna no existe, añadirla
+    if (columnCheck.length === 0) {
+      console.log("Añadiendo columna created_at a la tabla stores...");
+      await client`
+        ALTER TABLE stores 
+        ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;
+      `;
+      console.log("Columna created_at añadida exitosamente a la tabla stores.");
+    } else {
+      console.log("La columna created_at ya existe en la tabla stores. No se requieren cambios.");
+    }
   } catch (error) {
-    console.error("Error al modificar la tabla:", error);
+    console.error("Error al modificar las tablas:", error);
   } finally {
     // Cerrar conexión
     await client.end();

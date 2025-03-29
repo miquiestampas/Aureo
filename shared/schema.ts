@@ -30,6 +30,7 @@ export const stores = pgTable("stores", {
   district: text("district"), // Campo DISTRITO
   locality: text("locality"), // Campo LOCALIDAD
   active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(), // Fecha de grabación en el sistema
   // Campos adicionales
   address: text("address"),
   phone: text("phone"),

@@ -159,6 +159,7 @@ interface StoreData {
   district?: string; // Campo DISTRITO
   locality?: string; // Campo LOCALIDAD
   active: boolean;
+  createdAt?: string | Date; // Fecha de grabación en el sistema
   // Campos adicionales
   address?: string;
   phone?: string;
@@ -312,11 +313,12 @@ export default function StoreManagementPage() {
     // Tabla
     autoTable(doc, {
       startY: 45,
-      head: [["Código", "Nombre", "Tipo", "Localidad", "Distrito", "Estado"]],
+      head: [["Código", "Nombre", "Tipo", "Fecha grabación", "Localidad", "Distrito", "Estado"]],
       body: filteredStores.map(store => [
         store.code,
         store.name,
         store.type,
+        store.createdAt ? new Date(store.createdAt).toLocaleDateString('es-ES') : "—",
         store.locality || "—",
         store.district || "—",
         store.active ? "Activa" : "Inactiva"
@@ -350,6 +352,7 @@ export default function StoreManagementPage() {
       "Código": store.code,
       "Nombre": store.name,
       "Tipo": store.type,
+      "Fecha grabación": store.createdAt ? new Date(store.createdAt).toLocaleDateString('es-ES') : "—",
       "Localidad": store.locality || "—",
       "Distrito": store.district || "—",
       "Estado": store.active ? "Activa" : "Inactiva",
@@ -366,6 +369,7 @@ export default function StoreManagementPage() {
       { wch: 10 }, // Código
       { wch: 25 }, // Nombre
       { wch: 10 }, // Tipo
+      { wch: 15 }, // Fecha grabación
       { wch: 20 }, // Localidad
       { wch: 20 }, // Distrito
       { wch: 10 }, // Estado
@@ -635,6 +639,24 @@ export default function StoreManagementPage() {
             {type}
           </div>
         );
+      },
+      enableSorting: true
+    },
+    {
+      id: "createdAt",
+      accessorFn: (row) => row.createdAt ? new Date(row.createdAt) : null,
+      header: ({ column }) => <SortableColumnHeader column={column} title="Fecha grabación" />,
+      cell: ({ row }) => {
+        const createdAt = row.original.createdAt;
+        if (!createdAt) return "—";
+        
+        // Formatear la fecha como DD/MM/YYYY
+        const date = new Date(createdAt);
+        return date.toLocaleDateString('es-ES', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
       },
       enableSorting: true
     },
@@ -1751,6 +1773,18 @@ export default function StoreManagementPage() {
                     <h3 className="font-medium mb-3 border-b pb-2">Fechas</h3>
 
                     <div className="space-y-2">
+                      <div>
+                        <span className="font-medium">Fecha de grabación:</span> 
+                        <span className="ml-2">
+                          {selectedStore.createdAt 
+                            ? new Date(selectedStore.createdAt).toLocaleDateString('es-ES', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric'
+                              }) 
+                            : "—"}
+                        </span>
+                      </div>
                       <div>
                         <span className="font-medium">Fecha de inicio:</span> 
                         <span className="ml-2">
