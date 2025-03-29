@@ -72,7 +72,7 @@ export interface IStorage {
   // PdfDocument methods
   createPdfDocument(doc: InsertPdfDocument): Promise<PdfDocument>;
   getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]>;
-  searchPdfDocuments(params: { storeCodes: string[], dateFrom?: Date, dateTo?: Date }): Promise<PdfDocument[]>;
+  searchPdfDocuments(params: { storeCodes: string[], dateFrom?: string, dateTo?: string }): Promise<PdfDocument[]>;
   getPdfDocument(id: number): Promise<PdfDocument | undefined>;
   getPdfDocumentByActivityId(activityId: number): Promise<PdfDocument | undefined>;
   updatePdfDocumentPath(fileActivityId: number, newPath: string): Promise<boolean>;
@@ -134,10 +134,10 @@ export interface IStorage {
   purgeExcelStores(): Promise<{ count: number }>;
   purgePdfStores(): Promise<{ count: number }>;
   purgeAllStores(): Promise<{ count: number }>;
-  purgeExcelData(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }>;
-  purgePdfData(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }>;
-  purgeFileActivities(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }>;
-  purgeAllData(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }>;
+  purgeExcelData(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }>;
+  purgePdfData(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }>;
+  purgeFileActivities(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }>;
+  purgeAllData(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }>;
   purgeEntireDatabase(): Promise<{ tablesAffected: number }>;
 }
 
@@ -448,8 +448,8 @@ export class MemStorage implements IStorage {
   
   async searchPdfDocuments(params: { 
     storeCodes: string[], 
-    dateFrom?: Date, 
-    dateTo?: Date 
+    dateFrom?: string, 
+    dateTo?: string 
   }): Promise<PdfDocument[]> {
     let results = Array.from(this.pdfDocuments.values())
       .filter(doc => params.storeCodes.includes(doc.storeCode));
@@ -1289,8 +1289,8 @@ export class DatabaseStorage implements IStorage {
   
   async searchPdfDocuments(params: { 
     storeCodes: string[], 
-    dateFrom?: Date, 
-    dateTo?: Date 
+    dateFrom?: string, 
+    dateTo?: string 
   }): Promise<PdfDocument[]> {
     let query = db
       .select()
@@ -1405,7 +1405,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
-  async purgeExcelData(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }> {
+  async purgeExcelData(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }> {
     try {
       let query = db.delete(excelData);
       
@@ -1436,7 +1436,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
-  async purgePdfData(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }> {
+  async purgePdfData(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }> {
     try {
       let query = db.delete(pdfDocuments);
       
@@ -1459,7 +1459,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
-  async purgeFileActivities(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }> {
+  async purgeFileActivities(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }> {
     try {
       let query = db.delete(fileActivities);
       
@@ -1482,7 +1482,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
-  async purgeAllData(dateRange?: { from: Date | null, to: Date | null }): Promise<{ count: number }> {
+  async purgeAllData(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }> {
     try {
       // Eliminar todos los datos pero conservar las tiendas
       const excelCount = await this.purgeExcelData(dateRange);
@@ -3185,11 +3185,16 @@ export class DatabaseStorage implements IStorage {
   
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     try {
-      const result = await db.select({ count: count() }).from(coincidencias)
+      // Usar la función SQL count para contar las filas
+      const result = await db.select({ count: sql`count(*)` }).from(coincidencias)
         .where(eq(coincidencias.estado, 'NoLeido'));
       
       if (result && result.length > 0) {
-        return result[0].count || 0;
+        // Asegurarse de que se convierta a número
+        const count = typeof result[0].count === 'number' 
+          ? result[0].count 
+          : Number(result[0].count);
+        return count || 0;
       }
       
       return 0;

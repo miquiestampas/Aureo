@@ -946,8 +946,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (storeCode && storeCode !== "all") filters.storeCode = storeCode;
         
         // Filtros de fecha
-        if (dateFrom) filters.fromDate = new Date(dateFrom);
-        if (dateTo) filters.toDate = new Date(dateTo);
+        if (dateFrom) filters.fromDate = new Date(dateFrom).toISOString();
+        if (dateTo) filters.toDate = new Date(dateTo).toISOString();
         
         // Filtros específicos por campo
         if (orderNumber) filters.orderNumber = orderNumber;
@@ -1074,8 +1074,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const storeCode = req.query.storeCode as string;
       
       // Optional date filters
-      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : undefined;
-      const toDate = req.query.toDate ? new Date(req.query.toDate as string) : undefined;
+      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string).toISOString() : undefined;
+      const toDate = req.query.toDate ? new Date(req.query.toDate as string).toISOString() : undefined;
       
       // Optional price filters
       const priceMin = req.query.priceMin as string;
@@ -1252,8 +1252,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Obtener documentos PDF basados en los códigos de tienda y fechas
       const documents = await storage.searchPdfDocuments({
         storeCodes: storeCodesArray,
-        dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
-        dateTo: dateTo ? new Date(dateTo as string) : undefined
+        dateFrom: dateFrom as string | undefined,
+        dateTo: dateTo as string | undefined
       });
       
       // Enriquecer los resultados con información de tienda
@@ -1327,13 +1327,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // durante el procesamiento del archivo basado en su contenido
       const defaultStoreCode = "PENDIENTE";
       
-      // Create file activity entry
+      // Create file activity entry - asegurarnos de que la fecha sea una cadena para SQLite
+      const processingDate = new Date().toISOString();
+      
       const activity = await storage.createFileActivity({
         filename: req.file.originalname,
         storeCode: defaultStoreCode,
         fileType: 'Excel',
         status: 'Pending',
-        processingDate: new Date(),
+        processingDate,
         processedBy: 'Carga Manual',
         errorMessage: null,
         metadata: null
@@ -1368,12 +1370,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filePromises = req.files.map(async (file) => {
         try {
           // Crear actividad para cada archivo
+          const processingDate = new Date().toISOString();
+          
           const activity = await storage.createFileActivity({
             filename: file.originalname,
             storeCode: defaultStoreCode, // Se actualizará durante el procesamiento
             fileType: 'Excel',
             status: 'Pending',
-            processingDate: new Date(),
+            processingDate,
             processedBy: 'Carga Masiva',
             errorMessage: null,
             metadata: null
@@ -1419,12 +1423,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const storeCode = req.body.storeCode || defaultStoreCode;
       
       // Create file activity entry
+      const processingDate = new Date().toISOString();
+      
       const activity = await storage.createFileActivity({
         filename: req.file.originalname,
         storeCode,
         fileType: 'PDF',
         status: 'Pending',
-        processingDate: new Date(),
+        processingDate,
         processedBy: 'Carga Manual',
         errorMessage: null,
         metadata: null
@@ -1461,12 +1467,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filePromises = req.files.map(async (file) => {
         try {
           // Crear actividad para cada archivo
+          const processingDate = new Date().toISOString();
+          
           const activity = await storage.createFileActivity({
             filename: file.originalname,
             storeCode, // Usamos el código de tienda proporcionado o el predeterminado
             fileType: 'PDF',
             status: 'Pending',
-            processingDate: new Date(),
+            processingDate,
             processedBy: 'Carga Masiva',
             errorMessage: null,
             metadata: null
@@ -1609,8 +1617,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (fromDate || toDate) {
           dateRange = {
-            from: fromDate ? new Date(fromDate) : null,
-            to: toDate ? new Date(toDate) : null
+            from: fromDate || null,
+            to: toDate || null
           };
         }
         
