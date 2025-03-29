@@ -2,16 +2,24 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import os from 'os';
-import fileUpload from 'express-fileupload';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(fileUpload({
-  useTempFiles: true,
-  tempFileDir: './uploads/temp',
-  createParentPath: true
-}));
+
+// Asegúrate de que existan los directorios para los archivos temporales y cargados
+const uploadsDir = path.join(process.cwd(), 'uploads');
+const tempDir = path.join(uploadsDir, 'temp');
+const excelDir = path.join(uploadsDir, 'excel');
+const pdfDir = path.join(uploadsDir, 'pdf');
+
+[uploadsDir, tempDir, excelDir, pdfDir].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

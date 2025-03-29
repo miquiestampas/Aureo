@@ -50,54 +50,79 @@ export default function FileUploadModal({ isOpen, onClose, storesByType, fileTyp
   // Upload file mutation
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedFiles) {
+      if (!selectedFiles || selectedFiles.length === 0) {
         throw new Error("Debe seleccionar al menos un archivo");
       }
+      
+      console.log("Iniciando carga de archivos:", fileType, "Modo:", uploadType);
       
       const formData = new FormData();
       
       if (uploadType === "individual") {
         // Single file upload
-        formData.append("file", selectedFiles[0]);
+        const file = selectedFiles[0];
+        formData.append("file", file);
+        
+        // Log información del archivo para debugging
+        console.log("Subiendo archivo:", file.name, "Tipo:", file.type, "Tamaño:", file.size, "bytes");
         
         // Usamos un código de tienda vacío o la tienda seleccionada
         // El servidor se encargará de detectar la tienda adecuada del archivo
-        formData.append("storeCode", "");
+        formData.append("storeCode", selectedStore || "");
         
-        const response = await fetch(`/api/upload/${fileType.toLowerCase()}`, {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        });
-        
-        if (!response.ok) {
-          const error = await response.text();
-          throw new Error(error || `Error al subir archivo ${fileType}`);
+        try {
+          const response = await fetch(`/api/upload/${fileType.toLowerCase()}`, {
+            method: "POST",
+            body: formData,
+            credentials: "include",
+          });
+          
+          console.log("Respuesta del servidor:", response.status, response.statusText);
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Error en la respuesta:", errorText);
+            throw new Error(errorText || `Error al subir archivo ${fileType} (${response.status})`);
+          }
+          
+          return response.json();
+        } catch (error) {
+          console.error("Error en la solicitud:", error);
+          throw error;
         }
-        
-        return response.json();
       } else {
         // Batch upload
         // Create an array from FileList to append all files
-        Array.from(selectedFiles).forEach((file) => {
+        const files = Array.from(selectedFiles);
+        
+        files.forEach((file, index) => {
+          console.log(`Archivo ${index+1}:`, file.name, "Tipo:", file.type, "Tamaño:", file.size, "bytes");
           formData.append("files", file);
         });
         
         // Usamos un código de tienda vacío, el servidor detectará automáticamente la tienda adecuada
-        formData.append("storeCode", "");
+        formData.append("storeCode", selectedStore || "");
         
-        const response = await fetch(`/api/upload/${fileType.toLowerCase()}/batch`, {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        });
-        
-        if (!response.ok) {
-          const error = await response.text();
-          throw new Error(error || `Error al subir archivos ${fileType}`);
+        try {
+          const response = await fetch(`/api/upload/${fileType.toLowerCase()}/batch`, {
+            method: "POST",
+            body: formData,
+            credentials: "include",
+          });
+          
+          console.log("Respuesta del servidor para carga por lotes:", response.status, response.statusText);
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Error en la respuesta de carga por lotes:", errorText);
+            throw new Error(errorText || `Error al subir archivos ${fileType} (${response.status})`);
+          }
+          
+          return response.json();
+        } catch (error) {
+          console.error("Error en la solicitud de carga por lotes:", error);
+          throw error;
         }
-        
-        return response.json();
       }
     },
     onSuccess: () => {

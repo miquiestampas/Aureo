@@ -1658,8 +1658,30 @@ export class DatabaseStorage implements IStorage {
   
   // FileActivity methods
   async createFileActivity(insertActivity: InsertFileActivity): Promise<FileActivity> {
-    const [activity] = await db.insert(fileActivities).values(insertActivity).returning();
-    return activity;
+    try {
+      console.log("Creando actividad de archivo:", JSON.stringify(insertActivity));
+      
+      // Asegurarse de que processingDate sea un string en formato ISO
+      const cleanedActivity = {
+        ...insertActivity,
+        // Si la fecha de procesamiento no existe, la creamos
+        processingDate: insertActivity.processingDate 
+          ? (typeof insertActivity.processingDate === 'string' 
+             ? insertActivity.processingDate 
+             : (insertActivity.processingDate instanceof Date 
+                ? insertActivity.processingDate.toISOString() 
+                : new Date().toISOString()))
+          : new Date().toISOString()
+      };
+      
+      console.log("Actividad de archivo limpia para SQLite:", JSON.stringify(cleanedActivity));
+      
+      const [activity] = await db.insert(fileActivities).values(cleanedActivity).returning();
+      return activity;
+    } catch (error) {
+      console.error("Error al crear actividad de archivo:", error);
+      throw error;
+    }
   }
   
   async getFileActivity(id: number): Promise<FileActivity | undefined> {
@@ -1672,20 +1694,32 @@ export class DatabaseStorage implements IStorage {
     status: string, 
     errorMessage?: string
   ): Promise<FileActivity | undefined> {
-    const updateValues: Partial<FileActivity> = { 
-      status: status as "Pending" | "Processing" | "Processed" | "Failed"
-    };
-    
-    if (errorMessage) {
-      updateValues.errorMessage = errorMessage;
+    try {
+      // Para cada cambio de estado, actualizamos la fecha de procesamiento
+      const now = new Date().toISOString(); // Convertimos a string para SQLite
+      
+      const updateValues: Partial<FileActivity> = { 
+        status: status as "Pending" | "Processing" | "Processed" | "Failed",
+        processingDate: now
+      };
+      
+      if (errorMessage) {
+        updateValues.errorMessage = errorMessage;
+      }
+      
+      console.log(`Actualizando estado de actividad ${id} a ${status}:`, JSON.stringify(updateValues));
+      
+      const [updatedActivity] = await db
+        .update(fileActivities)
+        .set(updateValues)
+        .where(eq(fileActivities.id, id))
+        .returning();
+        
+      return updatedActivity;
+    } catch (error) {
+      console.error(`Error al actualizar estado de actividad ${id} a ${status}:`, error);
+      throw error;
     }
-    
-    const [updatedActivity] = await db
-      .update(fileActivities)
-      .set(updateValues)
-      .where(eq(fileActivities.id, id))
-      .returning();
-    return updatedActivity;
   }
   
   async updateFileActivity(
@@ -1701,10 +1735,24 @@ export class DatabaseStorage implements IStorage {
         return undefined;
       }
       
+      // Procesar las fechas para garantizar compatibilidad con SQLite
+      const processedUpdates: Partial<FileActivity> = { ...updates };
+      
+      // Si hay una fecha de procesamiento, convertirla a string ISO
+      if (updates.processingDate) {
+        if (updates.processingDate instanceof Date) {
+          processedUpdates.processingDate = updates.processingDate.toISOString();
+        } else if (typeof updates.processingDate !== 'string') {
+          processedUpdates.processingDate = new Date().toISOString();
+        }
+      }
+      
+      console.log(`Actualizando actividad de archivo ${id}:`, JSON.stringify(processedUpdates));
+      
       // Actualizar la actividad con los nuevos valores
       const [updatedActivity] = await db
         .update(fileActivities)
-        .set(updates)
+        .set(processedUpdates)
         .where(eq(fileActivities.id, id))
         .returning();
       
@@ -1799,8 +1847,35 @@ export class DatabaseStorage implements IStorage {
   
   // ExcelData methods
   async createExcelData(insertData: InsertExcelData): Promise<ExcelData> {
-    const [data] = await db.insert(excelData).values(insertData).returning();
-    return data;
+    try {
+      // Verificar que todas las propiedades están en el formato esperado por SQLite
+      console.log("Inserting Excel data:", JSON.stringify(insertData));
+      
+      // Si hay un problema con algún campo, convertirlo a string - SQLite solo acepta strings, números, etc.
+      // Esto es especialmente importante para las fechas que deben estar en formato string (ISO)
+      const cleanedData = {
+        ...insertData,
+        // Asegurarse de que orderDate es string
+        orderDate: typeof insertData.orderDate === 'string' 
+          ? insertData.orderDate 
+          : (insertData.orderDate instanceof Date ? insertData.orderDate.toISOString() : new Date().toISOString()),
+        
+        // Asegurarse de que saleDate es string o null
+        saleDate: insertData.saleDate 
+          ? (typeof insertData.saleDate === 'string' 
+             ? insertData.saleDate 
+             : (insertData.saleDate instanceof Date ? insertData.saleDate.toISOString() : null))
+          : null
+      };
+      
+      console.log("Cleaned Excel data for SQLite:", JSON.stringify(cleanedData));
+      
+      const [data] = await db.insert(excelData).values(cleanedData).returning();
+      return data;
+    } catch (error) {
+      console.error("Error al insertar datos de Excel:", error);
+      throw error;
+    }
   }
   
   async getExcelDataByStore(storeCode: string): Promise<ExcelData[]> {
@@ -1813,8 +1888,28 @@ export class DatabaseStorage implements IStorage {
   
   // PdfDocument methods
   async createPdfDocument(insertDoc: InsertPdfDocument): Promise<PdfDocument> {
-    const [doc] = await db.insert(pdfDocuments).values(insertDoc).returning();
-    return doc;
+    try {
+      // Verificar que todas las propiedades están en el formato esperado por SQLite
+      console.log("Inserting PDF document:", JSON.stringify(insertDoc));
+      
+      // Si hay un problema con algún campo, convertirlo a string - SQLite solo acepta strings, números, etc.
+      // Esto es especialmente importante para las fechas que deben estar en formato string (ISO)
+      const cleanedData = {
+        ...insertDoc,
+        // Asegurarse de que uploadDate es string
+        uploadDate: typeof insertDoc.uploadDate === 'string' 
+          ? insertDoc.uploadDate 
+          : (insertDoc.uploadDate instanceof Date ? insertDoc.uploadDate.toISOString() : new Date().toISOString()),
+      };
+      
+      console.log("Cleaned PDF document data for SQLite:", JSON.stringify(cleanedData));
+      
+      const [doc] = await db.insert(pdfDocuments).values(cleanedData).returning();
+      return doc;
+    } catch (error) {
+      console.error("Error al insertar documento PDF:", error);
+      throw error;
+    }
   }
   
   async getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]> {

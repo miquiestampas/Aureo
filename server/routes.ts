@@ -2574,19 +2574,26 @@ function setupFileUpload() {
   return multer({
     storage,
     limits: {
-      fileSize: 10 * 1024 * 1024, // 10MB max file size
+      fileSize: 50 * 1024 * 1024, // Incrementado a 50MB tamaño máximo
+      fieldSize: 50 * 1024 * 1024 // También incrementamos el tamaño de campo para formularios grandes
     },
     fileFilter: function(req, file, cb) {
-      // Accept Excel, CSV and PDF files
+      console.log("Procesando archivo:", file.originalname, "Mimetype:", file.mimetype);
+      
+      // Accept Excel, CSV and PDF files with more tipos MIME
       if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
           file.mimetype === 'application/vnd.ms-excel' ||
           file.mimetype === 'text/csv' ||
           file.mimetype === 'application/csv' ||
           file.mimetype === 'text/plain' ||  // Para archivos CSV guardados como TXT
-          file.mimetype === 'application/pdf') {
+          file.mimetype === 'application/pdf' ||
+          // Aceptar otros mimetype comunes para Excel
+          file.mimetype === 'application/octet-stream' ||
+          /excel|spreadsheet/i.test(file.mimetype)) {
         cb(null, true);
       } else {
-        cb(new Error('Solo se permiten archivos Excel, CSV y PDF'), false);
+        console.log("Tipo de archivo no permitido:", file.mimetype);
+        cb(new Error(`Solo se permiten archivos Excel, CSV y PDF. Tipo recibido: ${file.mimetype}`), false);
       }
     }
   });

@@ -276,18 +276,35 @@ function validateDate(dateValue: any): Date {
   if (!dateValue) return new Date();
   
   try {
-    // Intentar crear una fecha válida
-    const date = new Date(dateValue);
+    // Excel puede entregar diferentes formatos de fecha
+    let date;
+    
+    if (typeof dateValue === 'number') {
+      // Si es un número, podría ser un serial de Excel 
+      // (días desde 1/1/1900 para Windows, o 1/1/1904 para Mac)
+      const excelEpoch = new Date(1899, 11, 30); // 30/12/1899
+      date = new Date(excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000);
+    } else if (dateValue instanceof Date) {
+      // Si ya es un objeto Date, usarlo directamente
+      date = dateValue;
+    } else if (typeof dateValue === 'string') {
+      // Si es un string, convertirlo a Date
+      date = new Date(dateValue);
+    } else {
+      // Para otros casos, intentar convertir a string y luego a Date
+      date = new Date(String(dateValue));
+    }
     
     // Verificar si la fecha es válida (no es NaN y está dentro de un rango razonable)
     if (isNaN(date.getTime()) || date.getFullYear() < 1900 || date.getFullYear() > 2100) {
-      console.warn(`Fecha inválida detectada: ${dateValue}, usando fecha actual`);
+      console.warn(`Fecha inválida detectada: ${dateValue} (tipo: ${typeof dateValue}), usando fecha actual`);
       return new Date();
     }
     
+    console.log(`Fecha procesada correctamente: ${dateValue} -> ${date.toISOString()}`);
     return date;
   } catch (error) {
-    console.warn(`Error al procesar fecha: ${dateValue}, usando fecha actual`, error);
+    console.warn(`Error al procesar fecha: ${dateValue} (tipo: ${typeof dateValue}), usando fecha actual`, error);
     return new Date();
   }
 }
@@ -422,10 +439,11 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
     return null;
   }
   
+  // Convertir todas las fechas a formato ISO string para SQLite
   return {
     storeCode: finalStoreCode,
     orderNumber: orderNumber,
-    orderDate: orderDate,
+    orderDate: orderDate.toISOString(), // Convertimos Date a string para SQLite
     customerName: customerName,
     customerContact: customerContact,
     itemDetails: itemDetails,
@@ -435,7 +453,7 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
     carats: carats,
     price: price,
     pawnTicket: pawnTicket,
-    saleDate: saleDate,
+    saleDate: saleDate ? saleDate.toISOString() : null, // Convertimos Date a string para SQLite si existe
     fileActivityId: activityId
   };
 }
@@ -854,12 +872,14 @@ export async function processPdfFile(filePath: string, activityId: number, store
     }
     
     // Create PDF document record even if we couldn't parse the content
+    // Aseguramos que la fecha se guarde como string para SQLite
+    const now = new Date().toISOString();
     const pdfDocument: InsertPdfDocument = {
       storeCode,
       documentType,
       title,
       path: filePath,
-      uploadDate: new Date(),
+      uploadDate: now,
       fileSize,
       fileActivityId: activityId
     };
