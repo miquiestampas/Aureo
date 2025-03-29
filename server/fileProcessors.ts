@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { storage } from './storage';
 import { emitFileProcessingStatus } from './fileWatcher';
-import { InsertExcelData, InsertPdfDocument, InsertAlert, ExcelData } from '@shared/schema';
+import { InsertExcelData, InsertPdfDocument, InsertAlert, ExcelData, FileActivity } from '@shared/schema';
 import { promisify } from 'util';
 import ExcelJS from 'exceljs';
 import { read as readXLSX, utils as xlsxUtils } from 'xlsx';
@@ -598,8 +598,32 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     
     // Verificar si el código de tienda extraído existe
     if (excelStoreCode && excelStoreCode.trim() !== '') {
-      console.log(`Excel file has store code ${excelStoreCode} in cell A2`);
-      const excelStore = await storage.getStoreByCode(excelStoreCode);
+      // Normalizar código de tienda (eliminar espacios al inicio y final)
+      const normalizedExcelStoreCode = excelStoreCode.trim();
+      console.log(`Excel file has store code "${normalizedExcelStoreCode}" in cell A2 (original: "${excelStoreCode}")`);
+      
+      // Primero intentar búsqueda exacta
+      let excelStore = await storage.getStoreByCode(normalizedExcelStoreCode);
+      
+      // Si no encontramos coincidencia exacta, intentar búsqueda flexible
+      if (!excelStore) {
+        console.log(`No se encontró tienda con código exacto "${normalizedExcelStoreCode}", intentando búsqueda flexible`);
+        
+        // Obtener todas las tiendas y buscar una coincidencia ignorando espacios
+        const allStores = await storage.getStores();
+        
+        // Buscar tienda cuyo código sin espacios coincida con el código detectado sin espacios
+        const storeMatch = allStores.find(store => {
+          const storeCodeNoSpaces = store.code.replace(/\s+/g, '');
+          const detectedCodeNoSpaces = normalizedExcelStoreCode.replace(/\s+/g, '');
+          return storeCodeNoSpaces === detectedCodeNoSpaces;
+        });
+        
+        if (storeMatch) {
+          console.log(`Encontrada tienda con coincidencia flexible: "${storeMatch.code}"`);
+          excelStore = storeMatch;
+        }
+      }
       
       if (excelStore) {
         console.log(`Found matching store in database: ${excelStore.code}`);
@@ -795,7 +819,32 @@ export async function processPdfFile(filePath: string, activityId: number, store
     
     // Si hemos detectado un posible código de tienda, verificar que existe en la base de datos
     if (pdfStoreCode) {
-      const pdfStore = await storage.getStoreByCode(pdfStoreCode);
+      // Normalizar código de tienda (eliminar espacios al inicio y final)
+      const normalizedPdfStoreCode = pdfStoreCode.trim();
+      console.log(`PDF file has detected store code "${normalizedPdfStoreCode}" (original: "${pdfStoreCode}")`);
+      
+      // Primero intentar búsqueda exacta
+      let pdfStore = await storage.getStoreByCode(normalizedPdfStoreCode);
+      
+      // Si no encontramos coincidencia exacta, intentar búsqueda flexible
+      if (!pdfStore) {
+        console.log(`No se encontró tienda con código exacto "${normalizedPdfStoreCode}", intentando búsqueda flexible`);
+        
+        // Obtener todas las tiendas y buscar una coincidencia ignorando espacios
+        const allStores = await storage.getStores();
+        
+        // Buscar tienda cuyo código sin espacios coincida con el código detectado sin espacios
+        const storeMatch = allStores.find(store => {
+          const storeCodeNoSpaces = store.code.replace(/\s+/g, '');
+          const detectedCodeNoSpaces = normalizedPdfStoreCode.replace(/\s+/g, '');
+          return storeCodeNoSpaces === detectedCodeNoSpaces;
+        });
+        
+        if (storeMatch) {
+          console.log(`Encontrada tienda con coincidencia flexible: "${storeMatch.code}"`);
+          pdfStore = storeMatch;
+        }
+      }
       
       if (pdfStore) {
         console.log(`Found matching store in database for PDF: ${pdfStore.code}`);
@@ -834,7 +883,7 @@ export async function processPdfFile(filePath: string, activityId: number, store
       // Si se detectó un posible código pero no existe en la base de datos, lo guardamos
       // para poder sugerir la creación de una nueva tienda con ese código
       try {
-        const updates: Partial<FileActivity> = {
+        const updates: any = {
           status: 'PendingStoreAssignment',
         };
         
@@ -908,7 +957,7 @@ export async function processPdfFile(filePath: string, activityId: number, store
       } else if (pdfText.toLowerCase().includes('contrato') || pdfText.toLowerCase().includes('contract')) {
         documentType = 'Contrato';
       }
-    } catch (parseError) {
+    } catch (parseError: any) {
       console.warn(`Warning: Could not parse PDF content for type detection: ${parseError.message}`);
       // Continue with unknown document type, we don't want to fail the whole process just for text extraction
     }
