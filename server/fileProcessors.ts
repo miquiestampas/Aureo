@@ -640,12 +640,15 @@ export async function processExcelFile(filePath: string, activityId: number, sto
             status: 'PendingStoreAssignment',
             detectedStoreCode: excelStoreCode
           });
+          // Notificar al frontend del cambio de estado
+          emitFileProcessingStatus(activityId, 'PendingStoreAssignment');
+          console.log(`El archivo ha sido marcado como pendiente de asignación con código sugerido: ${excelStoreCode}`);
+          
+          // En lugar de lanzar una excepción, retornamos temprano para evitar procesar el archivo
+          return;
         } catch (updateError) {
           console.error(`Error updating file activity to PendingStoreAssignment:`, updateError);
         }
-        
-        // Lanzar excepción para detener el procesamiento hasta que se asigne una tienda
-        throw new Error(`El código de tienda ${excelStoreCode} no existe. Se ha marcado el archivo como pendiente de asignación.`);
       }
     } else {
       console.log(`No store code found in Excel file, using default: ${storeCode}`);
@@ -662,8 +665,12 @@ export async function processExcelFile(filePath: string, activityId: number, sto
           console.error(`Error updating file activity to PendingStoreAssignment:`, updateError);
         }
         
-        // Lanzar excepción para detener el procesamiento hasta que se asigne una tienda
-        throw new Error(`No se detectó código de tienda en el archivo. Se ha marcado como pendiente de asignación.`);
+        // Notificar al frontend del cambio de estado
+        emitFileProcessingStatus(activityId, 'PendingStoreAssignment');
+        console.log(`El archivo ha sido marcado como pendiente de asignación porque no se detectó código de tienda.`);
+        
+        // En lugar de lanzar error, retornamos temprano para evitar procesar el archivo
+        return;
       }
     }
     
