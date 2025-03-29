@@ -2192,23 +2192,23 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Construir consulta completa con drizzle
-      let query = db.select().from(excelData);
+      let dbQuery = db.select().from(excelData);
       
       // Aplicar condiciones OR o AND según sea apropiado
       if (isSimpleSearch && conditions.length > 0) {
         // Para búsqueda simple, usamos OR entre todas las condiciones
-        query = query.where(or(...conditions));
+        dbQuery = dbQuery.where(or(...conditions));
       } else if (conditions.length > 0) {
         // Para búsqueda avanzada, usamos AND entre todas las condiciones
-        query = query.where(and(...conditions));
+        dbQuery = dbQuery.where(and(...conditions));
       }
       
       // Ordenar por fecha de orden descendente
-      query = query.orderBy(desc(excelData.orderDate));
+      dbQuery = dbQuery.orderBy(desc(excelData.orderDate));
       
       // Ejecutar la consulta
       console.log("Ejecutando búsqueda con Drizzle ORM");
-      const results = await query;
+      const results = await dbQuery;
       
       console.log(`DatabaseStorage.searchExcelData - Resultados: ${results.length}`);
       return results;
