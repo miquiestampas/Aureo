@@ -183,7 +183,7 @@ const storeFormSchema = z.object({
   // Campos adicionales
   address: z.string().optional(),
   phone: z.string().optional(),
-  email: z.string().email("Formato de correo inválido").optional(),
+  email: z.string().optional(),
   cif: z.string().optional(),
   businessName: z.string().optional(),
   ownerName: z.string().optional(),
