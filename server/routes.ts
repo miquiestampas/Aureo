@@ -162,7 +162,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Store not found" });
         }
         
-        const updatedStore = await storage.updateStore(storeId, req.body);
+        // Preparar los datos de actualización - tratar fechas vacías
+        const updateData = { ...req.body };
+        
+        // Convertir fechas vacías a null
+        if (updateData.startDate === "") {
+          updateData.startDate = null;
+        }
+        
+        if (updateData.endDate === "") {
+          updateData.endDate = null;
+        }
+        
+        const updatedStore = await storage.updateStore(storeId, updateData);
         
         if (!updatedStore) {
           return res.status(500).json({ message: "Failed to update store" });
