@@ -2995,21 +2995,14 @@ export class DatabaseStorage implements IStorage {
   
   async getSenalPersonas(incluirInactivos: boolean = false): Promise<SenalPersona[]> {
     try {
-      let query = `SELECT * FROM senal_personas`;
+      let query = db.select().from(senalPersonas);
       
       if (!incluirInactivos) {
-        query += ` WHERE estado = 'Activo'`;
+        query = query.where(eq(senalPersonas.estado, "Activo"));
       }
       
-      query += ` ORDER BY creado_en DESC`;
-      
-      const result = await db.execute(query);
-      
-      if (result && result.rows && Array.isArray(result.rows)) {
-        return result.rows.map(row => row as SenalPersona);
-      }
-      
-      return [];
+      const personas = await query.orderBy(desc(senalPersonas.creadoEn));
+      return personas;
     } catch (error) {
       console.error("Error al obtener señalamientos de personas:", error);
       return [];
@@ -3073,19 +3066,22 @@ export class DatabaseStorage implements IStorage {
   async searchSenalPersonas(query: string): Promise<SenalPersona[]> {
     try {
       const searchQuery = `%${query}%`;
-      const result = await db.execute(
-        `SELECT * FROM senal_personas 
-         WHERE estado = 'Activo' AND 
-         (nombre ILIKE $1 OR documento_id ILIKE $1) 
-         ORDER BY creado_en DESC`,
-        [searchQuery]
-      );
       
-      if (result && result.rows && Array.isArray(result.rows)) {
-        return result.rows.map(row => row as SenalPersona);
-      }
+      const personas = await db
+        .select()
+        .from(senalPersonas)
+        .where(
+          and(
+            eq(senalPersonas.estado, "Activo"),
+            or(
+              like(senalPersonas.nombre, searchQuery),
+              like(senalPersonas.documentoId, searchQuery)
+            )
+          )
+        )
+        .orderBy(desc(senalPersonas.creadoEn));
       
-      return [];
+      return personas;
     } catch (error) {
       console.error("Error al buscar señalamientos de personas:", error);
       return [];
@@ -3110,21 +3106,14 @@ export class DatabaseStorage implements IStorage {
   
   async getSenalObjetos(incluirInactivos: boolean = false): Promise<SenalObjeto[]> {
     try {
-      let query = `SELECT * FROM senal_objetos`;
+      let query = db.select().from(senalObjetos);
       
       if (!incluirInactivos) {
-        query += ` WHERE estado = 'Activo'`;
+        query = query.where(eq(senalObjetos.estado, "Activo"));
       }
       
-      query += ` ORDER BY creado_en DESC`;
-      
-      const result = await db.execute(query);
-      
-      if (result && result.rows && Array.isArray(result.rows)) {
-        return result.rows.map(row => row as SenalObjeto);
-      }
-      
-      return [];
+      const objetos = await query.orderBy(desc(senalObjetos.creadoEn));
+      return objetos;
     } catch (error) {
       console.error("Error al obtener señalamientos de objetos:", error);
       return [];
@@ -3188,19 +3177,22 @@ export class DatabaseStorage implements IStorage {
   async searchSenalObjetos(query: string): Promise<SenalObjeto[]> {
     try {
       const searchQuery = `%${query}%`;
-      const result = await db.execute(
-        `SELECT * FROM senal_objetos 
-         WHERE estado = 'Activo' AND 
-         (descripcion ILIKE $1 OR grabacion ILIKE $1) 
-         ORDER BY creado_en DESC`,
-        [searchQuery]
-      );
       
-      if (result && result.rows && Array.isArray(result.rows)) {
-        return result.rows.map(row => row as SenalObjeto);
-      }
+      const objetos = await db
+        .select()
+        .from(senalObjetos)
+        .where(
+          and(
+            eq(senalObjetos.estado, "Activo"),
+            or(
+              like(senalObjetos.descripcion, searchQuery),
+              like(senalObjetos.grabacion, searchQuery)
+            )
+          )
+        )
+        .orderBy(desc(senalObjetos.creadoEn));
       
-      return [];
+      return objetos;
     } catch (error) {
       console.error("Error al buscar señalamientos de objetos:", error);
       return [];
@@ -3225,28 +3217,17 @@ export class DatabaseStorage implements IStorage {
   
   async getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit: number = 50): Promise<Coincidencia[]> {
     try {
-      let query = `SELECT * FROM coincidencias`;
+      let query = db.select().from(coincidencias);
       
       if (estado) {
-        query += ` WHERE estado = ?`;
+        query = query.where(eq(coincidencias.estado, estado));
       }
       
-      query += ` ORDER BY creado_en DESC LIMIT ?`;
+      const resultados = await query
+        .orderBy(desc(coincidencias.creadoEn))
+        .limit(limit);
       
-      const stmt = sqlite.prepare(query);
-      let results;
-      
-      if (estado) {
-        results = stmt.all(estado, limit);
-      } else {
-        results = stmt.all(limit);
-      }
-      
-      if (results && Array.isArray(results)) {
-        return results.map(row => row as Coincidencia);
-      }
-      
-      return [];
+      return resultados;
     } catch (error) {
       console.error("Error al obtener coincidencias:", error);
       return [];
@@ -3299,17 +3280,13 @@ export class DatabaseStorage implements IStorage {
   
   async getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]> {
     try {
-      const stmt = sqlite.prepare(
-        `SELECT * FROM coincidencias WHERE id_excel_data = ? ORDER BY creado_en DESC`
-      );
+      const resultados = await db
+        .select()
+        .from(coincidencias)
+        .where(eq(coincidencias.idExcelData, excelDataId))
+        .orderBy(desc(coincidencias.creadoEn));
       
-      const results = stmt.all(excelDataId);
-      
-      if (results && Array.isArray(results)) {
-        return results.map(row => row as Coincidencia);
-      }
-      
-      return [];
+      return resultados;
     } catch (error) {
       console.error(`Error al obtener coincidencias para excelDataId ${excelDataId}:`, error);
       return [];
@@ -3318,22 +3295,12 @@ export class DatabaseStorage implements IStorage {
   
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     try {
-      // Usar SQL directo con sqlite para contar
-      // La variable sqlite está importada desde "./db"
-      const stmt = sqlite.prepare(
-        `SELECT COUNT(*) as count FROM coincidencias WHERE estado = ?`
-      );
+      const result = await db
+        .select({ count: count() })
+        .from(coincidencias)
+        .where(eq(coincidencias.estado, "NoLeido"));
       
-      const result = stmt.get('NoLeido');
-      
-      if (result && result.count !== undefined) {
-        // Asegurarse de que se convierta a número
-        return typeof result.count === 'number' 
-          ? result.count 
-          : Number(result.count);
-      }
-      
-      return 0;
+      return result[0]?.count ?? 0;
     } catch (error) {
       console.error("Error al obtener número de coincidencias no leídas:", error);
       return 0;

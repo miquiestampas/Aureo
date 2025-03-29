@@ -16,6 +16,7 @@ import {
   InsertCoincidencia, Coincidencia
 } from "@shared/schema";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
@@ -60,7 +61,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Create user with hashed password
-        const crypto = require("crypto");
         const salt = crypto.randomBytes(16).toString("hex");
         const hash = crypto.scryptSync(req.body.password, salt, 64).toString("hex");
         const hashedPassword = `${hash}.${salt}`;
