@@ -1854,11 +1854,46 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getFileActivitiesByStore(storeCode: string): Promise<FileActivity[]> {
-    return await db
-      .select()
-      .from(fileActivities)
-      .where(eq(fileActivities.storeCode, storeCode))
-      .orderBy(desc(fileActivities.processingDate));
+    // Obtener todas las activities para hacer una búsqueda flexible
+    try {
+      console.log(`Buscando actividades para tienda con código: "${storeCode}"`);
+      
+      // Primero intentamos una búsqueda exacta
+      const exactActivities = await db
+        .select()
+        .from(fileActivities)
+        .where(eq(fileActivities.storeCode, storeCode))
+        .orderBy(desc(fileActivities.processingDate));
+        
+      if (exactActivities.length > 0) {
+        console.log(`Se encontraron ${exactActivities.length} actividades con código exacto`);
+        return exactActivities;
+      }
+      
+      // Si no hay resultados, hacemos una búsqueda más flexible
+      console.log("No se encontraron actividades con código exacto, intentando búsqueda flexible");
+      
+      // Normalizar el código de tienda (eliminar espacios)
+      const normalizedStoreCode = storeCode.replace(/\s+/g, '');
+      
+      // Obtener todas las actividades y filtrar por similaridad
+      const allActivities = await db
+        .select()
+        .from(fileActivities)
+        .orderBy(desc(fileActivities.processingDate));
+        
+      // Filtrar aquellas cuyo código sin espacios coincida
+      const matchingActivities = allActivities.filter(activity => {
+        const activityStoreCodeNormalized = activity.storeCode.replace(/\s+/g, '');
+        return activityStoreCodeNormalized === normalizedStoreCode;
+      });
+      
+      console.log(`Se encontraron ${matchingActivities.length} actividades con búsqueda flexible`);
+      return matchingActivities;
+    } catch (error) {
+      console.error("Error al buscar actividades por tienda:", error);
+      return [];
+    }
   }
   
   // ExcelData methods
@@ -1895,11 +1930,45 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getExcelDataByStore(storeCode: string): Promise<ExcelData[]> {
-    return await db
-      .select()
-      .from(excelData)
-      .where(eq(excelData.storeCode, storeCode))
-      .orderBy(desc(excelData.orderDate));
+    try {
+      console.log(`Buscando datos de Excel para tienda con código: "${storeCode}"`);
+      
+      // Primero intentamos una búsqueda exacta
+      const exactData = await db
+        .select()
+        .from(excelData)
+        .where(eq(excelData.storeCode, storeCode))
+        .orderBy(desc(excelData.orderDate));
+        
+      if (exactData.length > 0) {
+        console.log(`Se encontraron ${exactData.length} registros de Excel con código exacto`);
+        return exactData;
+      }
+      
+      // Si no hay resultados, hacemos una búsqueda más flexible
+      console.log("No se encontraron datos de Excel con código exacto, intentando búsqueda flexible");
+      
+      // Normalizar el código de tienda (eliminar espacios)
+      const normalizedStoreCode = storeCode.replace(/\s+/g, '');
+      
+      // Obtener todas las actividades y filtrar por similaridad
+      const allData = await db
+        .select()
+        .from(excelData)
+        .orderBy(desc(excelData.orderDate));
+        
+      // Filtrar aquellas cuyo código sin espacios coincida
+      const matchingData = allData.filter(item => {
+        const itemStoreCodeNormalized = item.storeCode.replace(/\s+/g, '');
+        return itemStoreCodeNormalized === normalizedStoreCode;
+      });
+      
+      console.log(`Se encontraron ${matchingData.length} registros de Excel con búsqueda flexible`);
+      return matchingData;
+    } catch (error) {
+      console.error("Error al buscar datos de Excel por tienda:", error);
+      return [];
+    }
   }
   
   // PdfDocument methods
@@ -1929,11 +1998,45 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]> {
-    return await db
-      .select()
-      .from(pdfDocuments)
-      .where(eq(pdfDocuments.storeCode, storeCode))
-      .orderBy(desc(pdfDocuments.uploadDate));
+    try {
+      console.log(`Buscando documentos PDF para tienda con código: "${storeCode}"`);
+      
+      // Primero intentamos una búsqueda exacta
+      const exactDocs = await db
+        .select()
+        .from(pdfDocuments)
+        .where(eq(pdfDocuments.storeCode, storeCode))
+        .orderBy(desc(pdfDocuments.uploadDate));
+        
+      if (exactDocs.length > 0) {
+        console.log(`Se encontraron ${exactDocs.length} documentos PDF con código exacto`);
+        return exactDocs;
+      }
+      
+      // Si no hay resultados, hacemos una búsqueda más flexible
+      console.log("No se encontraron documentos PDF con código exacto, intentando búsqueda flexible");
+      
+      // Normalizar el código de tienda (eliminar espacios)
+      const normalizedStoreCode = storeCode.replace(/\s+/g, '');
+      
+      // Obtener todas las actividades y filtrar por similaridad
+      const allDocs = await db
+        .select()
+        .from(pdfDocuments)
+        .orderBy(desc(pdfDocuments.uploadDate));
+        
+      // Filtrar aquellas cuyo código sin espacios coincida
+      const matchingDocs = allDocs.filter(doc => {
+        const docStoreCodeNormalized = doc.storeCode.replace(/\s+/g, '');
+        return docStoreCodeNormalized === normalizedStoreCode;
+      });
+      
+      console.log(`Se encontraron ${matchingDocs.length} documentos PDF con búsqueda flexible`);
+      return matchingDocs;
+    } catch (error) {
+      console.error("Error al buscar documentos PDF por tienda:", error);
+      return [];
+    }
   }
   
   async getPdfDocument(id: number): Promise<PdfDocument | undefined> {
