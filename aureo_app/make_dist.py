@@ -73,8 +73,6 @@ def create_distribution_zip(version=None, output_dir='..'):
         'db_update.py',
         'README.md',
         'build_frontend.py',
-        'INSTALL.txt',
-        'iniciar_aureo.bat',
     ]
     
     # Archivos y directorios a excluir
@@ -82,15 +80,13 @@ def create_distribution_zip(version=None, output_dir='..'):
         '__pycache__',
         '*.pyc',
         '*.pyo',
+        '*.sqlite',
         '*.sqlite-journal',
         '.DS_Store',
         'Thumbs.db',
         '*.log',
+        '.env',
     ]
-    
-    # Incluimos la base de datos con datos de prueba para demostración
-    include_files.append('datos.sqlite')
-    include_files.append('.env')
     
     # Crear un directorio temporal para preparar los archivos
     temp_dir = os.path.join(base_dir, 'temp_dist')
@@ -140,20 +136,8 @@ def create_distribution_zip(version=None, output_dir='..'):
             if os.path.exists(src_file):
                 shutil.copy2(src_file, dst_file)
         
-        # Crear directorios vacíos necesarios
-        empty_dirs = [
-            os.path.join(temp_dir, 'flask_session'),
-            os.path.join(temp_dir, 'data', 'excel_watch'),
-            os.path.join(temp_dir, 'data', 'pdf_watch'),
-            os.path.join(temp_dir, 'uploads', 'excel'),
-            os.path.join(temp_dir, 'uploads', 'pdf'),
-        ]
-        
-        for directory in empty_dirs:
-            os.makedirs(directory, exist_ok=True)
-            # Añadir un archivo .gitkeep para preservar el directorio vacío en el zip
-            with open(os.path.join(directory, '.gitkeep'), 'w') as f:
-                f.write('# Este archivo se incluye para mantener la estructura de directorios\n')
+        # Crear directorio flask_session
+        os.makedirs(os.path.join(temp_dir, 'flask_session'), exist_ok=True)
         
         # Crear archivo zip
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:

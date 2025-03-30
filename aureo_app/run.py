@@ -5,10 +5,10 @@ import argparse
 
 app = create_app()
 
-# Inicializar los vigilantes de archivos
-# Podemos usar with app.app_context() para compatibilidad con Flask 2.x
-# donde before_first_request está obsoleto
-with app.app_context():
+# Ejecutar antes del primer request
+@app.before_first_request
+def before_first_request():
+    # Inicializar vigilantes de archivos
     # La base de datos ya se inicializa en create_app()
     init_watchers()
 

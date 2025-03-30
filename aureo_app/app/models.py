@@ -66,7 +66,6 @@ class Store(db.Model):
         }
 
 class SystemConfig(db.Model):
-    __tablename__ = 'system_configs'  # Forzar el nombre de la tabla
     id = db.Column(db.Integer, primary_key=True)
     key = db.Column(db.String(50), unique=True, nullable=False)
     value = db.Column(db.String(1000), nullable=False)
@@ -302,13 +301,13 @@ def init_db():
             name='Administrador',
             role='SuperAdmin'
         )
-        user.set_password('admin')
+        user.set_password('password123')
         db.session.add(user)
     
     # Crear configuraciones del sistema
     configs = [
         {
-            'key': 'FILE_PROCESSING_ENABLED',
+            'key': 'FILE_WATCHING_ACTIVE',
             'value': 'true',
             'description': 'Indica si la vigilancia automática de archivos está activa'
         },
@@ -316,16 +315,6 @@ def init_db():
             'key': 'AUTO_STORE_DETECTION',
             'value': 'false',
             'description': 'Asigna automáticamente una tienda cuando no se detecta en el nombre del archivo'
-        },
-        {
-            'key': 'EXCEL_WATCH_DIR',
-            'value': os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), 'data', 'excel_watch'),
-            'description': 'Directorio para vigilancia automática de archivos Excel'
-        },
-        {
-            'key': 'PDF_WATCH_DIR',
-            'value': os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), 'data', 'pdf_watch'),
-            'description': 'Directorio para vigilancia automática de archivos PDF'
         },
         {
             'key': 'APP_NAME',
