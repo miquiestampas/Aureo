@@ -3326,95 +3326,141 @@ export class DatabaseStorage implements IStorage {
         return { nuevasCoincidencias: 0 };
       }
       
+      console.log(`Datos del Excel: ${JSON.stringify(excelData)}`);
+      
       // 2. Obtener todos los señalamientos activos
       const personas = await this.getSenalPersonas(false);
       const objetos = await this.getSenalObjetos(false);
       
       console.log(`Comparando con ${personas.length} señalamientos de personas y ${objetos.length} señalamientos de objetos`);
+      if (personas.length > 0) {
+        console.log(`Muestra de datos de personas: ${JSON.stringify(personas[0])}`);
+      }
+      if (objetos.length > 0) {
+        console.log(`Muestra de datos de objetos: ${JSON.stringify(objetos[0])}`);
+      }
       
       // 3. Buscar coincidencias con personas (por nombre o documento)
       if (excelData.customerName) {
+        console.log(`Buscando coincidencias para cliente: ${excelData.customerName}`);
         for (const persona of personas) {
+          if (!persona.nombre) {
+            console.log(`Advertencia: Hay una persona sin nombre en los señalamientos (ID: ${persona.id})`);
+            continue;
+          }
+          console.log(`Comparando "${excelData.customerName}" con "${persona.nombre}"`);
           const puntuacion = this.calcularPuntuacionSimilitud(
             excelData.customerName.toLowerCase(),
             persona.nombre.toLowerCase()
           );
           
+          console.log(`Puntuación para ${persona.nombre}: ${puntuacion}`);
+          
           if (puntuacion >= 70) { // 70% o más de similitud
             // Crear registro de coincidencia
-            await this.createCoincidencia({
-              tipoCoincidencia: "Persona",
-              idSenalPersona: persona.id,
-              idExcelData: excelData.id,
-              puntuacionCoincidencia: puntuacion,
-              tipoMatch: puntuacion >= 95 ? "Exacto" : "Parcial",
-              campoCoincidente: "nombre",
-              valorCoincidente: excelData.customerName,
-              estado: "NoLeido"
-            });
-            
-            console.log(`Coincidencia de PERSONA detectada: ${persona.nombre} con ${excelData.customerName}, puntuación: ${puntuacion}`);
+            try {
+              await this.createCoincidencia({
+                tipoCoincidencia: "Persona",
+                idSenalPersona: persona.id,
+                idExcelData: excelData.id,
+                puntuacionCoincidencia: puntuacion,
+                tipoMatch: puntuacion >= 95 ? "Exacto" : "Parcial",
+                campoCoincidente: "nombre",
+                valorCoincidente: excelData.customerName,
+                estado: "NoLeido"
+              });
+              console.log(`Coincidencia de PERSONA detectada: ${persona.nombre} con ${excelData.customerName}, puntuación: ${puntuacion}`);
+            } catch (err) {
+              console.error(`Error al crear coincidencia de persona: `, err);
+            }
           }
         }
+      } else {
+        console.log(`No hay nombre de cliente para comparar`);
       }
       
       // 4. Buscar coincidencias con objetos por grabaciones
-      if (excelData.engravings) {
+      if (excelData.engravings && excelData.engravings !== '-') {
+        console.log(`Buscando coincidencias para grabación: ${excelData.engravings}`);
         for (const objeto of objetos) {
-          if (objeto.grabacion) {
+          if (objeto.grabacion && objeto.grabacion !== '-' && objeto.grabacion.trim() !== '') {
+            console.log(`Comparando grabación "${excelData.engravings}" con "${objeto.grabacion}"`);
             const puntuacion = this.calcularPuntuacionSimilitud(
               excelData.engravings.toLowerCase(),
               objeto.grabacion.toLowerCase()
             );
             
+            console.log(`Puntuación para grabación ${objeto.grabacion}: ${puntuacion}`);
+            
             if (puntuacion >= 70) { // 70% o más de similitud
               // Crear registro de coincidencia
+              try {
+                await this.createCoincidencia({
+                  tipoCoincidencia: "Objeto",
+                  idSenalObjeto: objeto.id,
+                  idExcelData: excelData.id,
+                  puntuacionCoincidencia: puntuacion,
+                  tipoMatch: puntuacion >= 95 ? "Exacto" : "Parcial",
+                  campoCoincidente: "grabacion",
+                  valorCoincidente: excelData.engravings,
+                  estado: "NoLeido"
+                });
+                console.log(`Coincidencia de OBJETO por grabación detectada: ${objeto.grabacion} con ${excelData.engravings}, puntuación: ${puntuacion}`);
+              } catch (err) {
+                console.error(`Error al crear coincidencia de objeto por grabación: `, err);
+              }
+            }
+          } else {
+            console.log(`Objeto sin grabación válida para comparar (ID: ${objeto.id})`);
+          }
+        }
+      } else {
+        console.log(`No hay grabación para comparar o es un guión "-"`);
+      }
+      
+      // 5. Buscar coincidencias con objetos por descripción
+      if (excelData.itemDetails) {
+        console.log(`Buscando coincidencias para descripción: ${excelData.itemDetails}`);
+        for (const objeto of objetos) {
+          if (!objeto.descripcion) {
+            console.log(`Advertencia: Hay un objeto sin descripción en los señalamientos (ID: ${objeto.id})`);
+            continue;
+          }
+          console.log(`Comparando descripción "${excelData.itemDetails}" con "${objeto.descripcion}"`);
+          const puntuacion = this.calcularPuntuacionSimilitud(
+            excelData.itemDetails.toLowerCase(),
+            objeto.descripcion.toLowerCase()
+          );
+          
+          console.log(`Puntuación para descripción ${objeto.descripcion}: ${puntuacion}`);
+          
+          if (puntuacion >= 70) { // 70% o más de similitud
+            // Crear registro de coincidencia
+            try {
               await this.createCoincidencia({
                 tipoCoincidencia: "Objeto",
                 idSenalObjeto: objeto.id,
                 idExcelData: excelData.id,
                 puntuacionCoincidencia: puntuacion,
                 tipoMatch: puntuacion >= 95 ? "Exacto" : "Parcial",
-                campoCoincidente: "grabacion",
-                valorCoincidente: excelData.engravings,
+                campoCoincidente: "descripcion",
+                valorCoincidente: excelData.itemDetails,
                 estado: "NoLeido"
               });
-              
-              console.log(`Coincidencia de OBJETO por grabación detectada: ${objeto.grabacion} con ${excelData.engravings}, puntuación: ${puntuacion}`);
+              console.log(`Coincidencia de OBJETO por descripción detectada: ${objeto.descripcion} con ${excelData.itemDetails}, puntuación: ${puntuacion}`);
+            } catch (err) {
+              console.error(`Error al crear coincidencia de objeto por descripción: `, err);
             }
           }
         }
-      }
-      
-      // 5. Buscar coincidencias con objetos por descripción
-      if (excelData.itemDetails) {
-        for (const objeto of objetos) {
-          const puntuacion = this.calcularPuntuacionSimilitud(
-            excelData.itemDetails.toLowerCase(),
-            objeto.descripcion.toLowerCase()
-          );
-          
-          if (puntuacion >= 70) { // 70% o más de similitud
-            // Crear registro de coincidencia
-            await this.createCoincidencia({
-              tipoCoincidencia: "Objeto",
-              idSenalObjeto: objeto.id,
-              idExcelData: excelData.id,
-              puntuacionCoincidencia: puntuacion,
-              tipoMatch: puntuacion >= 95 ? "Exacto" : "Parcial",
-              campoCoincidente: "descripcion",
-              valorCoincidente: excelData.itemDetails,
-              estado: "NoLeido"
-            });
-            
-            console.log(`Coincidencia de OBJETO por descripción detectada: ${objeto.descripcion} con ${excelData.itemDetails}, puntuación: ${puntuacion}`);
-          }
-        }
+      } else {
+        console.log(`No hay descripción del objeto para comparar`);
       }
       
       // Contar cuántas coincidencias nuevas se encontraron
       const coincidenciasActuales = await this.getCoincidenciasByExcelDataId(excelDataId);
       nuevasCoincidencias = coincidenciasActuales.length;
+      console.log(`Se encontraron ${nuevasCoincidencias} coincidencias para el registro ${excelDataId}`);
       
       return { nuevasCoincidencias };
     } catch (error) {
