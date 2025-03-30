@@ -2457,7 +2457,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Buscando coincidencias con estado: ${estado || 'todas'}`);
         const coincidencias = await storage.getCoincidencias(estado, limit);
         console.log(`Encontradas ${coincidencias.length} coincidencias`);
-        res.json(coincidencias);
+        
+        // Enriquecer las coincidencias con la información de la orden
+        const coincidenciasEnriquecidas = await Promise.all(coincidencias.map(async (coincidencia) => {
+          try {
+            // Obtener la información de los datos de Excel
+            const excelData = await storage.getExcelDataById(coincidencia.idExcelData);
+            
+            // Obtener información de la tienda
+            let storeName = "";
+            if (excelData && excelData.storeCode) {
+              const store = await storage.getStoreByCode(excelData.storeCode);
+              if (store) {
+                storeName = store.name;
+              }
+            }
+            
+            // Obtener datos de señalamientos si corresponde
+            let nombrePersona = undefined;
+            let descripcionObjeto = undefined;
+            
+            if (coincidencia.tipoCoincidencia === "Persona" && coincidencia.idSenalPersona) {
+              const persona = await storage.getSenalPersona(coincidencia.idSenalPersona);
+              if (persona) {
+                nombrePersona = persona.nombre;
+              }
+            } else if (coincidencia.tipoCoincidencia === "Objeto" && coincidencia.idSenalObjeto) {
+              const objeto = await storage.getSenalObjeto(coincidencia.idSenalObjeto);
+              if (objeto) {
+                descripcionObjeto = objeto.descripcion;
+              }
+            }
+            
+            // Enriquecer la coincidencia con la información obtenida
+            return {
+              ...coincidencia,
+              nombrePersona,
+              descripcionObjeto,
+              ordenInfo: excelData ? {
+                storeCode: excelData.storeCode || "",
+                storeName: storeName,
+                orderNumber: excelData.orderNumber || "",
+                orderDate: excelData.orderDate || "",
+                customerName: excelData.customerName || ""
+              } : {
+                storeCode: "",
+                storeName: "",
+                orderNumber: "",
+                orderDate: "",
+                customerName: ""
+              }
+            };
+          } catch (error) {
+            console.error(`Error al enriquecer coincidencia ${coincidencia.id}:`, error);
+            // Si hay error, devolver la coincidencia original con datos vacíos para ordenInfo
+            return {
+              ...coincidencia,
+              ordenInfo: {
+                storeCode: "",
+                storeName: "",
+                orderNumber: "",
+                orderDate: "",
+                customerName: ""
+              }
+            };
+          }
+        }));
+        
+        res.json(coincidenciasEnriquecidas);
       } catch (error) {
         console.error("Error al obtener coincidencias:", error);
         next(error);
@@ -2478,7 +2545,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ error: "Coincidencia no encontrada" });
         }
         
-        res.json(coincidencia);
+        // Enriquecer la coincidencia con la información de la orden
+        try {
+          // Obtener la información de los datos de Excel
+          const excelData = await storage.getExcelDataById(coincidencia.idExcelData);
+          
+          // Obtener información de la tienda
+          let storeName = "";
+          if (excelData && excelData.storeCode) {
+            const store = await storage.getStoreByCode(excelData.storeCode);
+            if (store) {
+              storeName = store.name;
+            }
+          }
+          
+          // Obtener datos de señalamientos si corresponde
+          let nombrePersona = undefined;
+          let descripcionObjeto = undefined;
+          
+          if (coincidencia.tipoCoincidencia === "Persona" && coincidencia.idSenalPersona) {
+            const persona = await storage.getSenalPersona(coincidencia.idSenalPersona);
+            if (persona) {
+              nombrePersona = persona.nombre;
+            }
+          } else if (coincidencia.tipoCoincidencia === "Objeto" && coincidencia.idSenalObjeto) {
+            const objeto = await storage.getSenalObjeto(coincidencia.idSenalObjeto);
+            if (objeto) {
+              descripcionObjeto = objeto.descripcion;
+            }
+          }
+          
+          // Enriquecer la coincidencia con la información obtenida
+          const coincidenciaEnriquecida = {
+            ...coincidencia,
+            nombrePersona,
+            descripcionObjeto,
+            ordenInfo: excelData ? {
+              storeCode: excelData.storeCode || "",
+              storeName: storeName,
+              orderNumber: excelData.orderNumber || "",
+              orderDate: excelData.orderDate || "",
+              customerName: excelData.customerName || ""
+            } : {
+              storeCode: "",
+              storeName: "",
+              orderNumber: "",
+              orderDate: "",
+              customerName: ""
+            }
+          };
+          
+          res.json(coincidenciaEnriquecida);
+        } catch (error) {
+          console.error(`Error al enriquecer coincidencia ${id}:`, error);
+          // Si hay error, devolver la coincidencia original con datos vacíos para ordenInfo
+          res.json({
+            ...coincidencia,
+            ordenInfo: {
+              storeCode: "",
+              storeName: "",
+              orderNumber: "",
+              orderDate: "",
+              customerName: ""
+            }
+          });
+        }
       } catch (error) {
         console.error(`Error al obtener coincidencia con ID ${req.params.id}:`, error);
         next(error);
@@ -2541,7 +2672,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         const coincidencias = await storage.getCoincidenciasByExcelDataId(excelDataId);
-        res.json(coincidencias);
+        
+        // Enriquecer las coincidencias con la información de la orden y señalamientos
+        const coincidenciasEnriquecidas = await Promise.all(coincidencias.map(async (coincidencia) => {
+          try {
+            // El excelData ya lo tenemos por el ID
+            const excelData = await storage.getExcelDataById(excelDataId);
+            
+            // Obtener información de la tienda
+            let storeName = "";
+            if (excelData && excelData.storeCode) {
+              const store = await storage.getStoreByCode(excelData.storeCode);
+              if (store) {
+                storeName = store.name;
+              }
+            }
+            
+            // Obtener datos de señalamientos si corresponde
+            let nombrePersona = undefined;
+            let descripcionObjeto = undefined;
+            
+            if (coincidencia.tipoCoincidencia === "Persona" && coincidencia.idSenalPersona) {
+              const persona = await storage.getSenalPersona(coincidencia.idSenalPersona);
+              if (persona) {
+                nombrePersona = persona.nombre;
+              }
+            } else if (coincidencia.tipoCoincidencia === "Objeto" && coincidencia.idSenalObjeto) {
+              const objeto = await storage.getSenalObjeto(coincidencia.idSenalObjeto);
+              if (objeto) {
+                descripcionObjeto = objeto.descripcion;
+              }
+            }
+            
+            // Enriquecer la coincidencia con la información obtenida
+            return {
+              ...coincidencia,
+              nombrePersona,
+              descripcionObjeto,
+              ordenInfo: excelData ? {
+                storeCode: excelData.storeCode || "",
+                storeName: storeName,
+                orderNumber: excelData.orderNumber || "",
+                orderDate: excelData.orderDate || "",
+                customerName: excelData.customerName || ""
+              } : {
+                storeCode: "",
+                storeName: "",
+                orderNumber: "",
+                orderDate: "",
+                customerName: ""
+              }
+            };
+          } catch (error) {
+            console.error(`Error al enriquecer coincidencia ${coincidencia.id}:`, error);
+            // Si hay error, devolver la coincidencia original con datos vacíos para ordenInfo
+            return {
+              ...coincidencia,
+              ordenInfo: {
+                storeCode: "",
+                storeName: "",
+                orderNumber: "",
+                orderDate: "",
+                customerName: ""
+              }
+            };
+          }
+        }));
+        
+        res.json(coincidenciasEnriquecidas);
       } catch (error) {
         console.error(`Error al obtener coincidencias para excelDataId ${req.params.excelDataId}:`, error);
         next(error);
