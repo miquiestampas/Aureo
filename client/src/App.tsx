@@ -20,7 +20,8 @@ import UserManagementPage from "@/pages/user-management";
 import SystemConfigPage from "@/pages/system-config";
 import ActivityControlPage from "@/pages/activity-control";
 import PurchaseControlPage from "@/pages/purchase-control";
-// Las páginas de senalamientos y coincidencias han sido eliminadas
+import SenalamientosPage from "@/pages/senalamientos";
+import CoincidenciasPage from "@/pages/coincidencias";
 import PdfListingsPage from "@/pages/pdf-listings";
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
@@ -138,7 +139,15 @@ function Router() {
         )} 
       />
       
-      {/* Las rutas de señalamientos y coincidencias han sido eliminadas */}
+      <ProtectedRoute 
+        path="/senalamientos" 
+        component={SenalamientosPage} 
+      />
+      
+      <ProtectedRoute 
+        path="/coincidencias" 
+        component={CoincidenciasPage} 
+      />
       
       <ProtectedRoute 
         path="/pdf-listings" 
