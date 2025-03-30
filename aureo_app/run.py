@@ -2,20 +2,15 @@ from app import create_app, db
 from app.file_watcher import init_watchers
 import os
 import argparse
-from flask import Flask
 
 app = create_app()
 
-# En versiones recientes de Flask, before_first_request está obsoleto
-# Usamos un callback que se ejecuta después de crear la aplicación
-def init_watchers_callback():
+# Ejecutar antes del primer request
+@app.before_first_request
+def before_first_request():
     # Inicializar vigilantes de archivos
     # La base de datos ya se inicializa en create_app()
     init_watchers()
-
-# Registramos el callback para que se ejecute al iniciar la aplicación
-with app.app_context():
-    init_watchers_callback()
 
 def parse_arguments():
     """Procesa los argumentos de línea de comandos"""

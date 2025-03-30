@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
 Script para generar un archivo zip de distribución de Áureo.
-Este script prepara una versión lista para distribución, incluyendo
-la base de datos SQLite y creando un archivo .env básico.
-Se excluyen archivos temporales, caché y archivos de desarrollo.
+Este script prepara una versión limpia para distribución, sin incluir
+archivos temporales, caché, bases de datos o archivos de desarrollo.
 """
 
 import os
@@ -76,26 +75,18 @@ def create_distribution_zip(version=None, output_dir='..'):
         'build_frontend.py',
     ]
     
-    # Crear un .env básico con codificación correcta
-    env_content = """FLASK_APP=run.py
-FLASK_ENV=development
-FLASK_DEBUG=True
-SECRET_KEY=clave_secreta_para_aureo_aplicacion
-"""
-    
     # Archivos y directorios a excluir
     exclude_patterns = [
         '__pycache__',
         '*.pyc',
         '*.pyo',
+        '*.sqlite',
         '*.sqlite-journal',
         '.DS_Store',
         'Thumbs.db',
         '*.log',
+        '.env',
     ]
-    
-    # Incluir la base de datos en la distribución
-    include_database = True
     
     # Crear un directorio temporal para preparar los archivos
     temp_dir = os.path.join(base_dir, 'temp_dist')
@@ -145,21 +136,8 @@ SECRET_KEY=clave_secreta_para_aureo_aplicacion
             if os.path.exists(src_file):
                 shutil.copy2(src_file, dst_file)
         
-        # Incluir la base de datos si está habilitada la opción
-        if include_database:
-            db_file = os.path.join(base_dir, 'datos.sqlite')
-            if os.path.exists(db_file):
-                dst_db_file = os.path.join(temp_dir, 'datos.sqlite')
-                shutil.copy2(db_file, dst_db_file)
-                print(f"Base de datos incluida en la distribución: {db_file}")
-        
-        # Crear directorio flask_session y archivo .env con codificación UTF-8 explícita
+        # Crear directorio flask_session
         os.makedirs(os.path.join(temp_dir, 'flask_session'), exist_ok=True)
-        
-        # Crear archivo .env con codificación explícita UTF-8
-        env_file_path = os.path.join(temp_dir, '.env')
-        with open(env_file_path, 'w', encoding='utf-8') as f:
-            f.write(env_content)
         
         # Crear archivo zip
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:

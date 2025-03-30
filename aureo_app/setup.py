@@ -27,14 +27,13 @@ def setup_aureo():
             print(f"Error al crear directorio {directory}: {str(e)}")
             return False
     
-    # Crear archivo .env si no existe (con codificación UTF-8 explícita)
+    # Crear archivo .env si no existe
     env_path = os.path.join(base_dir, '.env')
     if not os.path.exists(env_path):
         try:
             import secrets
-            with open(env_path, 'w', encoding='utf-8') as f:
+            with open(env_path, 'w') as f:
                 f.write(f"# Configuración de Áureo\n")
-                f.write(f"FLASK_APP=run.py\n")
                 f.write(f"SECRET_KEY={secrets.token_hex(32)}\n")
                 f.write(f"FLASK_DEBUG=True\n")
                 f.write(f"# FLASK_ENV=development # Para versiones antiguas de Flask\n")
