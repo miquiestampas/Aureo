@@ -14,7 +14,7 @@ import shutil
 
 def main():
     # URL del archivo de distribución
-    dist_url = "https://raw.githubusercontent.com/replit/Aureo/main/aureo-1.0.0.zip"
+    dist_url = "https://github.com/replit-user/aureo/raw/main/aureo-1.0.0.zip"
     
     print("=== Descargador de Áureo ===")
     print("Este script descargará e instalará la última versión de Áureo.")

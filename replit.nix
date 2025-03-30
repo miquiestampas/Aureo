@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.libiconv
     pkgs.unzip
     pkgs.jq
     pkgs.sqlite
