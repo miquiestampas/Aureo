@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+.user-avatar {
+  background-color: #FFE600 !important;
+}
+
+.role-badge {
+  background-color: #FFE600 !important;
+  color: #000000 !important;
+  border-color: #FFD000 !important;
+}
