@@ -3495,9 +3495,15 @@ export class DatabaseStorage implements IStorage {
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     try {
       // Usar SQLite directamente para evitar problemas con columnas
+      // Solo contar coincidencias para señalamientos ACTIVOS
       const sql = `
         SELECT COUNT(*) as total FROM coincidencias
         WHERE estado = 'NoLeido'
+        AND (
+          (id_senal_persona IS NOT NULL AND id_senal_persona IN (SELECT id FROM senal_personas WHERE estado = 'Activo'))
+          OR 
+          (id_senal_objeto IS NOT NULL AND id_senal_objeto IN (SELECT id FROM senal_objetos WHERE estado = 'Activo'))
+        )
       `;
       
       const stmt = sqlite.prepare(sql);
