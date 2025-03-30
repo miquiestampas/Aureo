@@ -1,0 +1,58 @@
+PS D:\Aureo 01\Aureo 01> python start.py
+Traceback (most recent call last):
+  File "D:\Aureo 01\Aureo 01\start.py", line 4, in <module>
+    from app import create_app
+ModuleNotFoundError: No module named 'app'
+PS D:\Aureo 01\Aureo 01> python start.py
+=== Ejecutando configuración inicial ===
+=== Configuración inicial de Áureo ===
+Directorio creado o verificado: D:\Aureo 01\Aureo 01\uploads\excel
+Directorio creado o verificado: D:\Aureo 01\Aureo 01\uploads\pdf
+Directorio creado o verificado: D:\Aureo 01\Aureo 01\data\excel_watch
+Directorio creado o verificado: D:\Aureo 01\Aureo 01\data\pdf_watch
+Directorio creado o verificado: D:\Aureo 01\Aureo 01\flask_session
+Archivo .env creado en: D:\Aureo 01\Aureo 01\.env
+Configuración completada con éxito.
+La configuración se completó correctamente.
+=== Compilando frontend ===
+=== Compilación y configuración del frontend ===
+Error: No se encontró el directorio del cliente en: D:\Aureo 01\client
+Error al compilar y configurar el frontend.
+Error al compilar el frontend. Revise los logs para más detalles.
+Continuando con la aplicación backend...
+=== Iniciando Áureo en 0.0.0.0:5000 ===
+Traceback (most recent call last):
+  File "D:\Aureo 01\Aureo 01\run.py", line 8, in <module>
+    app = create_app()
+          ^^^^^^^^^^^^
+  File "D:\Aureo 01\Aureo 01\app\__init__.py", line 16, in create_app
+    app.config.from_object('config.Config')
+  File "C:\Users\s4lvi\AppData\Local\Programs\Python\Python312\Lib\site-packages\flask\config.py", line 251, in from_object
+    obj = import_string(obj)
+          ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\s4lvi\AppData\Local\Programs\Python\Python312\Lib\site-packages\werkzeug\utils.py", line 596, in import_string
+    __import__(import_name)
+  File "D:\Aureo 01\Aureo 01\config.py", line 5, in <module>
+    load_dotenv()
+  File "C:\Users\s4lvi\AppData\Local\Programs\Python\Python312\Lib\site-packages\dotenv\main.py", line 362, in load_dotenv
+    return dotenv.set_as_environment_variables()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\s4lvi\AppData\Local\Programs\Python\Python312\Lib\site-packages\dotenv\main.py", line 93, in set_as_environment_variables
+    if not self.dict():
+           ^^^^^^^^^^^
+  File "C:\Users\s4lvi\AppData\Local\Programs\Python\Python312\Lib\site-packages\dotenv\main.py", line 76, in dict
+    resolve_variables(raw_values, override=self.override)
+  File "C:\Users\s4lvi\AppData\Local\Programs\Python\Python312\Lib\site-packages\dotenv\main.py", line 239, in resolve_variables
+    for name, value in values:
+  File "C:\Users\s4lvi\AppData\Local\Programs\Python\Python312\Lib\site-packages\dotenv\main.py", line 85, in parse
+    for mapping in with_warn_for_invalid_lines(parse_stream(stream)):
+  File "C:\Users\s4lvi\AppData\Local\Programs\Python\Python312\Lib\site-packages\dotenv\main.py", line 25, in with_warn_for_invalid_lines
+    for mapping in mappings:
+  File "C:\Users\s4lvi\AppData\Local\Programs\Python\Python312\Lib\site-packages\dotenv\parser.py", line 173, in parse_stream
+    reader = Reader(stream)
+             ^^^^^^^^^^^^^^
+  File "C:\Users\s4lvi\AppData\Local\Programs\Python\Python312\Lib\site-packages\dotenv\parser.py", line 64, in __init__
+    self.string = stream.read()
+                  ^^^^^^^^^^^^^
+  File "<frozen codecs>", line 322, in decode
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf3 in position 13: invalid continuation byte
