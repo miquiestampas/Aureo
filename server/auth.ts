@@ -13,6 +13,41 @@ declare global {
   }
 }
 
+// Roles y sus permisos
+export const ROLES = {
+  Usuario: "Usuario",
+  Admin: "Admin",
+  SuperAdmin: "SuperAdmin"
+};
+
+// Definiciones de acceso por roles
+export const rolPermisos = {
+  [ROLES.Usuario]: [
+    "compras",
+    "listadosPdf"
+  ],
+  [ROLES.Admin]: [
+    "compras", 
+    "listadosPdf", 
+    "dashboard", 
+    "senalamientos", 
+    "coincidencias", 
+    "controlActividad", 
+    "tiendas"
+  ],
+  [ROLES.SuperAdmin]: [
+    "compras", 
+    "listadosPdf", 
+    "dashboard", 
+    "senalamientos", 
+    "coincidencias", 
+    "controlActividad", 
+    "tiendas", 
+    "usuarios", 
+    "configuracion"
+  ]
+};
+
 const scryptAsync = promisify(scrypt);
 
 async function hashPassword(password: string) {
@@ -120,30 +155,52 @@ export function setupAuth(app: Express) {
   const authorize = (roles: string[]) => {
     return (req: Express.Request, res: Express.Response, next: Express.NextFunction) => {
       if (!req.isAuthenticated()) {
-        return res.status(401).json({ message: "Unauthorized" });
+        return res.status(401).json({ message: "No autenticado" });
       }
       
       const userRole = (req.user as User).role;
       if (!roles.includes(userRole)) {
-        return res.status(403).json({ message: "Forbidden - Insufficient permissions" });
+        return res.status(403).json({ message: "Acceso denegado - Permisos insuficientes" });
       }
       
       next();
     };
   };
   
+  // Middleware para autorización basada en permisos de módulos
+  const authorizePermission = (permission: string) => {
+    return (req: Express.Request, res: Express.Response, next: Express.NextFunction) => {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "No autenticado" });
+      }
+      
+      const userRole = (req.user as User).role;
+      
+      // Verificar si el rol del usuario tiene permiso para acceder al módulo
+      if (rolPermisos[userRole] && rolPermisos[userRole].includes(permission)) {
+        return next();
+      }
+      
+      return res.status(403).json({ 
+        message: "Acceso denegado - No tiene permiso para acceder a este módulo"
+      });
+    };
+  };
+  
   // Make authorize middleware available
   app.use((req, res, next) => {
     req.authorize = authorize;
+    req.authorizePermission = authorizePermission;
     next();
   });
 }
 
-// Add authorize to Request type
+// Add authorize and authorizePermission to Request type
 declare global {
   namespace Express {
     interface Request {
       authorize: (roles: string[]) => (req: Express.Request, res: Express.Response, next: Express.NextFunction) => void;
+      authorizePermission: (permission: string) => (req: Express.Request, res: Express.Response, next: Express.NextFunction) => void;
     }
   }
 }

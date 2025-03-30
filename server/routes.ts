@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth } from "./auth";
+import { setupAuth, ROLES } from "./auth";
 import { storage } from "./storage";
 import { setupSocketIO, initializeFileWatchers, stopFileWatchers } from "./fileWatcher";
 import multer from "multer";
@@ -17,6 +17,74 @@ import {
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
+
+// Helper function to set up multer for file uploads
+function setupFileUpload() {
+  // Create upload directories
+  const uploadDir = path.join(process.cwd(), 'uploads');
+  const excelDir = path.join(uploadDir, 'excel');
+  const pdfDir = path.join(uploadDir, 'pdf');
+  
+  [uploadDir, excelDir, pdfDir].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
+  
+  // Configure storage
+  const storage = multer.diskStorage({
+    destination: function(req, file, cb) {
+      // Determine destination based on file type
+      if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+          file.mimetype === 'application/vnd.ms-excel') {
+        cb(null, excelDir);
+      } else if (file.mimetype === 'application/pdf') {
+        cb(null, pdfDir);
+      } else {
+        cb(new Error('Unsupported file type'), '');
+      }
+    },
+    filename: function(req, file, cb) {
+      // Mantener el nombre original pero añadir fecha para evitar conflictos
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      
+      // Obtener nombre y extensión
+      const ext = path.extname(file.originalname);
+      const nameWithoutExt = path.basename(file.originalname, ext);
+      
+      // Generar el nuevo nombre: original_fecha.extensión
+      cb(null, `${nameWithoutExt}_${timestamp}${ext}`);
+    }
+  });
+  
+  // Configure upload limits
+  return multer({
+    storage,
+    limits: {
+      fileSize: 50 * 1024 * 1024, // Incrementado a 50MB tamaño máximo
+      fieldSize: 50 * 1024 * 1024 // También incrementamos el tamaño de campo para formularios grandes
+    },
+    fileFilter: function(req, file, cb) {
+      console.log("Procesando archivo:", file.originalname, "Mimetype:", file.mimetype);
+      
+      // Accept Excel, CSV and PDF files with more tipos MIME
+      if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+          file.mimetype === 'application/vnd.ms-excel' ||
+          file.mimetype === 'text/csv' ||
+          file.mimetype === 'application/csv' ||
+          file.mimetype === 'text/plain' ||  // Para archivos CSV guardados como TXT
+          file.mimetype === 'application/pdf' ||
+          // Aceptar otros mimetype comunes para Excel
+          file.mimetype === 'application/octet-stream' ||
+          /excel|spreadsheet/i.test(file.mimetype)) {
+        cb(null, true);
+      } else {
+        console.log("Tipo de archivo no permitido:", file.mimetype);
+        cb(new Error(`Solo se permiten archivos Excel, CSV y PDF. Tipo recibido: ${file.mimetype}`), false);
+      }
+    }
+  });
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
@@ -1066,7 +1134,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Original Excel search route
-  app.get("/api/search/excel-data", async (req, res, next) => {
+  app.get("/api/search/excel-data", (req, res, next) => {
+    req.authorizePermission("compras")(req, res, async () => {
     try {
       // Extract query parameters
       const searchType = req.query.searchType as string || 'General';
@@ -1190,30 +1259,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // PDF document routes
-  app.get("/api/pdf-documents", async (req, res, next) => {
-    try {
-      if (!req.query.storeCode) {
-        return res.status(400).json({ message: "storeCode query parameter is required" });
+  app.get("/api/pdf-documents", (req, res, next) => {
+    req.authorizePermission("pdf")(req, res, async () => {
+      try {
+        if (!req.query.storeCode) {
+          return res.status(400).json({ message: "storeCode query parameter is required" });
+        }
+        
+        const documents = await storage.getPdfDocumentsByStore(req.query.storeCode as string);
+        res.json(documents);
+      } catch (err) {
+        next(err);
       }
-      
-      const documents = await storage.getPdfDocumentsByStore(req.query.storeCode as string);
-      res.json(documents);
-    } catch (err) {
-      next(err);
-    }
+    });
   });
   
   // Ruta para búsqueda avanzada de documentos PDF
-  app.get("/api/pdf-documents/search", async (req, res, next) => {
-    try {
-      const {
-        storeCode,
-        storeName,
-        district,
-        locality,
-        dateFrom,
-        dateTo
-      } = req.query;
+  app.get("/api/pdf-documents/search", (req, res, next) => {
+    req.authorizePermission("pdf")(req, res, async () => {
+      try {
+        const {
+          storeCode,
+          storeName,
+          district,
+          locality,
+          dateFrom,
+          dateTo
+        } = req.query;
       
       // Obtener primero las tiendas que coinciden con los criterios
       let matchingStores = await storage.getStores();
@@ -1275,44 +1347,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Obtener documento PDF por ID
-  app.get("/api/pdf-documents/:id", async (req, res, next) => {
-    try {
-      const id = parseInt(req.params.id);
-      const document = await storage.getPdfDocument(id);
-      
-      if (!document) {
-        return res.status(404).json({ message: "Documento PDF no encontrado" });
+  app.get("/api/pdf-documents/:id", (req, res, next) => {
+    req.authorizePermission("pdf")(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        const document = await storage.getPdfDocument(id);
+        
+        if (!document) {
+          return res.status(404).json({ message: "Documento PDF no encontrado" });
+        }
+        
+        res.json(document);
+      } catch (err) {
+        console.error('Error obteniendo documento PDF:', err);
+        res.status(500).json({ message: "Error obteniendo documento PDF" });
       }
-      
-      res.json(document);
-    } catch (err) {
-      console.error('Error obteniendo documento PDF:', err);
-      res.status(500).json({ message: "Error obteniendo documento PDF" });
-    }
+    });
   });
   
   // Visualizar documento PDF por ID
-  app.get("/api/pdf-documents/:id/view", async (req, res, next) => {
-    try {
-      const id = parseInt(req.params.id);
-      const document = await storage.getPdfDocument(id);
-      
-      if (!document) {
-        return res.status(404).json({ message: "Documento PDF no encontrado" });
+  app.get("/api/pdf-documents/:id/view", (req, res, next) => {
+    req.authorizePermission("pdf")(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        const document = await storage.getPdfDocument(id);
+        
+        if (!document) {
+          return res.status(404).json({ message: "Documento PDF no encontrado" });
+        }
+        
+        // Verificar si el archivo existe
+        const filePath = document.path;
+        if (!fs.existsSync(filePath)) {
+          return res.status(404).json({ message: "Archivo PDF no encontrado en el servidor" });
+        }
+        
+        // Enviar el archivo PDF
+        res.sendFile(path.resolve(filePath));
+      } catch (err) {
+        console.error('Error obteniendo documento PDF:', err);
+        res.status(500).json({ message: "Error obteniendo documento PDF" });
       }
-      
-      // Verificar si el archivo existe
-      const filePath = document.path;
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ message: "Archivo PDF no encontrado en el servidor" });
-      }
-      
-      // Enviar el archivo PDF
-      res.sendFile(path.resolve(filePath));
-    } catch (err) {
-      console.error('Error obteniendo documento PDF:', err);
-      res.status(500).json({ message: "Error obteniendo documento PDF" });
-    }
+    });
   });
   
   // File upload routes
@@ -1409,167 +1485,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/upload/pdf", upload.single("file"), async (req, res, next) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
+  app.post("/api/upload/pdf", upload.single("file"), (req, res, next) => {
+    req.authorizePermission("pdf")(req, res, async () => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+        
+        // Usamos un código de tienda vacío, que será reemplazado automáticamente
+        // durante el procesamiento del archivo basado en su nombre
+        const defaultStoreCode = "";
+        
+        // Si se proporciona un código de tienda explícitamente, lo usamos
+        const storeCode = req.body.storeCode || defaultStoreCode;
+        
+        // Create file activity entry
+        const processingDate = new Date().toISOString();
+        
+        const activity = await storage.createFileActivity({
+          filename: req.file.originalname,
+          storeCode,
+          fileType: 'PDF',
+          status: 'Pending',
+          processingDate,
+          processedBy: 'Carga Manual',
+          errorMessage: null,
+          metadata: null
+        });
+        
+        // Process the file in the background
+        processPdfFile(req.file.path, activity.id, storeCode)
+          .catch(err => console.error("Error processing uploaded PDF file:", err));
+        
+        res.status(202).json({
+          message: "File uploaded successfully and queued for processing",
+          fileActivity: activity
+        });
+      } catch (err) {
+        next(err);
       }
-      
-      // Usamos un código de tienda vacío, que será reemplazado automáticamente
-      // durante el procesamiento del archivo basado en su nombre
-      const defaultStoreCode = "";
-      
-      // Si se proporciona un código de tienda explícitamente, lo usamos
-      const storeCode = req.body.storeCode || defaultStoreCode;
-      
-      // Create file activity entry
-      const processingDate = new Date().toISOString();
-      
-      const activity = await storage.createFileActivity({
-        filename: req.file.originalname,
-        storeCode,
-        fileType: 'PDF',
-        status: 'Pending',
-        processingDate,
-        processedBy: 'Carga Manual',
-        errorMessage: null,
-        metadata: null
-      });
-      
-      // Process the file in the background
-      processPdfFile(req.file.path, activity.id, storeCode)
-        .catch(err => console.error("Error processing uploaded PDF file:", err));
-      
-      res.status(202).json({
-        message: "File uploaded successfully and queued for processing",
-        fileActivity: activity
-      });
-    } catch (err) {
-      next(err);
-    }
+    });
   });
   
   // Carga masiva de archivos PDF
-  app.post("/api/upload/pdf/batch", uploadMultiple, async (req, res, next) => {
-    try {
-      if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ message: "No se ha cargado ningún archivo" });
-      }
-      
-      // Usamos un código de tienda vacío, que será reemplazado automáticamente
-      // durante el procesamiento del archivo basado en su nombre
-      const defaultStoreCode = "";
-      // Si se proporciona un código de tienda explícitamente, lo usamos
-      const storeCode = req.body.storeCode || defaultStoreCode;
-      const activities = [];
-      
-      // Procesar cada archivo
-      const filePromises = req.files.map(async (file) => {
-        try {
-          // Crear actividad para cada archivo
-          const processingDate = new Date().toISOString();
-          
-          const activity = await storage.createFileActivity({
-            filename: file.originalname,
-            storeCode, // Usamos el código de tienda proporcionado o el predeterminado
-            fileType: 'PDF',
-            status: 'Pending',
-            processingDate,
-            processedBy: 'Carga Masiva',
-            errorMessage: null,
-            metadata: null
-          });
-          
-          activities.push(activity);
-          
-          // Procesar archivo en segundo plano
-          processPdfFile(file.path, activity.id, storeCode)
-            .catch(err => console.error(`Error al procesar archivo ${file.originalname}:`, err));
-            
-          return { filename: file.originalname, status: 'Encolado' };
-        } catch (err) {
-          console.error(`Error procesando archivo ${file.originalname}:`, err);
-          return { filename: file.originalname, status: 'Error', error: err.message };
+  app.post("/api/upload/pdf/batch", uploadMultiple, (req, res, next) => {
+    req.authorizePermission("pdf")(req, res, async () => {
+      try {
+        if (!req.files || req.files.length === 0) {
+          return res.status(400).json({ message: "No se ha cargado ningún archivo" });
         }
-      });
-      
-      // Esperar a que todos los archivos sean procesados
-      const results = await Promise.all(filePromises);
-      
-      res.status(202).json({
-        message: `${req.files.length} archivos PDF cargados exitosamente y en cola para procesamiento`,
-        files: results,
-        activities: activities
-      });
-    } catch (err) {
-      next(err);
-    }
+        
+        // Usamos un código de tienda vacío, que será reemplazado automáticamente
+        // durante el procesamiento del archivo basado en su nombre
+        const defaultStoreCode = "";
+        // Si se proporciona un código de tienda explícitamente, lo usamos
+        const storeCode = req.body.storeCode || defaultStoreCode;
+        const activities = [];
+        
+        // Procesar cada archivo
+        const filePromises = req.files.map(async (file) => {
+          try {
+            // Crear actividad para cada archivo
+            const processingDate = new Date().toISOString();
+            
+            const activity = await storage.createFileActivity({
+              filename: file.originalname,
+              storeCode, // Usamos el código de tienda proporcionado o el predeterminado
+              fileType: 'PDF',
+              status: 'Pending',
+              processingDate,
+              processedBy: 'Carga Masiva',
+              errorMessage: null,
+              metadata: null
+            });
+            
+            activities.push(activity);
+            
+            // Procesar archivo en segundo plano
+            processPdfFile(file.path, activity.id, storeCode)
+              .catch(err => console.error(`Error al procesar archivo ${file.originalname}:`, err));
+              
+            return { filename: file.originalname, status: 'Encolado' };
+          } catch (err) {
+            console.error(`Error procesando archivo ${file.originalname}:`, err);
+            return { filename: file.originalname, status: 'Error', error: err.message };
+          }
+        });
+        
+        // Esperar a que todos los archivos sean procesados
+        const results = await Promise.all(filePromises);
+        
+        res.status(202).json({
+          message: `${req.files.length} archivos PDF cargados exitosamente y en cola para procesamiento`,
+          files: results,
+          activities: activities
+        });
+      } catch (err) {
+        next(err);
+      }
+    });
   });
   
   // System status routes
-  app.get("/api/system/status", async (req, res) => {
-    try {
-      // Get system stats
-      const [excelStores, pdfStores, recentActivities] = await Promise.all([
-        storage.getStoresByType('Excel'),
-        storage.getStoresByType('PDF'),
-        storage.getRecentFileActivities(50)
-      ]);
-      
-      // Calculate processed today count
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      const processedToday = recentActivities.filter(activity => {
-        const activityDate = new Date(activity.processingDate);
-        return activityDate >= today && activity.status === 'Processed';
-      }).length;
-      
-      // Count pending files
-      const pendingFiles = recentActivities.filter(activity => 
-        activity.status === 'Pending' || activity.status === 'Processing'
-      ).length;
-      
-      // Check if file watchers are enabled
-      const fileProcessingConfig = await storage.getConfig('FILE_PROCESSING_ENABLED');
-      const fileWatchingActive = fileProcessingConfig?.value === 'true';
-      
-      // Calcular el tamaño de la base de datos SQLite (en porcentaje respecto a 1TB máximo)
-      const getDatabaseSize = async () => {
-        try {
-          // Obtener estadísticas del archivo de la BD (SQLite)
-          const dbPath = process.env.DATABASE_PATH || './aureo_app/datos.sqlite';
-          const stats = await fs.promises.stat(dbPath);
-          const sizeInBytes = stats.size;
-          const sizeInGB = sizeInBytes / (1024 * 1024 * 1024);
-          
-          // Calcular porcentaje relativo a 1TB
-          // 1TB = 1024GB, por lo que el porcentaje sería (tamaño en GB / 1024) * 100
-          const percentageOfMaxSize = (sizeInGB / 1024) * 100;
-          
-          // Redondear a 2 decimales
-          return Math.round(percentageOfMaxSize * 100) / 100;
-        } catch (error) {
-          console.error("Error al obtener el tamaño de la base de datos:", error);
-          return 0; // Valor por defecto en caso de error
-        }
-      };
-      
-      const databaseSize = await getDatabaseSize();
-      
-      res.json({
-        totalStores: excelStores.length + pdfStores.length,
-        excelStores: excelStores.length,
-        pdfStores: pdfStores.length,
-        processedToday,
-        pendingFiles,
-        fileWatchingActive,
-        lastSystemCheck: new Date().toISOString(),
-        databaseSize
-      });
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching system status" });
-    }
+  app.get("/api/system/status", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Get system stats
+        const [excelStores, pdfStores, recentActivities] = await Promise.all([
+          storage.getStoresByType('Excel'),
+          storage.getStoresByType('PDF'),
+          storage.getRecentFileActivities(50)
+        ]);
+        
+        // Calculate processed today count
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const processedToday = recentActivities.filter(activity => {
+          const activityDate = new Date(activity.processingDate);
+          return activityDate >= today && activity.status === 'Processed';
+        }).length;
+        
+        // Count pending files
+        const pendingFiles = recentActivities.filter(activity => 
+          activity.status === 'Pending' || activity.status === 'Processing'
+        ).length;
+        
+        // Check if file watchers are enabled
+        const fileProcessingConfig = await storage.getConfig('FILE_PROCESSING_ENABLED');
+        const fileWatchingActive = fileProcessingConfig?.value === 'true';
+        
+        // Calcular el tamaño de la base de datos SQLite (en porcentaje respecto a 1TB máximo)
+        const getDatabaseSize = async () => {
+          try {
+            // Obtener estadísticas del archivo de la BD (SQLite)
+            const dbPath = process.env.DATABASE_PATH || './aureo_app/datos.sqlite';
+            const stats = await fs.promises.stat(dbPath);
+            const sizeInBytes = stats.size;
+            const sizeInGB = sizeInBytes / (1024 * 1024 * 1024);
+            
+            // Calcular porcentaje relativo a 1TB
+            // 1TB = 1024GB, por lo que el porcentaje sería (tamaño en GB / 1024) * 100
+            const percentageOfMaxSize = (sizeInGB / 1024) * 100;
+            
+            // Redondear a 2 decimales
+            return Math.round(percentageOfMaxSize * 100) / 100;
+          } catch (error) {
+            console.error("Error al obtener el tamaño de la base de datos:", error);
+            return 0; // Valor por defecto en caso de error
+          }
+        };
+        
+        const databaseSize = await getDatabaseSize();
+        
+        res.json({
+          totalStores: excelStores.length + pdfStores.length,
+          excelStores: excelStores.length,
+          pdfStores: pdfStores.length,
+          processedToday,
+          pendingFiles,
+          fileWatchingActive,
+          lastSystemCheck: new Date().toISOString(),
+          databaseSize
+        });
+      } catch (err) {
+        next(err);
+      }
+    });
   });
   
   // Database purge routes (SuperAdmin only)
@@ -1984,7 +2066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Alert routes
   app.get("/api/alerts", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+    req.authorizePermission("viewAlerts")(req, res, async () => {
       try {
         const status = typeof req.query.status === 'string' ? req.query.status : undefined;
         const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
@@ -1998,7 +2080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.get("/api/alerts/:id", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+    req.authorizePermission("viewAlerts")(req, res, async () => {
       try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
@@ -2018,7 +2100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.post("/api/alerts", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    req.authorizePermission("createAlerts")(req, res, async () => {
       try {
         // Añadir createdBy al objeto
         const alertData = {
@@ -2035,7 +2117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.patch("/api/alerts/:id/status", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    req.authorizePermission("manageAlerts")(req, res, async () => {
       try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
@@ -2060,7 +2142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.get("/api/alerts/excel/:excelDataId", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+    req.authorizePermission("viewAlerts")(req, res, async () => {
       try {
         const excelDataId = parseInt(req.params.excelDataId);
         if (isNaN(excelDataId)) {

@@ -3296,7 +3296,7 @@ export class DatabaseStorage implements IStorage {
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     try {
       const result = await db
-        .select({ count: count() })
+        .select({ count: sql`count(*)` })
         .from(coincidencias)
         .where(eq(coincidencias.estado, "NoLeido"));
       
