@@ -67,6 +67,7 @@ export interface IStorage {
   getExcelDataByStore(storeCode: string): Promise<ExcelData[]>;
   searchExcelData(query: string, filters?: any): Promise<ExcelData[]>;
   getExcelDataById(id: number): Promise<ExcelData | undefined>;
+  getExcelDataByFileActivityId(fileActivityId: number): Promise<ExcelData[]>;
   deleteExcelDataByActivityId(activityId: number): Promise<boolean>;
   
   // PdfDocument methods
@@ -1052,6 +1053,11 @@ export class MemStorage implements IStorage {
     return this.excelData.get(id);
   }
   
+  async getExcelDataByFileActivityId(fileActivityId: number): Promise<ExcelData[]> {
+    return Array.from(this.excelData.values())
+      .filter(data => data.fileActivityId === fileActivityId);
+  }
+  
   // Watchlist Person methods
   async createWatchlistPerson(person: InsertWatchlistPerson): Promise<WatchlistPerson> {
     const id = this.watchlistPersonId++;
@@ -1685,8 +1691,21 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getFileActivity(id: number): Promise<FileActivity | undefined> {
-    const [activity] = await db.select().from(fileActivities).where(eq(fileActivities.id, id));
-    return activity;
+    try {
+      console.log(`Buscando actividad de archivo con ID ${id}`);
+      const [activity] = await db.select().from(fileActivities).where(eq(fileActivities.id, id));
+      
+      if (activity) {
+        console.log(`Encontrada actividad de archivo: ${JSON.stringify(activity)}`);
+      } else {
+        console.log(`No se encontró actividad de archivo con ID ${id}`);
+      }
+      
+      return activity;
+    } catch (error) {
+      console.error(`Error al obtener actividad de archivo con ID ${id}:`, error);
+      return undefined;
+    }
   }
   
   async updateFileActivityStatus(
@@ -2225,6 +2244,21 @@ export class DatabaseStorage implements IStorage {
       .from(excelData)
       .where(eq(excelData.id, id));
     return data;
+  }
+  
+  async getExcelDataByFileActivityId(fileActivityId: number): Promise<ExcelData[]> {
+    try {
+      console.log(`Buscando datos de Excel para fileActivityId: ${fileActivityId}`);
+      const data = await db
+        .select()
+        .from(excelData)
+        .where(eq(excelData.fileActivityId, fileActivityId));
+      console.log(`Encontrados ${data.length} registros de Excel.`);
+      return data;
+    } catch (error) {
+      console.error(`Error al obtener datos de Excel por fileActivityId ${fileActivityId}:`, error);
+      return [];
+    }
   }
   
   // Implementación de métodos para señalamientos de personas
@@ -3334,10 +3368,10 @@ export class DatabaseStorage implements IStorage {
       
       console.log(`Comparando con ${personas.length} señalamientos de personas y ${objetos.length} señalamientos de objetos`);
       if (personas.length > 0) {
-        console.log(`Muestra de datos de personas: ${JSON.stringify(personas[0])}`);
+        console.log(`Muestra de datos de personas: ${JSON.stringify(personas)}`);
       }
       if (objetos.length > 0) {
-        console.log(`Muestra de datos de objetos: ${JSON.stringify(objetos[0])}`);
+        console.log(`Muestra de datos de objetos: ${JSON.stringify(objetos)}`);
       }
       
       // 3. Buscar coincidencias con personas (por nombre o documento)
@@ -3360,8 +3394,8 @@ export class DatabaseStorage implements IStorage {
           
           console.log(`Puntuación para ${persona.nombre}: ${puntuacion}`);
           
-          // Umbral más bajo: 50% en lugar de 70%
-          if (puntuacion >= 50) {
+          // Umbral más bajo: 40% en lugar de 50%
+          if (puntuacion >= 40) {
             // Determinar tipo de coincidencia
             let tipoMatch = "Baja";
             if (puntuacion >= 95) {
@@ -3385,6 +3419,7 @@ export class DatabaseStorage implements IStorage {
                 estado: "NoLeido"
               });
               console.log(`Coincidencia de PERSONA detectada: ${persona.nombre} con ${excelData.customerName}, puntuación: ${puntuacion}, tipo: ${tipoMatch}`);
+              nuevasCoincidencias++;
             } catch (err) {
               console.error(`Error al crear coincidencia de persona: `, err);
             }
@@ -3410,8 +3445,8 @@ export class DatabaseStorage implements IStorage {
             
             console.log(`Puntuación para grabación ${objeto.grabacion}: ${puntuacion}`);
             
-            // Umbral más bajo: 50% en lugar de 70%
-            if (puntuacion >= 50) {
+            // Umbral más bajo: 40% en lugar de 50%
+            if (puntuacion >= 40) {
               // Determinar tipo de coincidencia
               let tipoMatch = "Baja";
               if (puntuacion >= 95) {
@@ -3435,6 +3470,7 @@ export class DatabaseStorage implements IStorage {
                   estado: "NoLeido"
                 });
                 console.log(`Coincidencia de OBJETO por grabación detectada: ${objeto.grabacion} con ${excelData.engravings}, puntuación: ${puntuacion}, tipo: ${tipoMatch}`);
+                nuevasCoincidencias++;
               } catch (err) {
                 console.error(`Error al crear coincidencia de objeto por grabación: `, err);
               }
@@ -3462,31 +3498,61 @@ export class DatabaseStorage implements IStorage {
           
           console.log(`Comparando descripción "${descripcionExcelNorm}" con "${descripcionObjetoNorm}"`);
           
-          // Verificar si la descripción del objeto está contenida en los detalles del Excel
-          // o si los detalles del Excel contienen la descripción del objeto
+          // Verificar si el texto normalizado del objeto está contenido en el texto normalizado del Excel
+          const objetoContenidoEnExcel = descripcionExcelNorm.indexOf(descripcionObjetoNorm) !== -1;
+          
+          // Verificar si el texto normalizado del Excel está contenido en el texto normalizado del objeto
+          const excelContenidoEnObjeto = descripcionObjetoNorm.indexOf(descripcionExcelNorm) !== -1;
+          
+          // Usar una puntuación base calculada con el algoritmo de similitud
           let puntuacion = this.calcularPuntuacionSimilitud(descripcionExcelNorm, descripcionObjetoNorm);
           
-          // Bonificación para coincidencias de palabras clave
-          if (descripcionExcelNorm.includes(descripcionObjetoNorm) || descripcionObjetoNorm.includes(descripcionExcelNorm)) {
-            puntuacion = Math.max(puntuacion, 70); // Asegurar al menos 70% si una contiene a la otra
+          // Imprimir el análisis detallado
+          console.log(`Análisis de contención:
+          - ¿Objeto en Excel?: ${objetoContenidoEnExcel}
+          - ¿Excel en Objeto?: ${excelContenidoEnObjeto}
+          - Puntuación base: ${puntuacion}`);
+          
+          // Si alguno está contenido en el otro, dar una puntuación alta directamente
+          if (objetoContenidoEnExcel || excelContenidoEnObjeto) {
+            puntuacion = Math.max(puntuacion, 80); // Asegurar al menos 80% si uno contiene al otro
+            console.log(`  => Aumentada a ${puntuacion} por contención total`);
           }
           
-          // Comprobar si hay palabras clave que coinciden
+          // Comprobar coincidencias de palabras individuales (más flexible)
           const palabrasExcel = descripcionExcelNorm.split(/\s+/);
           const palabrasObjeto = descripcionObjetoNorm.split(/\s+/);
           
-          // Si alguna palabra de longitud > 3 coincide exactamente, aumentar la puntuación
+          // Imprimir las palabras que se comparan
+          console.log(`Palabras Excel: ${JSON.stringify(palabrasExcel)}`);
+          console.log(`Palabras Objeto: ${JSON.stringify(palabrasObjeto)}`);
+          
+          // Si alguna palabra significativa coincide, aumentar la puntuación
+          let palabrasCoincidentes = 0;
           for (const palabraExcel of palabrasExcel) {
-            if (palabraExcel.length > 3 && palabrasObjeto.includes(palabraExcel)) {
-              puntuacion = Math.max(puntuacion, 65); // Asegurar al menos 65% si hay palabras clave coincidentes
-              break;
+            if (palabraExcel.length > 2 && palabrasObjeto.includes(palabraExcel)) {
+              palabrasCoincidentes++;
+              console.log(`  * Palabra coincidente: "${palabraExcel}"`);
             }
           }
           
-          console.log(`Puntuación para descripción ${objeto.descripcion}: ${puntuacion}`);
+          // Si hay palabras coincidentes, aumentar proporcionalmente la puntuación
+          if (palabrasCoincidentes > 0) {
+            // Calculamos un aumento basado en el porcentaje de palabras coincidentes
+            // con respecto al total de palabras en la descripción más corta
+            const porcentajeCoincidencia = palabrasCoincidentes / Math.min(palabrasExcel.length, palabrasObjeto.length);
+            const aumento = Math.min(30, porcentajeCoincidencia * 60); // Máximo aumento de 30 puntos
+            
+            const puntuacionAntesAumento = puntuacion;
+            puntuacion = Math.max(puntuacion, 40 + aumento); // Base de 40% + aumento proporcional
+            
+            console.log(`  => Puntuación aumentada de ${puntuacionAntesAumento} a ${puntuacion} (${palabrasCoincidentes} palabras coincidentes)`);
+          }
           
-          // Umbral más bajo: 50% en lugar de 70%
-          if (puntuacion >= 50) {
+          console.log(`Puntuación final para descripción ${objeto.descripcion}: ${puntuacion}`);
+          
+          // Umbral más bajo: 40% en lugar de 50%
+          if (puntuacion >= 40) {
             // Determinar tipo de coincidencia
             let tipoMatch = "Baja";
             if (puntuacion >= 95) {
@@ -3509,25 +3575,58 @@ export class DatabaseStorage implements IStorage {
                 valorCoincidente: excelData.itemDetails,
                 estado: "NoLeido"
               });
-              console.log(`Coincidencia de OBJETO por descripción detectada: ${objeto.descripcion} con ${excelData.itemDetails}, puntuación: ${puntuacion}, tipo: ${tipoMatch}`);
+              console.log(`ÉXITO: Coincidencia de OBJETO por descripción detectada: ${objeto.descripcion} con ${excelData.itemDetails}, puntuación: ${puntuacion}, tipo: ${tipoMatch}`);
+              nuevasCoincidencias++;
             } catch (err) {
               console.error(`Error al crear coincidencia de objeto por descripción: `, err);
             }
+          } else {
+            console.log(`No alcanza el umbral mínimo de 40% para crear coincidencia`);
           }
         }
       } else {
         console.log(`No hay descripción del objeto para comparar`);
       }
       
-      // Contar cuántas coincidencias nuevas se encontraron
-      const coincidenciasActuales = await this.getCoincidenciasByExcelDataId(excelDataId);
-      nuevasCoincidencias = coincidenciasActuales.length;
-      console.log(`Se encontraron ${nuevasCoincidencias} coincidencias para el registro ${excelDataId}`);
+      console.log(`Se encontraron ${nuevasCoincidencias} coincidencias nuevas para el registro ${excelDataId}`);
       
       return { nuevasCoincidencias };
     } catch (error) {
       console.error(`Error al detectar coincidencias para excelDataId ${excelDataId}:`, error);
       return { nuevasCoincidencias: 0 };
+    }
+  }
+  
+  // Nuevo método para procesar todos los registros de un archivo de Excel y detectar coincidencias
+  async detectarCoincidenciasExcelFile(fileActivityId: number): Promise<{ totalCoincidencias: number }> {
+    try {
+      console.log(`Iniciando detección de coincidencias para todos los registros del archivo con ID ${fileActivityId}`);
+      
+      // Obtener todos los registros de Excel asociados a este archivo
+      const excelRecords = await this.getExcelDataByFileActivityId(fileActivityId);
+      
+      if (!excelRecords || excelRecords.length === 0) {
+        console.log(`No se encontraron registros de Excel para el archivo con ID ${fileActivityId}`);
+        return { totalCoincidencias: 0 };
+      }
+      
+      console.log(`Encontrados ${excelRecords.length} registros de Excel para procesar`);
+      
+      let totalCoincidencias = 0;
+      
+      // Procesar cada registro individualmente
+      for (const record of excelRecords) {
+        console.log(`Procesando registro Excel ID: ${record.id}, ItemDetails: ${record.itemDetails}`);
+        const { nuevasCoincidencias } = await this.detectarCoincidencias(record.id);
+        totalCoincidencias += nuevasCoincidencias;
+      }
+      
+      console.log(`Proceso completo. Se encontraron un total de ${totalCoincidencias} coincidencias en ${excelRecords.length} registros`);
+      
+      return { totalCoincidencias };
+    } catch (error) {
+      console.error(`Error al detectar coincidencias para el archivo ${fileActivityId}:`, error);
+      return { totalCoincidencias: 0 };
     }
   }
   

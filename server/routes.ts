@@ -911,6 +911,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Obtener datos de Excel por ID de actividad de archivo
+  app.get("/api/excel-data/by-activity/:fileActivityId", async (req, res, next) => {
+    try {
+      console.log("Ruta getExcelDataByFileActivityId solicitada con fileActivityId:", req.params.fileActivityId);
+      const fileActivityId = parseInt(req.params.fileActivityId);
+      if (isNaN(fileActivityId)) {
+        console.error("El ID de actividad de archivo no es un número válido:", req.params.fileActivityId);
+        return res.status(400).json({ message: "El ID de actividad de archivo debe ser un número" });
+      }
+      
+      // Vamos a verificar primero que esta actividad de archivo existe
+      const fileActivity = await storage.getFileActivity(fileActivityId);
+      if (!fileActivity) {
+        console.error(`No se encontró la actividad de archivo con ID ${fileActivityId}`);
+        return res.status(404).json({ message: "Actividad de archivo no encontrada" });
+      }
+      
+      console.log(`Actividad de archivo encontrada: ${fileActivity.id}, tipo: ${fileActivity.fileType}`);
+      
+      const data = await storage.getExcelDataByFileActivityId(fileActivityId);
+      console.log(`Datos de Excel recuperados: ${data.length} registros`);
+      res.json(data);
+    } catch (err) {
+      console.error("Error al obtener datos de Excel por fileActivityId:", err);
+      next(err);
+    }
+  });
+  
   // Excel advanced search route for Purchase Control
   app.post("/api/search/excel-data/advanced", async (req, res, next) => {
     try {

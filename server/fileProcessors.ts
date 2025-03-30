@@ -698,14 +698,16 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       }
     }
     
-    // Guardar todos los datos extraídos y verificar coincidencias con la lista de vigilancia
+    // Guardar todos los datos extraídos
     for (const row of processedRows) {
       // Guardar los datos de Excel
       const savedData = await storage.createExcelData(row);
-      
-      // Verificar coincidencias con la lista de vigilancia
-      await checkWatchlistMatches(savedData);
     }
+    
+    // Procesar todas las coincidencias usando el nuevo algoritmo mejorado
+    console.log(`Procesando coincidencias para todos los registros del archivo con ID ${activityId}...`);
+    const { totalCoincidencias } = await storage.detectarCoincidenciasExcelFile(activityId);
+    console.log(`Se encontraron ${totalCoincidencias} coincidencias en total`);
     
     // Mover el archivo a la carpeta "procesados"
     try {
