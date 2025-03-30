@@ -106,6 +106,10 @@ export interface IStorage {
   // Serán reimplementados en el futuro
   // Stub para mantener compatibilidad con llamadas existentes
   detectarCoincidencias(excelDataId: number): Promise<{ nuevasCoincidencias: number }>;
+  
+  // File activity reporting methods
+  getPendingStoreAssignmentActivities(): Promise<FileActivity[]>;
+  getRecentFileActivities(limit?: number): Promise<FileActivity[]>;
 
   // Database cleaning methods
   purgeExcelStores(): Promise<{ count: number }>;
@@ -389,6 +393,16 @@ export class MemStorage implements IStorage {
         const dateB = new Date(b.processingDate).getTime();
         return dateB - dateA; // Sort in descending order (newest first)
       });
+  }
+  
+  async getRecentFileActivities(limit: number = 10): Promise<FileActivity[]> {
+    return Array.from(this.fileActivities.values())
+      .sort((a, b) => {
+        const dateA = new Date(a.processingDate).getTime();
+        const dateB = new Date(b.processingDate).getTime();
+        return dateB - dateA; // Sort in descending order (newest first)
+      })
+      .slice(0, limit);
   }
   
   // ExcelData methods
