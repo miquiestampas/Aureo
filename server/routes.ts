@@ -2165,30 +2165,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/senalamiento/personas", (req, res, next) => {
     req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
-        // Simular creación exitosa
-        console.log("Endpoint de creación de señalamientos temporalmente simplificado");
-        res.status(201).json({ 
-          id: 1, 
-          nombre: req.body.nombre || "",
-          documentoId: req.body.documentoId || "",
-          estado: "Activo",
-          mensaje: "Funcionalidad en mantenimiento" 
-        });
+        const data = req.body;
         
-        // La siguiente sección está comentada porque ya devolvimos una respuesta arriba
-        // Mantenerla como referencia para futuras implementaciones
-        /*
+        // Validar que al menos uno de los campos tenga información
+        if (!data.nombre && !data.documentoId && !data.notas) {
+          return res.status(400).json({ error: "Debe proporcionar al menos un nombre, documento de identidad o notas" });
+        }
+        
         // Agregar ID del usuario creador
         const senalPersona: InsertSenalPersona = {
           ...data,
           // Si el nombre es una cadena vacía, establecerlo como null para la base de datos
           nombre: data.nombre || null,
+          documentoId: data.documentoId || null,
           creadoPor: req.user!.id
         };
         
+        console.log("Creando señalamiento de persona:", senalPersona);
         const nuevaPersona = await storage.createSenalPersona(senalPersona);
+        console.log("Señalamiento de persona creado:", nuevaPersona);
         res.status(201).json(nuevaPersona);
-        */
       } catch (error) {
         console.error("Error al crear señalamiento de persona:", error);
         next(error);
@@ -2199,16 +2195,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/senalamiento/personas/:id", (req, res, next) => {
     req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
-        console.log("Endpoint de detalles de señalamiento temporalmente simplificado");
-        // Devolver un señalamiento ficticio
-        res.json({ 
-          id: parseInt(req.params.id), 
-          nombre: "Señalamiento temporal",
-          documentoId: "ID12345",
-          estado: "Activo",
-          creadoPor: 1,
-          mensaje: "Funcionalidad en mantenimiento" 
-        });
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const persona = await storage.getSenalPersona(id);
+        if (!persona) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        res.json(persona);
       } catch (error) {
         console.error(`Error al obtener señalamiento de persona con ID ${req.params.id}:`, error);
         next(error);
@@ -2219,17 +2216,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/senalamiento/personas/:id", (req, res, next) => {
     req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
-        console.log("Endpoint de actualización de señalamiento temporalmente simplificado");
-        // Simular actualización exitosa
-        res.json({ 
-          id: parseInt(req.params.id), 
-          nombre: req.body.nombre || "Señalamiento actualizado",
-          documentoId: req.body.documentoId || "ID12345",
-          estado: "Activo",
-          creadoPor: 1,
-          modificadoPor: req.user?.id || 1,
-          mensaje: "Funcionalidad en mantenimiento" 
-        });
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const data = req.body;
+        
+        // Validar que al menos uno de los campos tenga información
+        if (!data.nombre && !data.documentoId && !data.notas) {
+          return res.status(400).json({ error: "Debe proporcionar al menos un nombre, documento de identidad o notas" });
+        }
+        
+        // Obtener la persona existente
+        const existingPersona = await storage.getSenalPersona(id);
+        if (!existingPersona) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        // Preparar los datos para la actualización
+        const updateData: Partial<SenalPersona> = {
+          ...data,
+          // Si el nombre es una cadena vacía, establecerlo como null para la base de datos
+          nombre: data.nombre || null,
+          documentoId: data.documentoId || null,
+          modificadoPor: req.user!.id
+        };
+        
+        const personaActualizada = await storage.updateSenalPersona(id, updateData);
+        res.json(personaActualizada);
       } catch (error) {
         console.error(`Error al actualizar señalamiento de persona con ID ${req.params.id}:`, error);
         next(error);
@@ -2240,12 +2255,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/senalamiento/personas/:id", (req, res, next) => {
     req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
-        console.log("Endpoint de eliminación de señalamiento temporalmente simplificado");
-        // Simular eliminación exitosa
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const deleted = await storage.deleteSenalPersona(id, req.user!.id);
+        if (!deleted) {
+          return res.status(404).json({ error: "Señalamiento no encontrado o no se pudo eliminar" });
+        }
+        
         res.json({ 
           success: true, 
           message: "Señalamiento eliminado correctamente",
-          id: parseInt(req.params.id)
+          id: id
         });
       } catch (error) {
         console.error(`Error al eliminar señalamiento de persona con ID ${req.params.id}:`, error);
@@ -2398,8 +2421,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "ID inválido" });
         }
         
-        console.log(`Endpoint de actualización de señalamiento de objeto simplificado (id=${id})`);
-        
         const data = req.body;
         
         // Validar que al menos uno de los campos tenga información
@@ -2407,19 +2428,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "Debe proporcionar al menos una descripción, grabación o notas" });
         }
         
-        // Simular objeto actualizado
-        const objetoActualizado = {
-          id: id,
-          descripcion: data.descripcion || "Descripción actualizada",
-          grabacion: data.grabacion || "SN987654321",
-          notas: data.notas || "Notas actualizadas",
-          estado: data.estado || "Activo",
-          creadoPor: 1,
-          creadoEn: new Date(Date.now() - 24*60*60*1000).toISOString(),
-          modificadoPor: req.user!.id,
-          modificadoEn: new Date().toISOString()
+        // Obtener el objeto existente
+        const existingObjeto = await storage.getSenalObjeto(id);
+        if (!existingObjeto) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        // Preparar los datos para la actualización
+        const updateData: Partial<SenalObjeto> = {
+          ...data,
+          // Si la descripción es una cadena vacía, establecerla como null para la base de datos
+          descripcion: data.descripcion || null,
+          grabacion: data.grabacion || null,
+          modificadoPor: req.user!.id
         };
         
+        const objetoActualizado = await storage.updateSenalObjeto(id, updateData);
         res.json(objetoActualizado);
       } catch (error) {
         console.error(`Error al actualizar señalamiento de objeto con ID ${req.params.id}:`, error);
@@ -2436,17 +2460,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "ID inválido" });
         }
         
-        /* La implementación original está comentada mientras arreglamos el problema estructural
         const deleted = await storage.deleteSenalObjeto(id, req.user!.id);
         if (!deleted) {
           return res.status(404).json({ error: "Señalamiento no encontrado o no se pudo eliminar" });
         }
-        */
         
-        console.log(`Endpoint de eliminación de señalamiento de objeto simplificado (id=${id})`);
-        
-        // Simular eliminación exitosa
-        res.json({ success: true, message: "Señalamiento eliminado correctamente" });
+        res.json({ 
+          success: true, 
+          message: "Señalamiento eliminado correctamente",
+          id: id
+        });
       } catch (error) {
         console.error(`Error al eliminar señalamiento de objeto con ID ${req.params.id}:`, error);
         next(error);
@@ -2457,28 +2480,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/senalamiento/objetos/buscar/:query", (req, res, next) => {
     req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
-        console.log("Endpoint de búsqueda de objetos temporalmente simplificado");
-        // Simular resultados de búsqueda
-        res.json([
-          { 
-            id: 1, 
-            descripcion: "Objeto de prueba 1", 
-            grabacion: "AX123456", 
-            estado: "Activo",
-            creadoPor: 1,
-            creadoEn: new Date().toISOString(),
-            notas: "Este es un objeto de ejemplo generado para pruebas" 
-          },
-          { 
-            id: 2, 
-            descripcion: "Objeto de prueba 2", 
-            grabacion: "BC987654", 
-            estado: "Activo",
-            creadoPor: 1,
-            creadoEn: new Date().toISOString(),
-            notas: "Este es un objeto de ejemplo generado para pruebas" 
-          }
-        ]);
+        const query = req.params.query.trim();
+        
+        if (!query || query.length < 2) {
+          return res.status(400).json({ error: "La consulta de búsqueda debe tener al menos 2 caracteres" });
+        }
+        
+        // Registrar búsqueda en historial
+        const searchEntry: InsertSearchHistory = {
+          userId: req.user!.id,
+          searchType: "SenalObjeto",
+          searchTerms: query,
+          resultCount: 0 // Lo actualizaremos después con el recuento real
+        };
+        
+        // Realizar la búsqueda
+        const results = await storage.searchSenalObjetos(query);
+        
+        // Actualizar el recuento de resultados y guardar la entrada
+        searchEntry.resultCount = results.length;
+        await storage.addSearchHistory(searchEntry);
+        
+        res.json(results);
       } catch (error) {
         console.error(`Error al buscar señalamientos de objetos con query ${req.params.query}:`, error);
         next(error);
@@ -2490,66 +2513,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/coincidencias", (req, res, next) => {
     req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
-        console.log("Endpoint de coincidencias temporalmente simplificado");
-        // Simular coincidencias
-        res.json([
-          {
-            id: 1,
-            estado: "NoLeido",
-            creadoEn: new Date().toISOString(),
-            tipoCoincidencia: "Persona",
-            idSenalPersona: 1,
-            idSenalObjeto: null,
-            idExcelData: 123,
-            puntuacionCoincidencia: 95,
-            textoOriginal: "Juan Carlos Mendez",
-            valorCoincidente: "Juan Carlos Mendez",
-            notasRevision: null,
-            revisadoPor: null,
-            revisadoEn: null,
-            senalPersona: {
-              id: 1,
-              nombre: "Juan Carlos Mendez",
-              documentoId: "ID12345",
-              estado: "Activo"
-            },
-            excelData: {
-              id: 123,
-              storeCode: "TIENDA1",
-              orderNumber: "ORD-001",
-              customerName: "Juan Carlos Mendez",
-              orderDate: "2025-03-10"
-            }
-          },
-          {
-            id: 2,
-            estado: "Leido",
-            creadoEn: new Date(Date.now() - 24*60*60*1000).toISOString(),
-            tipoCoincidencia: "Objeto",
-            idSenalPersona: null,
-            idSenalObjeto: 1,
-            idExcelData: 124,
-            puntuacionCoincidencia: 85,
-            textoOriginal: "Samsung Galaxy S30",
-            valorCoincidente: "Samsung Galaxy S30",
-            notasRevision: "Revisado y confirmado",
-            revisadoPor: 1,
-            revisadoEn: new Date(Date.now() - 12*60*60*1000).toISOString(),
-            senalObjeto: {
-              id: 1,
-              descripcion: "Samsung Galaxy S30",
-              grabacion: "BC123456",
-              estado: "Activo"
-            },
-            excelData: {
-              id: 124,
-              storeCode: "TIENDA2",
-              orderNumber: "ORD-002",
-              itemDetails: "Samsung Galaxy S30",
-              orderDate: "2025-03-12"
-            }
+        // Obtener parámetros de consulta para la paginación y filtrado
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const estado = req.query.estado as string || undefined;
+        const tipo = req.query.tipo as string || undefined;
+        const desde = req.query.desde as string || undefined;
+        const hasta = req.query.hasta as string || undefined;
+        const storeCode = req.query.storeCode as string || undefined;
+        const puntuacionMinima = parseInt(req.query.puntuacionMinima as string) || undefined;
+        
+        // Obtener las coincidencias con los filtros especificados
+        const coincidencias = await storage.getCoincidencias({
+          page,
+          limit,
+          estado: estado as "NoLeido" | "Leido" | "Descartado" | undefined,
+          tipoCoincidencia: tipo,
+          fechaDesde: desde,
+          fechaHasta: hasta,
+          storeCode,
+          puntuacionMinima
+        });
+        
+        // Contar también el total para la paginación
+        const total = await storage.countCoincidencias({
+          estado: estado as "NoLeido" | "Leido" | "Descartado" | undefined,
+          tipoCoincidencia: tipo,
+          fechaDesde: desde,
+          fechaHasta: hasta,
+          storeCode,
+          puntuacionMinima
+        });
+        
+        res.json({
+          coincidencias,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit)
           }
-        ]);
+        });
       } catch (error) {
         console.error("Error al obtener coincidencias:", error);
         next(error);
@@ -2565,36 +2569,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "ID inválido" });
         }
         
-        console.log(`Endpoint de obtención de coincidencia individual simplificado para ID ${id}`);
-        // Simular coincidencia específica
-        const coincidencia = {
-          id: id,
-          estado: "NoLeido",
-          creadoEn: new Date().toISOString(),
-          tipoCoincidencia: "Persona",
-          idSenalPersona: 1,
-          idSenalObjeto: null,
-          idExcelData: 123,
-          puntuacionCoincidencia: 95,
-          textoOriginal: "Juan Carlos Mendez",
-          valorCoincidente: "Juan Carlos Mendez",
-          notasRevision: null,
-          revisadoPor: null,
-          revisadoEn: null,
-          senalPersona: {
-            id: 1,
-            nombre: "Juan Carlos Mendez",
-            documentoId: "ID12345",
-            estado: "Activo"
-          },
-          excelData: {
-            id: 123,
-            storeCode: "TIENDA1",
-            orderNumber: "ORD-001",
-            customerName: "Juan Carlos Mendez",
-            orderDate: "2025-03-10"
-          }
-        };
+        // Obtener la coincidencia con su información relacionada
+        const coincidencia = await storage.getCoincidencia(id);
+        
+        if (!coincidencia) {
+          return res.status(404).json({ error: "Coincidencia no encontrada" });
+        }
         
         res.json(coincidencia);
       } catch (error) {
@@ -2617,37 +2597,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "Estado inválido" });
         }
         
-        console.log(`Endpoint de actualización de estado de coincidencia simplificado (id=${id}, estado=${estado})`);
+        // Obtener la coincidencia antes de actualizarla
+        const coincidencia = await storage.getCoincidencia(id);
+        if (!coincidencia) {
+          return res.status(404).json({ error: "Coincidencia no encontrada" });
+        }
         
-        // Simular coincidencia actualizada
-        const coincidenciaActualizada = {
-          id: id,
-          estado: estado,
-          creadoEn: new Date(Date.now() - 24*60*60*1000).toISOString(),
-          tipoCoincidencia: "Persona",
-          idSenalPersona: 1,
-          idSenalObjeto: null,
-          idExcelData: 123,
-          puntuacionCoincidencia: 95,
-          textoOriginal: "Juan Carlos Mendez",
-          valorCoincidente: "Juan Carlos Mendez",
-          notasRevision: notas || null,
-          revisadoPor: req.user!.id,
-          revisadoEn: new Date().toISOString(),
-          senalPersona: {
-            id: 1,
-            nombre: "Juan Carlos Mendez",
-            documentoId: "ID12345",
-            estado: "Activo"
-          },
-          excelData: {
-            id: 123,
-            storeCode: "TIENDA1",
-            orderNumber: "ORD-001",
-            customerName: "Juan Carlos Mendez",
-            orderDate: "2025-03-10"
-          }
-        };
+        // Actualizar el estado de la coincidencia
+        const coincidenciaActualizada = await storage.updateCoincidenciaEstado(
+          id, 
+          estado as "NoLeido" | "Leido" | "Descartado", 
+          notas || null, 
+          req.user!.id
+        );
+        
+        if (!coincidenciaActualizada) {
+          return res.status(500).json({ error: "Error al actualizar la coincidencia" });
+        }
         
         res.json(coincidenciaActualizada);
       } catch (error) {
@@ -2665,38 +2631,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "ID inválido" });
         }
         
-        console.log(`Endpoint de coincidencias por Excel simplificado para ID ${excelDataId}`);
-        // Simular coincidencias para Excel específico
-        res.json([
-          {
-            id: 1,
-            estado: "NoLeido",
-            creadoEn: new Date().toISOString(),
-            tipoCoincidencia: "Persona",
-            idSenalPersona: 1,
-            idSenalObjeto: null,
-            idExcelData: excelDataId,
-            puntuacionCoincidencia: 95,
-            textoOriginal: "Juan Carlos Mendez",
-            valorCoincidente: "Juan Carlos Mendez",
-            notasRevision: null,
-            revisadoPor: null,
-            revisadoEn: null,
-            senalPersona: {
-              id: 1,
-              nombre: "Juan Carlos Mendez",
-              documentoId: "ID12345",
-              estado: "Activo"
-            },
-            excelData: {
-              id: excelDataId,
-              storeCode: "TIENDA1",
-              orderNumber: "ORD-001",
-              customerName: "Juan Carlos Mendez",
-              orderDate: "2025-03-10"
-            }
-          }
-        ]);
+        // Obtener coincidencias para un Excel específico
+        const coincidencias = await storage.getCoincidenciasByExcelData(excelDataId);
+        
+        if (!coincidencias || coincidencias.length === 0) {
+          // No es un error, simplemente no hay coincidencias
+          return res.json([]);
+        }
+        
+        res.json(coincidencias);
       } catch (error) {
         console.error(`Error al obtener coincidencias para excelDataId ${req.params.excelDataId}:`, error);
         next(error);
@@ -2707,9 +2650,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/coincidencias/noleidas/count", (req, res, next) => {
     req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
-        console.log("Endpoint de conteo de coincidencias no leídas simplificado");
-        // Simular un conteo de coincidencias no leídas
-        res.json({ count: 0 });
+        // Simplificado para usar los parámetros filtros básicos
+        const count = await storage.countCoincidencias({
+          estado: "NoLeido"
+        });
+        console.log(`Coincidencias no leídas: ${count}`);
+        res.json({ count });
       } catch (error) {
         console.error("Error al obtener número de coincidencias no leídas:", error);
         next(error);
@@ -2726,10 +2672,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "ID inválido" });
         }
         
-        console.log(`Endpoint de detección de coincidencias simplificado para ID ${excelDataId}`);
-        // Simulación de detección de coincidencias
+        // Obtener los datos del Excel
+        const excelData = await storage.getExcelData(excelDataId);
+        if (!excelData) {
+          return res.status(404).json({ error: "Datos de Excel no encontrados" });
+        }
         
-        res.json({ success: true, message: "Detección de coincidencias ejecutada correctamente" });
+        // Comprobar si hay coincidencias con personas o objetos señalados
+        try {
+          const resultado = await storage.detectarCoincidencias(excelData);
+          
+          return res.json({
+            success: true,
+            message: "Detección de coincidencias ejecutada correctamente",
+            resultado
+          });
+        } catch (err) {
+          console.error("Error en proceso de detección de coincidencias:", err);
+          return res.status(500).json({ 
+            error: "Error al procesar coincidencias", 
+            details: err instanceof Error ? err.message : String(err) 
+          });
+        }
       } catch (error) {
         console.error(`Error al detectar coincidencias para excelDataId ${req.params.excelDataId}:`, error);
         next(error);
