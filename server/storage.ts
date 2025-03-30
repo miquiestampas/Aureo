@@ -2865,7 +2865,7 @@ export class DatabaseStorage implements IStorage {
         params.push(status);
       }
       
-      sql += ` ORDER BY createdat DESC LIMIT $${params.length + 1}`;
+      sql += ` ORDER BY created_at DESC LIMIT $${params.length + 1}`;
       params.push(limit);
       
       // Ejecutar la consulta SQL directa con sqlite
@@ -2914,18 +2914,19 @@ export class DatabaseStorage implements IStorage {
   async getAlertsByExcelDataId(excelDataId: number): Promise<Alert[]> {
     try {
       // Usar SQL directo para evitar problemas de nomenclatura
-      const result = await db.execute(
-        `SELECT * FROM "alerts" WHERE "excel_data_id" = $1 ORDER BY "createdat" DESC`,
-        [excelDataId]
+      const stmt = sqlite.prepare(
+        `SELECT * FROM alerts WHERE excel_data_id = ? ORDER BY created_at DESC`
       );
       
-      // Transformar el resultado en un array de Alert
-      if (result && result.rows && Array.isArray(result.rows)) {
-        return result.rows.map(row => {
+      const results = stmt.all(excelDataId);
+      
+      // Si hay resultados, transformarlos en un array de Alert
+      if (results && Array.isArray(results)) {
+        return results.map(row => {
           // Mapear los nombres de columnas de la base de datos a los nombres en el código
           return {
             id: row.id,
-            alertType: row.alerttype, // Nota: en la BD es 'alerttype', en el esquema es 'alert_type'
+            alertType: row.alert_type,
             excelDataId: row.excel_data_id,
             watchlistPersonId: row.watchlist_person_id,
             watchlistItemId: row.watchlist_item_id,
@@ -2952,16 +2953,15 @@ export class DatabaseStorage implements IStorage {
     try {
       // Insertar directamente usando SQL para evitar problemas con TypeScript
       const stmt = sqlite.prepare(
-        `INSERT INTO search_history (user_id, search_type, search_terms, search_date, result_count, filters) 
-         VALUES (?, ?, ?, datetime('now'), ?, ?) RETURNING *`
+        `INSERT INTO search_history (user_id, search_type, search_terms, search_date, result_count) 
+         VALUES (?, ?, ?, datetime('now'), ?) RETURNING *`
       );
       
       const result = stmt.get(
         searchHistory.userId, 
         searchHistory.searchType, 
         searchHistory.searchTerms, 
-        searchHistory.resultCount,
-        searchHistory.filters || null
+        searchHistory.resultCount
       );
       
       if (result) {
@@ -3241,13 +3241,60 @@ export class DatabaseStorage implements IStorage {
   // Métodos para gestionar Coincidencias
   async createCoincidencia(coincidencia: InsertCoincidencia): Promise<Coincidencia> {
     try {
-      // No establecemos creadoEn manualmente ya que el esquema tiene defaultNow()
-      const [newCoincidencia] = await db
-        .insert(coincidencias)
-        .values(coincidencia)
-        .returning();
+      // Usar SQLite directamente para evitar problemas con columnas y tipos
+      const now = new Date().toISOString();
       
-      return newCoincidencia;
+      const insertSql = `
+        INSERT INTO coincidencias (
+          tipo_coincidencia, 
+          id_senal_persona, 
+          id_senal_objeto, 
+          id_excel_data, 
+          puntuacion_coincidencia, 
+          tipo_match, 
+          campo_coincidente, 
+          valor_coincidente, 
+          estado, 
+          creado_en
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING *
+      `;
+      
+      const stmt = sqlite.prepare(insertSql);
+      const result = stmt.get(
+        coincidencia.tipoCoincidencia,
+        coincidencia.idSenalPersona || null,
+        coincidencia.idSenalObjeto || null,
+        coincidencia.idExcelData,
+        coincidencia.puntuacionCoincidencia,
+        coincidencia.tipoMatch,
+        coincidencia.campoCoincidente,
+        coincidencia.valorCoincidente,
+        coincidencia.estado,
+        now
+      );
+      
+      if (result) {
+        // Mapear los nombres de columnas del resultado a los nombres en el esquema
+        return {
+          id: result.id,
+          estado: result.estado,
+          creadoEn: result.creado_en,
+          tipoCoincidencia: result.tipo_coincidencia,
+          idSenalPersona: result.id_senal_persona,
+          idSenalObjeto: result.id_senal_objeto,
+          idExcelData: result.id_excel_data,
+          puntuacionCoincidencia: result.puntuacion_coincidencia,
+          tipoMatch: result.tipo_match,
+          campoCoincidente: result.campo_coincidente,
+          valorCoincidente: result.valor_coincidente,
+          revisadoPor: result.revisado_por,
+          revisadoEn: result.revisado_en,
+          notasRevision: result.notas_revision
+        } as Coincidencia;
+      }
+      
+      throw new Error("No se pudo crear la coincidencia");
     } catch (error) {
       console.error("Error al crear coincidencia:", error);
       throw error;
@@ -3256,17 +3303,48 @@ export class DatabaseStorage implements IStorage {
   
   async getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit: number = 50): Promise<Coincidencia[]> {
     try {
-      let query = db.select().from(coincidencias);
+      // Construir la consulta SQL directamente
+      let sql = `
+        SELECT * FROM coincidencias
+        ${estado ? `WHERE estado = ?` : ''}
+        ORDER BY creado_en DESC
+        LIMIT ?
+      `;
       
+      // Preparar la consulta
+      const stmt = sqlite.prepare(sql);
+      
+      // Ejecutar la consulta con los parámetros apropiados
+      let rows;
       if (estado) {
-        query = query.where(eq(coincidencias.estado, estado));
+        rows = stmt.all(estado, limit);
+      } else {
+        rows = stmt.all(limit);
       }
       
-      const resultados = await query
-        .orderBy(desc(coincidencias.creadoEn))
-        .limit(limit);
+      // Transformar los resultados a la estructura esperada
+      if (rows && Array.isArray(rows)) {
+        return rows.map(row => {
+          return {
+            id: row.id,
+            estado: row.estado,
+            creadoEn: row.creado_en,
+            tipoCoincidencia: row.tipo_coincidencia,
+            idSenalPersona: row.id_senal_persona,
+            idSenalObjeto: row.id_senal_objeto,
+            idExcelData: row.id_excel_data,
+            puntuacionCoincidencia: row.puntuacion_coincidencia,
+            tipoMatch: row.tipo_match,
+            campoCoincidente: row.campo_coincidente,
+            valorCoincidente: row.valor_coincidente,
+            revisadoPor: row.revisado_por,
+            revisadoEn: row.revisado_en,
+            notasRevision: row.notas_revision
+          } as Coincidencia;
+        });
+      }
       
-      return resultados;
+      return [];
     } catch (error) {
       console.error("Error al obtener coincidencias:", error);
       return [];
@@ -3275,12 +3353,36 @@ export class DatabaseStorage implements IStorage {
   
   async getCoincidencia(id: number): Promise<Coincidencia | undefined> {
     try {
-      const [coincidencia] = await db
-        .select()
-        .from(coincidencias)
-        .where(eq(coincidencias.id, id));
+      // Usar SQLite directamente
+      const sql = `
+        SELECT * FROM coincidencias
+        WHERE id = ?
+      `;
       
-      return coincidencia;
+      const stmt = sqlite.prepare(sql);
+      const row = stmt.get(id);
+      
+      if (row) {
+        // Mapear los nombres de columnas del resultado a los nombres en el esquema
+        return {
+          id: row.id,
+          estado: row.estado,
+          creadoEn: row.creado_en,
+          tipoCoincidencia: row.tipo_coincidencia,
+          idSenalPersona: row.id_senal_persona,
+          idSenalObjeto: row.id_senal_objeto,
+          idExcelData: row.id_excel_data,
+          puntuacionCoincidencia: row.puntuacion_coincidencia,
+          tipoMatch: row.tipo_match,
+          campoCoincidente: row.campo_coincidente,
+          valorCoincidente: row.valor_coincidente,
+          revisadoPor: row.revisado_por,
+          revisadoEn: row.revisado_en,
+          notasRevision: row.notas_revision
+        } as Coincidencia;
+      }
+      
+      return undefined;
     } catch (error) {
       console.error(`Error al obtener coincidencia con ID ${id}:`, error);
       return undefined;
@@ -3294,23 +3396,43 @@ export class DatabaseStorage implements IStorage {
     notas?: string
   ): Promise<Coincidencia | undefined> {
     try {
-      const updateData: Partial<Coincidencia> = {
-        estado,
-        revisadoPor: userId,
-        revisadoEn: new Date().toISOString() // Convertir a string para SQLite
-      };
+      // Usar SQLite directamente para evitar problemas de conversión de tipos
+      const now = new Date().toISOString();
       
-      if (notas) {
-        updateData.notasRevision = notas;
+      const updateSql = `
+        UPDATE coincidencias 
+        SET estado = ?, 
+            revisado_por = ?, 
+            revisado_en = ?, 
+            notas_revision = ? 
+        WHERE id = ? 
+        RETURNING *
+      `;
+      
+      const stmt = sqlite.prepare(updateSql);
+      const result = stmt.get(estado, userId, now, notas || null, id);
+      
+      if (result) {
+        // Mapear los nombres de columnas del resultado a los nombres en el esquema
+        return {
+          id: result.id,
+          estado: result.estado,
+          creadoEn: result.creado_en,
+          tipoCoincidencia: result.tipo_coincidencia,
+          idSenalPersona: result.id_senal_persona,
+          idSenalObjeto: result.id_senal_objeto,
+          idExcelData: result.id_excel_data,
+          puntuacionCoincidencia: result.puntuacion_coincidencia,
+          tipoMatch: result.tipo_match,
+          campoCoincidente: result.campo_coincidente,
+          valorCoincidente: result.valor_coincidente,
+          revisadoPor: result.revisado_por,
+          revisadoEn: result.revisado_en,
+          notasRevision: result.notas_revision
+        } as Coincidencia;
       }
       
-      const [updated] = await db
-        .update(coincidencias)
-        .set(updateData)
-        .where(eq(coincidencias.id, id))
-        .returning();
-      
-      return updated;
+      return undefined;
     } catch (error) {
       console.error(`Error al actualizar estado de coincidencia con ID ${id}:`, error);
       return undefined;
@@ -3319,13 +3441,39 @@ export class DatabaseStorage implements IStorage {
   
   async getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]> {
     try {
-      const resultados = await db
-        .select()
-        .from(coincidencias)
-        .where(eq(coincidencias.idExcelData, excelDataId))
-        .orderBy(desc(coincidencias.creadoEn));
+      // Usar SQLite directamente para evitar problemas con columnas y tipos
+      const sql = `
+        SELECT * FROM coincidencias
+        WHERE id_excel_data = ?
+        ORDER BY creado_en DESC
+      `;
       
-      return resultados;
+      const stmt = sqlite.prepare(sql);
+      const rows = stmt.all(excelDataId);
+      
+      // Transformar los resultados a la estructura esperada
+      if (rows && Array.isArray(rows)) {
+        return rows.map(row => {
+          return {
+            id: row.id,
+            estado: row.estado,
+            creadoEn: row.creado_en,
+            tipoCoincidencia: row.tipo_coincidencia,
+            idSenalPersona: row.id_senal_persona,
+            idSenalObjeto: row.id_senal_objeto,
+            idExcelData: row.id_excel_data,
+            puntuacionCoincidencia: row.puntuacion_coincidencia,
+            tipoMatch: row.tipo_match,
+            campoCoincidente: row.campo_coincidente,
+            valorCoincidente: row.valor_coincidente,
+            revisadoPor: row.revisado_por,
+            revisadoEn: row.revisado_en,
+            notasRevision: row.notas_revision
+          } as Coincidencia;
+        });
+      }
+      
+      return [];
     } catch (error) {
       console.error(`Error al obtener coincidencias para excelDataId ${excelDataId}:`, error);
       return [];
@@ -3334,13 +3482,17 @@ export class DatabaseStorage implements IStorage {
   
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     try {
-      const result = await db
-        .select({ total: sql`COUNT(*)` })
-        .from(coincidencias)
-        .where(eq(coincidencias.estado, "NoLeido"));
+      // Usar SQLite directamente para evitar problemas con columnas
+      const sql = `
+        SELECT COUNT(*) as total FROM coincidencias
+        WHERE estado = 'NoLeido'
+      `;
+      
+      const stmt = sqlite.prepare(sql);
+      const result = stmt.get();
       
       // Convertir explícitamente el resultado a número
-      return Number(result[0]?.total) || 0;
+      return Number(result?.total) || 0;
     } catch (error) {
       console.error("Error al obtener número de coincidencias no leídas:", error);
       return 0;
