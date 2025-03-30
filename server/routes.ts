@@ -2117,12 +2117,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
-  // ===== ENDPOINTS PARA SEÑALAMIENTOS =====
-  // NOTA: Endpoints simplificados temporalmente mientras migramos completamente a SQLite
+  // Los módulos de señalamientos y coincidencias han sido eliminados temporalmente
+  // Estos módulos serán reimplementados en el futuro
   
-  // 1. Endpoints para Señalamientos de Personas
-  app.get("/api/senalamiento/personas", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+  /* Los endpoints de señalamientos y coincidencias han sido eliminados:
+  Rutas señalamientos:
+  - GET /api/senalamiento/personas
+  - GET /api/senalamiento/personas/:id
+  - GET /api/senalamiento/personas/buscar/:query
+  - POST /api/senalamiento/personas
+  - PUT /api/senalamiento/personas/:id
+  - DELETE /api/senalamiento/personas/:id
+  - GET /api/senalamiento/objetos
+  - GET /api/senalamiento/objetos/:id
+  - GET /api/senalamiento/objetos/buscar/:query
+  - POST /api/senalamiento/objetos
+  - PUT /api/senalamiento/objetos/:id
+  - DELETE /api/senalamiento/objetos/:id
+  
+  Rutas coincidencias:
+  - GET /api/coincidencias
+  - GET /api/coincidencias/:id
+  - PUT /api/coincidencias/:id/estado
+  - GET /api/coincidencias/excel/:excelDataId
+  - GET /api/coincidencias/noleidas/count
+  - POST /api/coincidencias/detectar/:excelDataId
+  
+  Las funcionalidades serán reimplementadas en el futuro.
+  */
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         const page = parseInt(req.query.page as string) || 1;
         const pageSize = parseInt(req.query.pageSize as string) || 10;
@@ -2163,7 +2187,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.post("/api/senalamiento/personas", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         const data = req.body;
         
@@ -2193,7 +2218,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.get("/api/senalamiento/personas/:id", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
@@ -2214,7 +2240,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.put("/api/senalamiento/personas/:id", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
@@ -2253,7 +2280,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.delete("/api/senalamiento/personas/:id", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
@@ -2278,7 +2306,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.get("/api/senalamiento/personas/buscar/:query", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         console.log("Endpoint de búsqueda de señalamientos temporalmente simplificado");
         // Simular resultados de búsqueda
@@ -2311,7 +2340,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // 2. Endpoints para Señalamientos de Objetos
   app.get("/api/senalamiento/objetos", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         // Por defecto solo mostrar activos, a menos que se indique lo contrario
         const incluirInactivos = req.query.incluirInactivos === "true";
@@ -2353,7 +2383,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.post("/api/senalamiento/objetos", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         // Simular creación exitosa
         console.log("Endpoint de creación de señalamientos de objetos temporalmente simplificado");
@@ -2393,7 +2424,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.get("/api/senalamiento/objetos/:id", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
@@ -2414,7 +2446,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.put("/api/senalamiento/objetos/:id", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
@@ -2453,7 +2486,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.delete("/api/senalamiento/objetos/:id", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
@@ -2478,7 +2512,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.get("/api/senalamiento/objetos/buscar/:query", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         const query = req.params.query.trim();
         
@@ -2511,7 +2546,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // 3. Endpoints para Coincidencias
   app.get("/api/coincidencias", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         // Obtener parámetros de consulta para la paginación y filtrado
         const page = parseInt(req.query.page as string) || 1;
@@ -2562,7 +2598,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.get("/api/coincidencias/:id", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
@@ -2585,7 +2622,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.put("/api/coincidencias/:id/estado", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
@@ -2624,7 +2662,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.get("/api/coincidencias/excel/:excelDataId", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         const excelDataId = parseInt(req.params.excelDataId);
         if (isNaN(excelDataId)) {
@@ -2648,7 +2687,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.get("/api/coincidencias/noleidas/count", (req, res, next) => {
-    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
         // Simplificado para usar los parámetros filtros básicos
         const count = await storage.countCoincidencias({
@@ -2665,7 +2705,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // 4. Endpoint para detectar coincidencias manualmente (para pruebas)
   app.post("/api/coincidencias/detectar/:excelDataId", (req, res, next) => {
-    req.authorize(["SuperAdmin"])(req, res, async () => {
+    // Las funcionalidades de señalamientos y coincidencias han sido comentadas
+  /* req.authorize(["SuperAdmin"])(req, res, async () => {
       try {
         const excelDataId = parseInt(req.params.excelDataId);
         if (isNaN(excelDataId)) {

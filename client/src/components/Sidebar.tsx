@@ -124,23 +124,7 @@ export default function Sidebar() {
             active={location === '/pdf-listings'}
           />
           
-          <NavItem
-            href="/senalamientos"
-            icon={<AlertTriangle size={20} />}
-            label="Señalamientos"
-            active={location === '/senalamientos'}
-            requiredRoles={["SuperAdmin", "Admin"]}
-            userRole={user?.role}
-          />
-          
-          <NavItem
-            href="/coincidencias"
-            icon={<Bell size={20} />}
-            label="Coincidencias"
-            active={location === '/coincidencias'}
-            requiredRoles={["SuperAdmin", "Admin"]}
-            userRole={user?.role}
-          />
+          {/* Los elementos de navegación para señalamientos y coincidencias han sido eliminados */}
 
           {/* Administración Section */}
           <div className="mt-6 mb-2">
