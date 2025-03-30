@@ -1,7 +1,6 @@
 import { 
   users, stores, systemConfigs, fileActivities, excelData, pdfDocuments,
   watchlistPersons, watchlistItems, alerts, searchHistory,
-  senalPersonas, senalObjetos, coincidencias,
   type User, type InsertUser, type Store, type InsertStore, 
   type SystemConfig, type InsertSystemConfig, type FileActivity, 
   type InsertFileActivity, type ExcelData, type InsertExcelData,
@@ -9,11 +8,8 @@ import {
   type WatchlistPerson, type InsertWatchlistPerson,
   type WatchlistItem, type InsertWatchlistItem,
   type Alert, type InsertAlert,
-  type SearchHistory, type InsertSearchHistory,
-  type SenalPersona, type InsertSenalPersona,
-  type SenalObjeto, type InsertSenalObjeto,
-  type Coincidencia, type InsertCoincidencia
-} from "@shared/schema";
+  type SearchHistory, type InsertSearchHistory
+} from "../shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 // No necesitamos connectPg para SQLite
@@ -106,29 +102,9 @@ export interface IStorage {
   addSearchHistory(searchHistory: InsertSearchHistory): Promise<SearchHistory>;
   getRecentSearches(userId: number, limit?: number): Promise<SearchHistory[]>;
   
-  // Señalamientos de Personas
-  createSenalPersona(persona: InsertSenalPersona): Promise<SenalPersona>;
-  getSenalPersonas(incluirInactivos?: boolean): Promise<SenalPersona[]>;
-  getSenalPersona(id: number): Promise<SenalPersona | undefined>;
-  updateSenalPersona(id: number, persona: Partial<SenalPersona>): Promise<SenalPersona | undefined>;
-  deleteSenalPersona(id: number, userId: number): Promise<boolean>;
-  searchSenalPersonas(query: string): Promise<SenalPersona[]>;
-  
-  // Señalamientos de Objetos
-  createSenalObjeto(objeto: InsertSenalObjeto): Promise<SenalObjeto>;
-  getSenalObjetos(incluirInactivos?: boolean): Promise<SenalObjeto[]>;
-  getSenalObjeto(id: number): Promise<SenalObjeto | undefined>;
-  updateSenalObjeto(id: number, objeto: Partial<SenalObjeto>): Promise<SenalObjeto | undefined>;
-  deleteSenalObjeto(id: number, userId: number): Promise<boolean>;
-  searchSenalObjetos(query: string): Promise<SenalObjeto[]>;
-  
-  // Coincidencias
-  createCoincidencia(coincidencia: InsertCoincidencia): Promise<Coincidencia>;
-  getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit?: number): Promise<Coincidencia[]>;
-  getCoincidencia(id: number): Promise<Coincidencia | undefined>;
-  updateCoincidenciaEstado(id: number, estado: "NoLeido" | "Leido" | "Descartado", revisadoPor: number, notasRevision?: string): Promise<Coincidencia | undefined>;
-  getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]>;
-  getNumeroCoincidenciasNoLeidas(): Promise<number>;
+  // Los módulos de señalamientos y coincidencias han sido eliminados temporalmente
+  // Serán reimplementados en el futuro
+  // Stub para mantener compatibilidad con llamadas existentes
   detectarCoincidencias(excelDataId: number): Promise<{ nuevasCoincidencias: number }>;
 
   // Database cleaning methods
@@ -153,9 +129,10 @@ export class MemStorage implements IStorage {
   private watchlistItems: Map<number, WatchlistItem>;
   private alerts: Map<number, Alert>;
   private searchHistories: Map<number, SearchHistory>;
-  private senalPersonas: Map<number, SenalPersona>;
-  private senalObjetos: Map<number, SenalObjeto>;
-  private coincidencias: Map<number, Coincidencia>;
+  // Las siguientes propiedades han sido eliminadas temporalmente
+  // private senalPersonas: Map<number, any>;
+  // private senalObjetos: Map<number, any>;
+  // private coincidencias: Map<number, any>;
   
   sessionStore: any; // Using any to bypass type issues with express-session
   
@@ -169,9 +146,10 @@ export class MemStorage implements IStorage {
   private watchlistItemId: number;
   private alertId: number;
   private searchHistoryId: number;
-  private senalPersonaId: number;
-  private senalObjetoId: number;
-  private coincidenciaId: number;
+  // Las siguientes propiedades han sido eliminadas temporalmente
+  // private senalPersonaId: number;
+  // private senalObjetoId: number;
+  // private coincidenciaId: number;
 
   constructor() {
     this.users = new Map();
@@ -184,9 +162,10 @@ export class MemStorage implements IStorage {
     this.watchlistItems = new Map();
     this.alerts = new Map();
     this.searchHistories = new Map();
-    this.senalPersonas = new Map();
-    this.senalObjetos = new Map();
-    this.coincidencias = new Map();
+    // Los siguientes mapas han sido eliminados temporalmente
+    // this.senalPersonas = new Map();
+    // this.senalObjetos = new Map();
+    // this.coincidencias = new Map();
     
     this.userId = 1;
     this.storeId = 1;
@@ -198,9 +177,10 @@ export class MemStorage implements IStorage {
     this.watchlistItemId = 1;
     this.alertId = 1;
     this.searchHistoryId = 1;
-    this.senalPersonaId = 1;
-    this.senalObjetoId = 1;
-    this.coincidenciaId = 1;
+    // Los siguientes contadores de IDs han sido eliminados temporalmente
+    // this.senalPersonaId = 1;
+    // this.senalObjetoId = 1;
+    // this.coincidenciaId = 1;
     
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // prune expired entries every 24h
@@ -548,7 +528,8 @@ export class MemStorage implements IStorage {
   
   // Implementación de nuevos métodos para cumplir con la interfaz
   
-  // Métodos para señalamientos de personas
+  // Métodos para señalamientos de personas - TEMPORALMENTE DESACTIVADOS
+  /*
   async createSenalPersona(persona: InsertSenalPersona): Promise<SenalPersona> {
     const id = this.senalPersonaId++;
     const now = new Date();
@@ -633,8 +614,10 @@ export class MemStorage implements IStorage {
       );
     });
   }
+  */
   
-  // Métodos para señalamientos de objetos
+  // Métodos para señalamientos de objetos - TEMPORALMENTE DESACTIVADOS
+  /*
   async createSenalObjeto(objeto: InsertSenalObjeto): Promise<SenalObjeto> {
     const id = this.senalObjetoId++;
     const now = new Date();
@@ -719,8 +702,10 @@ export class MemStorage implements IStorage {
       );
     });
   }
+  */
   
-  // Métodos para coincidencias
+  // Métodos para coincidencias - TEMPORALMENTE DESACTIVADOS
+  /*
   async createCoincidencia(coincidencia: InsertCoincidencia): Promise<Coincidencia> {
     const id = this.coincidenciaId++;
     const now = new Date();
@@ -807,6 +792,222 @@ export class MemStorage implements IStorage {
     // En una implementación real, aquí iría el algoritmo de similitud
     console.log(`[MemStorage] Detectando coincidencias para excelDataId: ${excelDataId}`);
     return { nuevasCoincidencias: 0 };
+  }
+  */
+  
+  // Implementación temporal de stub para método de detección de coincidencias 
+  // (para evitar errores donde se llame a este método)
+  async detectarCoincidencias(excelDataId: number): Promise<{ nuevasCoincidencias: number }> {
+    console.log(`[MemStorage] Detectando coincidencias para excelDataId: ${excelDataId} - TEMPORALMENTE DESACTIVADO`);
+    return { nuevasCoincidencias: 0 };
+  }
+  
+  // Database cleaning methods
+  async purgeExcelStores(): Promise<{ count: number }> {
+    console.log("[MemStorage] Purging Excel stores");
+    let count = 0;
+    
+    const storesToDelete = Array.from(this.stores.values())
+      .filter(store => store.type === 'Excel');
+    
+    for (const store of storesToDelete) {
+      this.stores.delete(store.id);
+      count++;
+    }
+    
+    return { count };
+  }
+  
+  async purgePdfStores(): Promise<{ count: number }> {
+    console.log("[MemStorage] Purging PDF stores");
+    let count = 0;
+    
+    const storesToDelete = Array.from(this.stores.values())
+      .filter(store => store.type === 'PDF');
+    
+    for (const store of storesToDelete) {
+      this.stores.delete(store.id);
+      count++;
+    }
+    
+    return { count };
+  }
+  
+  async purgeAllStores(): Promise<{ count: number }> {
+    console.log("[MemStorage] Purging all stores");
+    const count = this.stores.size;
+    this.stores.clear();
+    return { count };
+  }
+  
+  async purgeExcelData(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }> {
+    console.log("[MemStorage] Purging Excel data", dateRange);
+    let count = 0;
+    
+    if (!dateRange) {
+      // Sin rango de fechas, purgar todos los datos
+      count = this.excelData.size;
+      this.excelData.clear();
+    } else {
+      const excelRecordsToDelete = Array.from(this.excelData.values()).filter(data => {
+        const orderDate = new Date(data.orderDate).getTime();
+        
+        if (dateRange.from && dateRange.to) {
+          const fromDate = new Date(dateRange.from).getTime();
+          const toDate = new Date(dateRange.to).getTime();
+          return orderDate >= fromDate && orderDate <= toDate;
+        } else if (dateRange.from) {
+          const fromDate = new Date(dateRange.from).getTime();
+          return orderDate >= fromDate;
+        } else if (dateRange.to) {
+          const toDate = new Date(dateRange.to).getTime();
+          return orderDate <= toDate;
+        }
+        
+        return false;
+      });
+      
+      for (const record of excelRecordsToDelete) {
+        this.excelData.delete(record.id);
+        count++;
+      }
+    }
+    
+    return { count };
+  }
+  
+  async purgePdfData(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }> {
+    console.log("[MemStorage] Purging PDF data", dateRange);
+    let count = 0;
+    
+    if (!dateRange) {
+      // Sin rango de fechas, purgar todos los datos
+      count = this.pdfDocuments.size;
+      this.pdfDocuments.clear();
+    } else {
+      const pdfDocsToDelete = Array.from(this.pdfDocuments.values()).filter(doc => {
+        const uploadDate = new Date(doc.uploadDate).getTime();
+        
+        if (dateRange.from && dateRange.to) {
+          const fromDate = new Date(dateRange.from).getTime();
+          const toDate = new Date(dateRange.to).getTime();
+          return uploadDate >= fromDate && uploadDate <= toDate;
+        } else if (dateRange.from) {
+          const fromDate = new Date(dateRange.from).getTime();
+          return uploadDate >= fromDate;
+        } else if (dateRange.to) {
+          const toDate = new Date(dateRange.to).getTime();
+          return uploadDate <= toDate;
+        }
+        
+        return false;
+      });
+      
+      for (const doc of pdfDocsToDelete) {
+        this.pdfDocuments.delete(doc.id);
+        count++;
+      }
+    }
+    
+    return { count };
+  }
+  
+  async purgeFileActivities(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }> {
+    console.log("[MemStorage] Purging file activities", dateRange);
+    let count = 0;
+    
+    if (!dateRange) {
+      // Sin rango de fechas, purgar todas las actividades
+      count = this.fileActivities.size;
+      this.fileActivities.clear();
+    } else {
+      const activitiesToDelete = Array.from(this.fileActivities.values()).filter(activity => {
+        const processingDate = new Date(activity.processingDate).getTime();
+        
+        if (dateRange.from && dateRange.to) {
+          const fromDate = new Date(dateRange.from).getTime();
+          const toDate = new Date(dateRange.to).getTime();
+          return processingDate >= fromDate && processingDate <= toDate;
+        } else if (dateRange.from) {
+          const fromDate = new Date(dateRange.from).getTime();
+          return processingDate >= fromDate;
+        } else if (dateRange.to) {
+          const toDate = new Date(dateRange.to).getTime();
+          return processingDate <= toDate;
+        }
+        
+        return false;
+      });
+      
+      for (const activity of activitiesToDelete) {
+        this.fileActivities.delete(activity.id);
+        count++;
+      }
+    }
+    
+    return { count };
+  }
+  
+  async purgeAllData(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }> {
+    console.log("[MemStorage] Purging all data", dateRange);
+    
+    const excelResult = await this.purgeExcelData(dateRange);
+    const pdfResult = await this.purgePdfData(dateRange);
+    const activitiesResult = await this.purgeFileActivities(dateRange);
+    
+    const count = excelResult.count + pdfResult.count + activitiesResult.count;
+    
+    return { count };
+  }
+  
+  async purgeEntireDatabase(): Promise<{ tablesAffected: number }> {
+    console.log("[MemStorage] Purging entire database");
+    
+    // No eliminar los usuarios para mantener acceso al sistema
+    // this.users.clear();
+    
+    this.stores.clear();
+    this.systemConfigs.clear();
+    this.fileActivities.clear();
+    this.excelData.clear();
+    this.pdfDocuments.clear();
+    this.watchlistPersons.clear();
+    this.watchlistItems.clear();
+    this.alerts.clear();
+    this.searchHistories.clear();
+    
+    // Reiniciar los contadores
+    this.storeId = 1;
+    this.configId = 1;
+    this.activityId = 1;
+    this.excelDataId = 1;
+    this.pdfDocumentId = 1;
+    this.watchlistPersonId = 1;
+    this.watchlistItemId = 1;
+    this.alertId = 1;
+    this.searchHistoryId = 1;
+    
+    // Recrear las configuraciones por defecto
+    this.setConfig({
+      key: "EXCEL_WATCH_DIR",
+      value: "./data/excel",
+      description: "Directory to watch for Excel files"
+    });
+    
+    this.setConfig({
+      key: "PDF_WATCH_DIR",
+      value: "./data/pdf",
+      description: "Directory to watch for PDF files"
+    });
+    
+    this.setConfig({
+      key: "FILE_PROCESSING_ENABLED",
+      value: "true",
+      description: "Enable or disable file processing"
+    });
+    
+    // Número de tablas afectadas (no incluimos users)
+    return { tablesAffected: 9 };
   }
   
   // Excel Data Search and Lookup
