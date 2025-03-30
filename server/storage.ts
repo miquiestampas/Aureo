@@ -18,7 +18,7 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 // No necesitamos connectPg para SQLite
 import { db, sqlite } from "./db";
-import { eq, desc, like, or, and, gte, lte, inArray, sql } from "drizzle-orm";
+import { eq, desc, like, or, and, gte, lte, inArray, sql, count } from "drizzle-orm";
 // SQLite no necesita pool
 
 const MemoryStore = createMemoryStore(session);
@@ -2975,7 +2975,7 @@ export class DatabaseStorage implements IStorage {
   // Métodos para gestionar Señalamientos de Personas
   async createSenalPersona(persona: InsertSenalPersona): Promise<SenalPersona> {
     try {
-      const now = new Date(); // No convertir a string, dejarlo como objeto Date
+      const now = new Date().toISOString(); // Convertir a string para SQLite
       const values = {
         ...persona,
         creadoEn: now
@@ -3091,10 +3091,15 @@ export class DatabaseStorage implements IStorage {
   // Métodos para gestionar Señalamientos de Objetos
   async createSenalObjeto(objeto: InsertSenalObjeto): Promise<SenalObjeto> {
     try {
-      // No establecemos creadoEn manualmente ya que el esquema tiene defaultNow()
+      const now = new Date().toISOString(); // Convertir a string para SQLite
+      const values = {
+        ...objeto,
+        creadoEn: now
+      };
+      
       const [newObjeto] = await db
         .insert(senalObjetos)
-        .values(objeto)
+        .values(values)
         .returning();
       
       return newObjeto;
@@ -3258,7 +3263,7 @@ export class DatabaseStorage implements IStorage {
       const updateData: Partial<Coincidencia> = {
         estado,
         revisadoPor: userId,
-        revisadoEn: new Date() // Usar objeto Date directamente, no convertir a string
+        revisadoEn: new Date().toISOString() // Convertir a string para SQLite
       };
       
       if (notas) {
@@ -3296,11 +3301,12 @@ export class DatabaseStorage implements IStorage {
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     try {
       const result = await db
-        .select({ count: count() })
+        .select({ total: sql`COUNT(*)` })
         .from(coincidencias)
         .where(eq(coincidencias.estado, "NoLeido"));
       
-      return result[0]?.count ?? 0;
+      // Convertir explícitamente el resultado a número
+      return Number(result[0]?.total) || 0;
     } catch (error) {
       console.error("Error al obtener número de coincidencias no leídas:", error);
       return 0;
