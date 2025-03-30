@@ -3348,15 +3348,30 @@ export class DatabaseStorage implements IStorage {
             console.log(`Advertencia: Hay una persona sin nombre en los señalamientos (ID: ${persona.id})`);
             continue;
           }
-          console.log(`Comparando "${excelData.customerName}" con "${persona.nombre}"`);
-          const puntuacion = this.calcularPuntuacionSimilitud(
-            excelData.customerName.toLowerCase(),
-            persona.nombre.toLowerCase()
-          );
+          
+          // Normalizar las cadenas para compararlas
+          const nombreExcelNorm = this.normalizarTexto(excelData.customerName);
+          const nombrePersonaNorm = this.normalizarTexto(persona.nombre);
+          
+          console.log(`Comparando "${nombreExcelNorm}" con "${nombrePersonaNorm}"`);
+          
+          // Calcular puntuación de similitud
+          const puntuacion = this.calcularPuntuacionSimilitud(nombreExcelNorm, nombrePersonaNorm);
           
           console.log(`Puntuación para ${persona.nombre}: ${puntuacion}`);
           
-          if (puntuacion >= 70) { // 70% o más de similitud
+          // Umbral más bajo: 50% en lugar de 70%
+          if (puntuacion >= 50) {
+            // Determinar tipo de coincidencia
+            let tipoMatch = "Baja";
+            if (puntuacion >= 95) {
+              tipoMatch = "Exacta";
+            } else if (puntuacion >= 80) {
+              tipoMatch = "Alta";
+            } else if (puntuacion >= 65) {
+              tipoMatch = "Media";
+            }
+            
             // Crear registro de coincidencia
             try {
               await this.createCoincidencia({
@@ -3364,12 +3379,12 @@ export class DatabaseStorage implements IStorage {
                 idSenalPersona: persona.id,
                 idExcelData: excelData.id,
                 puntuacionCoincidencia: puntuacion,
-                tipoMatch: puntuacion >= 95 ? "Exacto" : "Parcial",
+                tipoMatch: tipoMatch,
                 campoCoincidente: "nombre",
                 valorCoincidente: excelData.customerName,
                 estado: "NoLeido"
               });
-              console.log(`Coincidencia de PERSONA detectada: ${persona.nombre} con ${excelData.customerName}, puntuación: ${puntuacion}`);
+              console.log(`Coincidencia de PERSONA detectada: ${persona.nombre} con ${excelData.customerName}, puntuación: ${puntuacion}, tipo: ${tipoMatch}`);
             } catch (err) {
               console.error(`Error al crear coincidencia de persona: `, err);
             }
@@ -3384,15 +3399,29 @@ export class DatabaseStorage implements IStorage {
         console.log(`Buscando coincidencias para grabación: ${excelData.engravings}`);
         for (const objeto of objetos) {
           if (objeto.grabacion && objeto.grabacion !== '-' && objeto.grabacion.trim() !== '') {
-            console.log(`Comparando grabación "${excelData.engravings}" con "${objeto.grabacion}"`);
-            const puntuacion = this.calcularPuntuacionSimilitud(
-              excelData.engravings.toLowerCase(),
-              objeto.grabacion.toLowerCase()
-            );
+            // Normalizar las cadenas para compararlas
+            const grabacionExcelNorm = this.normalizarTexto(excelData.engravings);
+            const grabacionObjetoNorm = this.normalizarTexto(objeto.grabacion);
+            
+            console.log(`Comparando grabación "${grabacionExcelNorm}" con "${grabacionObjetoNorm}"`);
+            
+            // Calcular puntuación de similitud
+            const puntuacion = this.calcularPuntuacionSimilitud(grabacionExcelNorm, grabacionObjetoNorm);
             
             console.log(`Puntuación para grabación ${objeto.grabacion}: ${puntuacion}`);
             
-            if (puntuacion >= 70) { // 70% o más de similitud
+            // Umbral más bajo: 50% en lugar de 70%
+            if (puntuacion >= 50) {
+              // Determinar tipo de coincidencia
+              let tipoMatch = "Baja";
+              if (puntuacion >= 95) {
+                tipoMatch = "Exacta";
+              } else if (puntuacion >= 80) {
+                tipoMatch = "Alta";
+              } else if (puntuacion >= 65) {
+                tipoMatch = "Media";
+              }
+              
               // Crear registro de coincidencia
               try {
                 await this.createCoincidencia({
@@ -3400,12 +3429,12 @@ export class DatabaseStorage implements IStorage {
                   idSenalObjeto: objeto.id,
                   idExcelData: excelData.id,
                   puntuacionCoincidencia: puntuacion,
-                  tipoMatch: puntuacion >= 95 ? "Exacto" : "Parcial",
+                  tipoMatch: tipoMatch,
                   campoCoincidente: "grabacion",
                   valorCoincidente: excelData.engravings,
                   estado: "NoLeido"
                 });
-                console.log(`Coincidencia de OBJETO por grabación detectada: ${objeto.grabacion} con ${excelData.engravings}, puntuación: ${puntuacion}`);
+                console.log(`Coincidencia de OBJETO por grabación detectada: ${objeto.grabacion} con ${excelData.engravings}, puntuación: ${puntuacion}, tipo: ${tipoMatch}`);
               } catch (err) {
                 console.error(`Error al crear coincidencia de objeto por grabación: `, err);
               }
@@ -3426,15 +3455,48 @@ export class DatabaseStorage implements IStorage {
             console.log(`Advertencia: Hay un objeto sin descripción en los señalamientos (ID: ${objeto.id})`);
             continue;
           }
-          console.log(`Comparando descripción "${excelData.itemDetails}" con "${objeto.descripcion}"`);
-          const puntuacion = this.calcularPuntuacionSimilitud(
-            excelData.itemDetails.toLowerCase(),
-            objeto.descripcion.toLowerCase()
-          );
+          
+          // Normalizar las cadenas para compararlas
+          const descripcionExcelNorm = this.normalizarTexto(excelData.itemDetails);
+          const descripcionObjetoNorm = this.normalizarTexto(objeto.descripcion);
+          
+          console.log(`Comparando descripción "${descripcionExcelNorm}" con "${descripcionObjetoNorm}"`);
+          
+          // Verificar si la descripción del objeto está contenida en los detalles del Excel
+          // o si los detalles del Excel contienen la descripción del objeto
+          let puntuacion = this.calcularPuntuacionSimilitud(descripcionExcelNorm, descripcionObjetoNorm);
+          
+          // Bonificación para coincidencias de palabras clave
+          if (descripcionExcelNorm.includes(descripcionObjetoNorm) || descripcionObjetoNorm.includes(descripcionExcelNorm)) {
+            puntuacion = Math.max(puntuacion, 70); // Asegurar al menos 70% si una contiene a la otra
+          }
+          
+          // Comprobar si hay palabras clave que coinciden
+          const palabrasExcel = descripcionExcelNorm.split(/\s+/);
+          const palabrasObjeto = descripcionObjetoNorm.split(/\s+/);
+          
+          // Si alguna palabra de longitud > 3 coincide exactamente, aumentar la puntuación
+          for (const palabraExcel of palabrasExcel) {
+            if (palabraExcel.length > 3 && palabrasObjeto.includes(palabraExcel)) {
+              puntuacion = Math.max(puntuacion, 65); // Asegurar al menos 65% si hay palabras clave coincidentes
+              break;
+            }
+          }
           
           console.log(`Puntuación para descripción ${objeto.descripcion}: ${puntuacion}`);
           
-          if (puntuacion >= 70) { // 70% o más de similitud
+          // Umbral más bajo: 50% en lugar de 70%
+          if (puntuacion >= 50) {
+            // Determinar tipo de coincidencia
+            let tipoMatch = "Baja";
+            if (puntuacion >= 95) {
+              tipoMatch = "Exacta";
+            } else if (puntuacion >= 80) {
+              tipoMatch = "Alta";
+            } else if (puntuacion >= 65) {
+              tipoMatch = "Media";
+            }
+            
             // Crear registro de coincidencia
             try {
               await this.createCoincidencia({
@@ -3442,12 +3504,12 @@ export class DatabaseStorage implements IStorage {
                 idSenalObjeto: objeto.id,
                 idExcelData: excelData.id,
                 puntuacionCoincidencia: puntuacion,
-                tipoMatch: puntuacion >= 95 ? "Exacto" : "Parcial",
+                tipoMatch: tipoMatch,
                 campoCoincidente: "descripcion",
                 valorCoincidente: excelData.itemDetails,
                 estado: "NoLeido"
               });
-              console.log(`Coincidencia de OBJETO por descripción detectada: ${objeto.descripcion} con ${excelData.itemDetails}, puntuación: ${puntuacion}`);
+              console.log(`Coincidencia de OBJETO por descripción detectada: ${objeto.descripcion} con ${excelData.itemDetails}, puntuación: ${puntuacion}, tipo: ${tipoMatch}`);
             } catch (err) {
               console.error(`Error al crear coincidencia de objeto por descripción: `, err);
             }
@@ -3471,13 +3533,17 @@ export class DatabaseStorage implements IStorage {
   
   // Función para calcular similitud entre dos cadenas (algoritmo de Levenshtein normalizado)
   private calcularPuntuacionSimilitud(cadena1: string, cadena2: string): number {
-    // Normalizar las cadenas (eliminar espacios extra, acentos, etc.)
-    cadena1 = this.normalizarTexto(cadena1);
-    cadena2 = this.normalizarTexto(cadena2);
-    
     // Verificar si es una coincidencia exacta
     if (cadena1 === cadena2) {
       return 100;
+    }
+    
+    // Si una cadena está contenida en la otra, dar una puntuación alta
+    if (cadena1.includes(cadena2) || cadena2.includes(cadena1)) {
+      const longitudMinima = Math.min(cadena1.length, cadena2.length);
+      const longitudMaxima = Math.max(cadena1.length, cadena2.length);
+      // Dar una puntuación proporcional a la similitud de longitudes
+      return 80 + Math.floor(20 * (longitudMinima / longitudMaxima));
     }
     
     // Calcular distancia de Levenshtein
@@ -3487,20 +3553,38 @@ export class DatabaseStorage implements IStorage {
     const longitudMaxima = Math.max(cadena1.length, cadena2.length);
     if (longitudMaxima === 0) return 100; // Ambas cadenas vacías
     
-    const puntuacion = 100 - Math.round((distancia / longitudMaxima) * 100);
+    // Cálculo básico de puntuación
+    let puntuacion = 100 - Math.round((distancia / longitudMaxima) * 100);
+    
+    // Ajuste para cadenas cortas: si ambas son cortas, es más probable que sean similares por casualidad
+    if (cadena1.length < 5 && cadena2.length < 5) {
+      // Reducir un poco la puntuación para evitar falsos positivos
+      puntuacion = Math.max(puntuacion - 10, 0);
+    }
     
     return puntuacion;
   }
   
   private normalizarTexto(texto: string): string {
-    // Convertir a minúsculas y eliminar espacios extra
-    let resultado = texto.toLowerCase().trim().replace(/\s+/g, ' ');
+    if (!texto) return '';
+    
+    // Convertir a minúsculas
+    let resultado = texto.toLowerCase();
+    
+    // Eliminar números al inicio si son parte de un prefijo como "1 CADENA" -> "CADENA"
+    resultado = resultado.replace(/^\d+\s+/, '');
+    
+    // Eliminar artículos y preposiciones comunes al inicio
+    resultado = resultado.replace(/^(el|la|los|las|un|una|unos|unas|de|del)\s+/gi, '');
     
     // Eliminar acentos
     resultado = resultado.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
-    // Eliminar caracteres especiales
-    resultado = resultado.replace(/[^\w\s]/gi, '');
+    // Reemplazar caracteres especiales por espacios
+    resultado = resultado.replace(/[^\w\s]/gi, ' ');
+    
+    // Eliminar espacios múltiples
+    resultado = resultado.replace(/\s+/g, ' ').trim();
     
     return resultado;
   }

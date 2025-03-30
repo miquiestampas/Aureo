@@ -344,7 +344,7 @@ export const coincidencias = sqliteTable("coincidencias", {
   idSenalObjeto: integer("id_senal_objeto"),
   idExcelData: integer("id_excel_data").notNull(),
   puntuacionCoincidencia: integer("puntuacion_coincidencia").notNull(), // 0-100
-  tipoMatch: text("tipo_match").notNull(), // "Exacto", "Parcial"
+  tipoMatch: text("tipo_match").notNull(), // "Exacta", "Alta", "Media", "Baja"
   campoCoincidente: text("campo_coincidente").notNull(), // nombre, documento, descripcion, grabacion
   valorCoincidente: text("valor_coincidente").notNull(), // El valor que coincidió
   estado: text("estado").notNull().default("NoLeido"), // "NoLeido", "Leido", "Descartado"
