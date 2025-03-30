@@ -3059,9 +3059,12 @@ export class DatabaseStorage implements IStorage {
   
   async updateSenalPersona(id: number, updates: Partial<SenalPersona>): Promise<SenalPersona | undefined> {
     try {
+      // Convertir la fecha a formato ISO string para SQLite
+      const now = new Date().toISOString();
+      
       const updateData = {
         ...updates,
-        modificadoEn: new Date() // No convertir a string, dejarlo como objeto Date
+        modificadoEn: now // Usar string ISO para evitar problemas con SQLite
       };
       
       const [updated] = await db
@@ -3080,12 +3083,15 @@ export class DatabaseStorage implements IStorage {
   async deleteSenalPersona(id: number, userId: number): Promise<boolean> {
     try {
       // En lugar de eliminar, marcamos como inactivo
+      // Convertir la fecha a formato ISO string para SQLite
+      const now = new Date().toISOString();
+      
       const [updated] = await db
         .update(senalPersonas)
         .set({
           estado: "Inactivo",
           modificadoPor: userId,
-          modificadoEn: new Date() // No convertir a string, dejarlo como objeto Date
+          modificadoEn: now // Usar string ISO para evitar problemas con SQLite
         })
         .where(eq(senalPersonas.id, id))
         .returning();
@@ -3175,9 +3181,12 @@ export class DatabaseStorage implements IStorage {
   
   async updateSenalObjeto(id: number, updates: Partial<SenalObjeto>): Promise<SenalObjeto | undefined> {
     try {
+      // Convertir la fecha a formato ISO string para SQLite
+      const now = new Date().toISOString();
+      
       const updateData = {
         ...updates,
-        modificadoEn: new Date() // No convertir a string, dejarlo como objeto Date
+        modificadoEn: now // Usar string ISO para evitar problemas con SQLite
       };
       
       const [updated] = await db
@@ -3196,12 +3205,15 @@ export class DatabaseStorage implements IStorage {
   async deleteSenalObjeto(id: number, userId: number): Promise<boolean> {
     try {
       // En lugar de eliminar, marcamos como inactivo
+      // Convertir la fecha a formato ISO string para SQLite
+      const now = new Date().toISOString();
+      
       const [updated] = await db
         .update(senalObjetos)
         .set({
           estado: "Inactivo",
           modificadoPor: userId,
-          modificadoEn: new Date() // No convertir a string, dejarlo como objeto Date
+          modificadoEn: now // Usar string ISO para evitar problemas con SQLite
         })
         .where(eq(senalObjetos.id, id))
         .returning();
