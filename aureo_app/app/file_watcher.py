@@ -48,7 +48,7 @@ def init_watchers():
     """Inicializa los vigilantes de archivos según la configuración del sistema"""
     try:
         # Verificar si la vigilancia está habilitada
-        config = SystemConfig.query.filter_by(key='FILE_WATCHING_ACTIVE').first()
+        config = SystemConfig.query.filter_by(key='FILE_PROCESSING_ENABLED').first()
         if config and config.value.lower() == 'true':
             # Iniciar en un hilo separado para no bloquear la inicialización de la app
             global watcher_thread

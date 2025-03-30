@@ -1,0 +1,47 @@
+=== GUÍA DE INSTALACIÓN RÁPIDA DE ÁUREO ===
+
+Esta guía le ayudará a instalar y ejecutar Áureo en su computadora local. Áureo es una aplicación para la gestión de compras en tiendas de empeño y está diseñada para ser fácil de instalar y usar.
+
+REQUISITOS PREVIOS:
+- Windows 10 o superior
+- Python 3.9 o superior (preferiblemente 3.11)
+- Conexión a Internet (solo para la instalación)
+
+INSTRUCCIONES DE INSTALACIÓN:
+
+1. INSTALACIÓN DE PYTHON:
+   Si no tiene Python instalado, descárguelo desde https://www.python.org/downloads/
+   * Importante: Durante la instalación, marque la casilla "Add Python to PATH"
+
+2. PASOS DE INSTALACIÓN:
+   a. Descomprima este archivo ZIP en una carpeta de su elección (ej. C:\Aureo)
+   b. Abra una ventana de Símbolo del sistema (cmd) como administrador
+   c. Navegue a la carpeta donde descomprimió los archivos:
+      cd C:\Aureo
+   d. Instale las dependencias necesarias:
+      pip install -r requirements.txt
+   e. Configure la aplicación:
+      python setup.py
+
+3. EJECUCIÓN DE LA APLICACIÓN:
+   a. Para iniciar la aplicación, ejecute:
+      python start.py
+   b. Abra su navegador web y vaya a:
+      http://localhost:5000
+   c. Inicie sesión con:
+      Usuario: 117020
+      Contraseña: admin
+
+4. FUNCIONALIDADES DE DEMOSTRACIÓN:
+   - La aplicación incluye datos de ejemplo para demostración
+   - Puede explorar la sección de coincidencias para ver alertas preconfiguradas
+   - Pruebe la carga de archivos Excel o PDF en Administración > Archivos
+
+5. SOLUCIÓN DE PROBLEMAS:
+   - Si el servidor no arranca, verifique que el puerto 5000 esté disponible
+   - Si tiene problemas con la base de datos, puede reiniciarla con:
+     python reset_admin.py
+
+Para más información o soporte, contacte a su asesor comercial.
+
+© 2025 Áureo - Todos los derechos reservados
