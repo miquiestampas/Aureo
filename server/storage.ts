@@ -2262,25 +2262,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Implementación de métodos para señalamientos de personas
-  async createSenalPersona(persona: InsertSenalPersona): Promise<SenalPersona> {
-    try {
-      const now = new Date();
-      
-      const [nuevaPersona] = await db
-        .insert(senalPersonas)
-        .values({
-          ...persona,
-          creadoEn: now,
-          modificadoEn: null,
-        })
-        .returning();
-        
-      return nuevaPersona;
-    } catch (error) {
-      console.error("Error al crear señalamiento de persona:", error);
-      throw error;
-    }
-  }
+  // Este método ha sido movido a la implementación principal en línea ~3012
   
   async getSenalPersonas(incluirInactivos: boolean = false): Promise<SenalPersona[]> {
     try {
@@ -2410,25 +2392,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Implementación de métodos para señalamientos de objetos
-  async createSenalObjeto(objeto: InsertSenalObjeto): Promise<SenalObjeto> {
-    try {
-      const now = new Date();
-      
-      const [nuevoObjeto] = await db
-        .insert(senalObjetos)
-        .values({
-          ...objeto,
-          creadoEn: now,
-          modificadoEn: null,
-        })
-        .returning();
-        
-      return nuevoObjeto;
-    } catch (error) {
-      console.error("Error al crear señalamiento de objeto:", error);
-      throw error;
-    }
-  }
+  // Este método ha sido movido a la implementación principal en línea ~3092
   
   async getSenalObjetos(incluirInactivos: boolean = false): Promise<SenalObjeto[]> {
     try {
@@ -2495,26 +2459,28 @@ export class DatabaseStorage implements IStorage {
   
   async deleteSenalObjeto(id: number, userId: number): Promise<boolean> {
     try {
-      // Primero verificar si el usuario es el creador
+      // Primero verificar si el objeto existe
       const [objeto] = await db
         .select()
         .from(senalObjetos)
         .where(eq(senalObjetos.id, id));
         
-      if (!objeto || (objeto.creadoPor !== userId)) {
-        // La verificación de rol SuperAdmin se hace en la ruta
+      if (!objeto) {
+        console.log(`Señalamiento de objeto con ID ${id} no encontrado`);
         return false;
       }
       
-      // Eliminar las coincidencias asociadas primero
-      await db
-        .delete(coincidencias)
-        .where(eq(coincidencias.idSenalObjeto, id));
-      
-      // Ahora eliminar el señalamiento
-      const result = await db
-        .delete(senalObjetos)
-        .where(eq(senalObjetos.id, id));
+      // En lugar de eliminar, marcamos como inactivo
+      const [updated] = await db
+        .update(senalObjetos)
+        .set({
+          estado: "Inactivo",
+          modificadoPor: userId,
+          // Convertir a string ISO para evitar problemas con SQLite
+          modificadoEn: new Date().toISOString()
+        })
+        .where(eq(senalObjetos.id, id))
+        .returning();
         
       return true;
     } catch (error) {
@@ -2558,37 +2524,129 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Métodos para coincidencias
-  async createCoincidencia(coincidencia: InsertCoincidencia): Promise<Coincidencia> {
-    try {
-      const now = new Date();
-      
-      const [nuevaCoincidencia] = await db
-        .insert(coincidencias)
-        .values({
-          ...coincidencia,
-          creadoEn: now,
-          revisadoEn: null,
-        })
-        .returning();
-        
-      return nuevaCoincidencia;
-    } catch (error) {
-      console.error("Error al crear coincidencia:", error);
-      throw error;
-    }
-  }
+  // Este método ha sido movido a la implementación principal en línea ~3172
   
-  async getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit: number = 50): Promise<Coincidencia[]> {
+  async getCoincidencias(
+    estadoOrFilters?: "NoLeido" | "Leido" | "Descartado" | {
+      page?: number;
+      limit?: number;
+      estado?: "NoLeido" | "Leido" | "Descartado";
+      tipoCoincidencia?: string;
+      fechaDesde?: string;
+      fechaHasta?: string;
+      storeCode?: string;
+      puntuacionMinima?: number;
+    },
+    limitParam: number = 50
+  ): Promise<Coincidencia[]> {
     try {
       let query = db.select().from(coincidencias);
+      let limit = limitParam;
+      let offset = 0;
+      const conditions: any[] = [];
       
-      if (estado) {
-        query = query.where(eq(coincidencias.estado, estado));
+      // Procesar los argumentos dependiendo de si recibimos un string o un objeto
+      if (typeof estadoOrFilters === 'string') {
+        // Forma antigua: getCoincidencias(estado, limit)
+        conditions.push(eq(coincidencias.estado, estadoOrFilters));
+      } else if (estadoOrFilters && typeof estadoOrFilters === 'object') {
+        // Forma nueva: getCoincidencias({ filters })
+        const filters = estadoOrFilters;
+        
+        // Configurar paginación
+        if (filters.limit) limit = filters.limit;
+        if (filters.page && filters.page > 0) {
+          offset = (filters.page - 1) * limit;
+        }
+        
+        // Filtrar por estado
+        if (filters.estado && filters.estado !== 'all') {
+          conditions.push(eq(coincidencias.estado, filters.estado));
+        }
+        
+        // Filtrar por tipo de coincidencia
+        if (filters.tipoCoincidencia) {
+          conditions.push(eq(coincidencias.tipoCoincidencia, filters.tipoCoincidencia));
+        }
+        
+        // Filtrar por fecha
+        if (filters.fechaDesde) {
+          conditions.push(gte(coincidencias.creadoEn, filters.fechaDesde));
+        }
+        
+        if (filters.fechaHasta) {
+          conditions.push(lte(coincidencias.creadoEn, filters.fechaHasta));
+        }
+        
+        // Filtrar por puntuación
+        if (filters.puntuacionMinima) {
+          conditions.push(gte(coincidencias.puntuacionCoincidencia, filters.puntuacionMinima));
+        }
+        
+        // Si hay código de tienda, necesitamos un join con excel_data
+        if (filters.storeCode) {
+          // En SQLite es más simple usar SQL directo para este caso
+          // Construir la consulta SQL con condiciones
+          let whereClauses = ['e.store_code = ?'];
+          const params: any[] = [filters.storeCode];
+          
+          // Añadir condiciones para estado
+          if (filters.estado && filters.estado !== 'all') {
+            whereClauses.push('c.estado = ?');
+            params.push(filters.estado);
+          }
+          
+          // Añadir condiciones para tipo de coincidencia
+          if (filters.tipoCoincidencia) {
+            whereClauses.push('c.tipo_coincidencia = ?');
+            params.push(filters.tipoCoincidencia);
+          }
+          
+          // Añadir condiciones para fechas
+          if (filters.fechaDesde) {
+            whereClauses.push('c.creado_en >= ?');
+            params.push(filters.fechaDesde);
+          }
+          
+          if (filters.fechaHasta) {
+            whereClauses.push('c.creado_en <= ?');
+            params.push(filters.fechaHasta);
+          }
+          
+          // Añadir condición para puntuación mínima
+          if (filters.puntuacionMinima) {
+            whereClauses.push('c.puntuacion_coincidencia >= ?');
+            params.push(filters.puntuacionMinima);
+          }
+          
+          // Agregar parámetros para paginación
+          params.push(limit, offset);
+          
+          // Preparar la consulta
+          const stmt = sqlite.prepare(`
+            SELECT c.* 
+            FROM coincidencias c
+            JOIN excel_data e ON c.id_excel_data = e.id
+            WHERE ${whereClauses.join(' AND ')}
+            ORDER BY c.creado_en DESC
+            LIMIT ? OFFSET ?
+          `);
+          
+          // Ejecutar la consulta
+          return stmt.all(...params) as Coincidencia[];
+        }
       }
       
+      // Aplicar condiciones si existen
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions));
+      }
+      
+      // Ejecutar la consulta con paginación
       const resultado = await query
         .orderBy(desc(coincidencias.creadoEn))
-        .limit(limit);
+        .limit(limit)
+        .offset(offset);
         
       return resultado;
     } catch (error) {
@@ -3077,25 +3135,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
-  async deleteSenalPersona(id: number, userId: number): Promise<boolean> {
-    try {
-      // En lugar de eliminar, marcamos como inactivo
-      const [updated] = await db
-        .update(senalPersonas)
-        .set({
-          estado: "Inactivo",
-          modificadoPor: userId,
-          modificadoEn: new Date() // No convertir a string, dejarlo como objeto Date
-        })
-        .where(eq(senalPersonas.id, id))
-        .returning();
-      
-      return !!updated;
-    } catch (error) {
-      console.error(`Error al eliminar señalamiento de persona con ID ${id}:`, error);
-      return false;
-    }
-  }
+  // Este método ha sido movido a la implementación principal en línea ~2348
   
   async searchSenalPersonas(query: string): Promise<SenalPersona[]> {
     try {
@@ -3193,25 +3233,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
-  async deleteSenalObjeto(id: number, userId: number): Promise<boolean> {
-    try {
-      // En lugar de eliminar, marcamos como inactivo
-      const [updated] = await db
-        .update(senalObjetos)
-        .set({
-          estado: "Inactivo",
-          modificadoPor: userId,
-          modificadoEn: new Date() // No convertir a string, dejarlo como objeto Date
-        })
-        .where(eq(senalObjetos.id, id))
-        .returning();
-      
-      return !!updated;
-    } catch (error) {
-      console.error(`Error al eliminar señalamiento de objeto con ID ${id}:`, error);
-      return false;
-    }
-  }
+  // Este método ha sido movido a la implementación principal en línea ~2496
   
   async searchSenalObjetos(query: string): Promise<SenalObjeto[]> {
     try {
@@ -3343,6 +3365,97 @@ export class DatabaseStorage implements IStorage {
       return Number(result[0]?.total) || 0;
     } catch (error) {
       console.error("Error al obtener número de coincidencias no leídas:", error);
+      return 0;
+    }
+  }
+  
+  async countCoincidencias(filters: {
+    estado?: "NoLeido" | "Leido" | "Descartado";
+    tipoCoincidencia?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    storeCode?: string;
+    puntuacionMinima?: number;
+  } = {}): Promise<number> {
+    try {
+      console.log(`Contando coincidencias con filtros: ${JSON.stringify(filters)}`);
+      
+      // Si estamos filtrando por storeCode, necesitamos un join con excelData
+      if (filters.storeCode) {
+        try {
+          // Usar SQL directo para el caso con storeCode
+          const stmt = sqlite.prepare(`
+            SELECT COUNT(*) as total 
+            FROM coincidencias c
+            JOIN excel_data e ON c.id_excel_data = e.id
+            WHERE e.store_code = ? 
+            ${filters.estado ? 'AND c.estado = ?' : ''}
+            ${filters.tipoCoincidencia ? 'AND c.tipo_coincidencia = ?' : ''}
+            ${filters.fechaDesde ? 'AND c.creado_en >= ?' : ''}
+            ${filters.fechaHasta ? 'AND c.creado_en <= ?' : ''}
+            ${filters.puntuacionMinima ? 'AND c.puntuacion_coincidencia >= ?' : ''}
+          `);
+          
+          // Construir array de parámetros en el mismo orden que en la consulta
+          const params = [filters.storeCode];
+          if (filters.estado) params.push(filters.estado);
+          if (filters.tipoCoincidencia) params.push(filters.tipoCoincidencia);
+          if (filters.fechaDesde) params.push(filters.fechaDesde);
+          if (filters.fechaHasta) params.push(filters.fechaHasta);
+          if (filters.puntuacionMinima) params.push(filters.puntuacionMinima);
+          
+          const result = stmt.get(...params);
+          console.log(`Total de coincidencias encontradas con SQL directo: ${result?.total}`);
+          return Number(result?.total) || 0;
+        } catch (err) {
+          console.error("Error al usar SQL directo para contar coincidencias:", err);
+          // Si falla, continuamos con el método estándar
+        }
+      }
+      
+      // Método estándar sin join
+      let query = db
+        .select({ total: sql`COUNT(*)` })
+        .from(coincidencias);
+        
+      // Condiciones para filtrar
+      const conditions = [];
+      
+      // Filtrar por estado
+      if (filters.estado) {
+        conditions.push(eq(coincidencias.estado, filters.estado));
+      }
+      
+      // Filtrar por tipo de coincidencia
+      if (filters.tipoCoincidencia) {
+        conditions.push(eq(coincidencias.tipoCoincidencia, filters.tipoCoincidencia));
+      }
+      
+      // Filtrar por fecha (convertir strings a objetos Date)
+      if (filters.fechaDesde) {
+        conditions.push(gte(coincidencias.creadoEn, filters.fechaDesde));
+      }
+      
+      if (filters.fechaHasta) {
+        conditions.push(lte(coincidencias.creadoEn, filters.fechaHasta));
+      }
+      
+      // Filtrar por puntuación mínima
+      if (filters.puntuacionMinima) {
+        conditions.push(gte(coincidencias.puntuacionCoincidencia, filters.puntuacionMinima));
+      }
+      
+      // Aplicar los filtros si hay condiciones
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions));
+      }
+      
+      // Ejecutar la consulta
+      const result = await query;
+      console.log(`Total de coincidencias encontradas: ${result[0]?.total}`);
+      return Number(result[0]?.total) || 0;
+    } catch (error) {
+      console.error("Error al contar coincidencias:", error);
       return 0;
     }
   }
