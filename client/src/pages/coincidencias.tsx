@@ -63,12 +63,22 @@ interface Coincidencia {
   tipoMatch: "Exacto" | "Parcial";
   campoCoincidente: string;
   valorCoincidente: string;
-  ordenInfo: {
+  // La estructura ordenInfo está siendo reemplazada por excelData
+  excelData?: {
     storeCode: string;
-    storeName: string;
+    storeName?: string;
     orderNumber: string;
     orderDate: string;
-    customerName: string;
+    customerName?: string | null;
+    customerContact?: string | null;
+    itemDetails?: string | null;
+    metals?: string | null;
+    engravings?: string | null;
+    stones?: string | null;
+    carats?: string | null;
+    price?: string | null;
+    pawnTicket?: string | null;
+    saleDate?: string | null;
   };
   revisadoPor: number | null;
   revisadoEn: string | null;
@@ -244,11 +254,11 @@ export default function Coincidencias() {
       },
     },
     {
-      accessorKey: "ordenInfo.storeCode",
+      accessorKey: "excelData.storeCode",
       header: ({ column }: any) => <SortableColumnHeader column={column} title="Tienda" />,
       cell: ({ row }: { row: Row<Coincidencia> }) => {
-        const storeCode = row.original.ordenInfo.storeCode;
-        const storeName = row.original.ordenInfo.storeName;
+        const storeCode = row.original.excelData?.storeCode || '';
+        const storeName = row.original.excelData?.storeName || storeCode;
         
         return (
           <TooltipProvider>
@@ -265,7 +275,7 @@ export default function Coincidencias() {
       },
     },
     {
-      accessorKey: "ordenInfo.orderNumber",
+      accessorKey: "excelData.orderNumber",
       header: ({ column }: any) => <SortableColumnHeader column={column} title="Nº Orden" />,
     },
     {
@@ -518,27 +528,29 @@ export default function Coincidencias() {
                     <div>
                       <span className="text-xs font-medium text-muted-foreground">Tienda:</span>
                       <p className="text-sm">
-                        {viewingCoincidencia.ordenInfo.storeCode} - {viewingCoincidencia.ordenInfo.storeName}
+                        {viewingCoincidencia.excelData?.storeCode} - {viewingCoincidencia.excelData?.storeName || ""}
                       </p>
                     </div>
                     <div>
                       <span className="text-xs font-medium text-muted-foreground">Nº Orden:</span>
-                      <p className="text-sm">{viewingCoincidencia.ordenInfo.orderNumber}</p>
+                      <p className="text-sm">{viewingCoincidencia.excelData?.orderNumber || "N/A"}</p>
                     </div>
                     <div>
                       <span className="text-xs font-medium text-muted-foreground">Fecha orden:</span>
                       <p className="text-sm">
-                        {format(new Date(viewingCoincidencia.ordenInfo.orderDate), "dd/MM/yyyy", { locale: es })}
+                        {viewingCoincidencia.excelData?.orderDate 
+                          ? format(new Date(viewingCoincidencia.excelData.orderDate), "dd/MM/yyyy", { locale: es }) 
+                          : "N/A"}
                       </p>
                     </div>
                     <div>
                       <span className="text-xs font-medium text-muted-foreground">Cliente:</span>
-                      <p className="text-sm">{viewingCoincidencia.ordenInfo.customerName || "N/A"}</p>
+                      <p className="text-sm">{viewingCoincidencia.excelData?.customerName || "N/A"}</p>
                     </div>
                   </div>
                   <div className="mt-2">
                     <Button variant="outline" size="sm" className="mt-2" asChild>
-                      <a href={`/purchase-control?orderNumber=${viewingCoincidencia.ordenInfo.orderNumber}`} target="_blank">
+                      <a href={`/purchase-control?orderNumber=${viewingCoincidencia.excelData?.orderNumber || ''}`} target="_blank">
                         <ExternalLink className="h-4 w-4 mr-2" />
                         Ver en Control de Compras
                       </a>
