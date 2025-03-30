@@ -1,29 +1,120 @@
 # Áureo - Sistema de Gestión para Tiendas
 
-## Contenido de la Distribución
+## Descripción
 
-Este paquete contiene una versión completa de la aplicación Áureo para demostración.
+Áureo es un sistema de gestión completo diseñado para tiendas que necesitan un control detallado de compras y documentación. El sistema combina dos métodos paralelos de ingreso de datos:
 
-## Instrucciones de Instalación Rápida
+1. **Sistema Excel**: Para el registro detallado de compras con información completa de cliente y artículos.
+2. **Sistema PDF**: Para la gestión documental y clasificación por códigos de tienda.
 
-1. Descomprime el archivo `aureo-x.x.x.zip`
-2. Lee el archivo `LEEME.md` para instrucciones detalladas
-3. Instala las dependencias: `pip install -r aureo_app/requirements.txt`
-4. Inicia la aplicación: `python aureo_app/start.py`
-5. Accede a través del navegador: `http://localhost:5000`
+El sistema cuenta con detección automática de archivos y procesamiento en segundo plano, búsqueda avanzada, alertas automáticas para elementos y personas de interés, y una interfaz completamente en español.
 
-## Configuración Inicial
+## Características Principales
 
-- Usuario por defecto: `117020`
-- Para configurar la contraseña: `python aureo_app/reset_admin.py`
+- Interfaz de usuario moderna y fácil de usar con React
+- Backend robusto desarrollado en Python con Flask
+- Base de datos SQLite para fácil despliegue sin configuración adicional
+- Vigilancia automática de archivos nuevos en carpetas específicas
+- Asignación automática o manual de documentos a tiendas
+- Sistema de alertas para elementos y personas de interés
+- Búsqueda avanzada con múltiples criterios
+- Tres niveles de usuarios: SuperAdmin, Admin y User
+- Exportación de datos y reportes
+- Diseño responsivo que funciona en cualquier dispositivo
+
+## Estructura del Proyecto
+
+El proyecto está dividido en dos componentes principales:
+
+1. **Frontend (cliente)**: Aplicación React con TypeScript ubicada en el directorio `/client`
+2. **Backend (servidor)**: Aplicación Flask ubicada en el directorio `/aureo_app`
+
+### Instalación y Ejecución
+
+#### Aplicación Backend (Flask)
+
+La aplicación Flask es completamente independiente y puede ejecutarse en cualquier servidor Windows con Python 3.8 o superior.
+
+1. Descomprima el archivo `aureo-[version].zip` en el directorio deseado
+2. Instale las dependencias:
+   ```
+   pip install -r requirements.txt
+   ```
+3. Ejecute la aplicación:
+   ```
+   python start.py
+   ```
+
+Para más detalles, consulte el README dentro del directorio `aureo_app`
+
+#### Crear un archivo de distribución
+
+Para generar un archivo zip listo para distribución en producción:
+
+```
+cd aureo_app
+python make_dist.py
+```
+
+Esto generará un archivo `aureo-[version].zip` con todos los archivos necesarios y sin incluir datos temporales o de desarrollo.
+
+#### Desarrollo del Frontend
+
+El frontend se desarrolla en React y se compila para ser servido por la aplicación Flask:
+
+1. Navegue al directorio del cliente:
+   ```
+   cd client
+   ```
+2. Instale las dependencias:
+   ```
+   npm install
+   ```
+3. Ejecute el servidor de desarrollo:
+   ```
+   npm run dev
+   ```
+
+Para compilar el frontend para producción:
+```
+npm run build
+```
+
+Los archivos compilados pueden copiarse manualmente al directorio `aureo_app/app/static` o usar el script `build_frontend.py` incluido en `aureo_app`.
+
+## Configuración y Personalización
+
+### Sistema de Vigilancia de Archivos
+
+El sistema puede vigilar automáticamente directorios específicos para detectar nuevos archivos:
+
+- Excel: `aureo_app/data/excel_watch/`
+- PDF: `aureo_app/data/pdf_watch/`
+
+Esta función puede habilitarse o deshabilitarse desde la configuración del sistema.
+
+### Base de Datos
+
+La aplicación utiliza SQLite por defecto, lo que simplifica la instalación y el mantenimiento. Los datos se almacenan en el archivo `aureo_app/datos.sqlite`.
+
+#### Actualización de la Base de Datos
+
+Si necesita actualizar la estructura de la base de datos después de modificar los modelos, utilice el script `db_update.py`:
+
+```
+cd aureo_app
+python db_update.py
+```
+
+Este script:
+1. Verifica si la estructura actual coincide con la estructura esperada
+2. Crea una copia de seguridad de la base de datos actual
+3. Actualiza la estructura preservando los datos de usuario
+
+## Licencia
+
+Esta aplicación es propiedad del cliente y está protegida por las leyes de propiedad intelectual.
 
 ## Soporte
 
-Para más información, consulta la documentación completa o contacta con soporte.
-
-## Requisitos del Sistema
-
-- Windows 10 o superior
-- Python 3.8 o superior
-- Aproximadamente 150 MB de espacio en disco
-- 4 GB de RAM (recomendado)
+Para soporte técnico, contacte al desarrollador o abra un ticket en el sistema de soporte.

@@ -11,8 +11,7 @@ def build_frontend():
     - Copia los archivos generados al directorio static de Flask
     """
     base_dir = os.path.abspath(os.path.dirname(__file__))
-    root_dir = os.path.abspath(os.path.join(base_dir, '..'))
-    client_dir = os.path.abspath(os.path.join(root_dir, 'client'))
+    client_dir = os.path.abspath(os.path.join(base_dir, '..', 'client'))
     static_dir = os.path.join(base_dir, 'app', 'static')
     templates_dir = os.path.join(base_dir, 'app', 'templates')
     
@@ -24,10 +23,10 @@ def build_frontend():
     try:
         print("Compilando el frontend de React...")
         
-        # Ejecutar npm run build (desde el directorio raíz donde está el package.json principal)
+        # Ejecutar npm run build
         process = subprocess.run(
             ['npm', 'run', 'build'],
-            cwd=root_dir,  # Usar directorio raíz
+            cwd=client_dir,
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -53,12 +52,8 @@ def build_frontend():
             elif os.path.isdir(item_path):
                 shutil.rmtree(item_path)
         
-        # Buscar el directorio de compilación del frontend
-        # Primero intentar en la raíz (donde se compila con el nuevo setup)
-        root_build_dir = os.path.join(root_dir, 'dist', 'public')
-        client_build_dir = os.path.join(client_dir, 'dist')
-        
-        build_dir = root_build_dir if os.path.exists(root_build_dir) else client_build_dir
+        # Copiar archivos compilados al directorio static
+        build_dir = os.path.join(client_dir, 'dist')
         
         if not os.path.exists(build_dir):
             print(f"Error: No se encontró el directorio de compilación en: {build_dir}")
