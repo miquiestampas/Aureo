@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth, ROLES } from "./auth";
+import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { setupSocketIO, initializeFileWatchers, stopFileWatchers } from "./fileWatcher";
 import multer from "multer";
@@ -17,6 +17,2519 @@ import {
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Set up authentication
+  setupAuth(app);
+  
+  // Create HTTP server for both Express and Socket.IO
+  const httpServer = createServer(app);
+  
+  // Set up Socket.IO
+  const io = setupSocketIO(httpServer);
+  
+  // Set up file upload middleware
+  const upload = setupFileUpload();
+  const uploadMultiple = setupFileUpload().array('files', 20); // Permitir hasta 20 archivos a la vez
+  
+  // User routes
+  app.get("/api/users", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const users = await storage.getUsers();
+        // Remove passwords from response
+        const sanitizedUsers = users.map(user => {
+          const { password, ...userWithoutPassword } = user;
+          return userWithoutPassword;
+        });
+        
+        res.json(sanitizedUsers);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.post("/api/users", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const { username } = req.body;
+        const existingUser = await storage.getUserByUsername(username);
+        
+        if (existingUser) {
+          return res.status(400).json({ message: "Username already exists" });
+        }
+        
+        // Create user with hashed password
+        const salt = crypto.randomBytes(16).toString("hex");
+        const hash = crypto.scryptSync(req.body.password, salt, 64).toString("hex");
+        const hashedPassword = `${hash}.${salt}`;
+        
+        const user = await storage.createUser({
+          ...req.body,
+          password: hashedPassword
+        });
+        
+        // Remove password from response
+        const { password, ...userWithoutPassword } = user;
+        res.status(201).json(userWithoutPassword);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.put("/api/users/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const userId = parseInt(req.params.id);
+        const user = await storage.getUser(userId);
+        
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        
+        const updatedUser = await storage.updateUser(userId, req.body);
+        
+        if (!updatedUser) {
+          return res.status(500).json({ message: "Failed to update user" });
+        }
+        
+        // Remove password from response
+        const { password, ...userWithoutPassword } = updatedUser;
+        res.json(userWithoutPassword);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.delete("/api/users/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const userId = parseInt(req.params.id);
+        const success = await storage.deleteUser(userId);
+        
+        if (!success) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        
+        res.sendStatus(204);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Store routes
+  app.get("/api/stores", async (req, res, next) => {
+    try {
+      let stores;
+      if (req.query.type) {
+        stores = await storage.getStoresByType(req.query.type as 'Excel' | 'PDF');
+      } else {
+        stores = await storage.getStores();
+      }
+      res.json(stores);
+    } catch (err) {
+      next(err);
+    }
+  });
+  
+  app.post("/api/stores", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const { code } = req.body;
+        const existingStore = await storage.getStoreByCode(code);
+        
+        if (existingStore) {
+          return res.status(400).json({ message: "Store code already exists" });
+        }
+        
+        // Preprocesar datos para asegurar compatibilidad con SQLite
+        const storeData = {
+          ...req.body,
+          // Asegurar que active es number (1 o 0) para SQLite
+          active: req.body.active === true || req.body.active === 1 ? 1 : 0,
+          // Convertir fechas y otros campos cuando sea necesario
+          createdAt: new Date().toISOString(),
+          startDate: req.body.startDate || null,
+          endDate: req.body.endDate || null,
+          // Asegurar que los campos opcionales sean string o null
+          district: req.body.district || null,
+          locality: req.body.locality || null,
+          address: req.body.address || null,
+          phone: req.body.phone || null,
+          email: req.body.email || null,
+          cif: req.body.cif || null,
+          businessName: req.body.businessName || null,
+          ownerName: req.body.ownerName || null,
+          ownerIdNumber: req.body.ownerIdNumber || null,
+          notes: req.body.notes || null
+        };
+        
+        const store = await storage.createStore(storeData);
+        res.status(201).json(store);
+      } catch (err) {
+        console.error('Error creating store:', err);
+        next(err);
+      }
+    });
+  });
+  
+  app.put("/api/stores/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const storeId = parseInt(req.params.id);
+        const store = await storage.getStore(storeId);
+        
+        if (!store) {
+          return res.status(404).json({ message: "Store not found" });
+        }
+        
+        // Preprocesar datos para asegurar compatibilidad con SQLite
+        const storeData = {
+          ...req.body,
+          // Asegurar que active es number (1 o 0) para SQLite
+          active: req.body.active === true || req.body.active === 1 ? 1 : 0,
+          // Convertir fechas y otros campos cuando sea necesario
+          startDate: req.body.startDate === "" ? null : req.body.startDate,
+          endDate: req.body.endDate === "" ? null : req.body.endDate,
+          // Asegurar que los campos opcionales sean string o null
+          district: req.body.district || null,
+          locality: req.body.locality || null,
+          address: req.body.address || null,
+          phone: req.body.phone || null,
+          email: req.body.email || null,
+          cif: req.body.cif || null,
+          businessName: req.body.businessName || null,
+          ownerName: req.body.ownerName || null,
+          ownerIdNumber: req.body.ownerIdNumber || null,
+          notes: req.body.notes || null
+        };
+        
+        const updatedStore = await storage.updateStore(storeId, storeData);
+        
+        if (!updatedStore) {
+          return res.status(500).json({ message: "Failed to update store" });
+        }
+        
+        res.json(updatedStore);
+      } catch (err) {
+        console.error('Error updating store:', err);
+        next(err);
+      }
+    });
+  });
+  
+  app.delete("/api/stores/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const storeId = parseInt(req.params.id);
+        const success = await storage.deleteStore(storeId);
+        
+        if (!success) {
+          return res.status(404).json({ message: "Store not found" });
+        }
+        
+        res.sendStatus(204);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Importación de tiendas desde Excel
+  app.post("/api/import-stores", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // @ts-ignore - req.files es añadido por express-fileupload
+        if (!req.files || !req.files.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+        
+        // @ts-ignore - req.files es añadido por express-fileupload
+        const file = req.files.file;
+        if (Array.isArray(file)) {
+          return res.status(400).json({ message: "Multiple files not supported" });
+        }
+        
+        if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+          return res.status(400).json({ message: "Invalid file format. Only Excel files are supported." });
+        }
+        
+        // Crear un archivo temporal para procesar
+        const tempFilePath = path.join(os.tmpdir(), `import_${Date.now()}_${file.name}`);
+        await fs.promises.writeFile(tempFilePath, file.data);
+        
+        // Procesar el archivo Excel
+        const workbook = XLSX.readFile(tempFilePath);
+        const worksheet = workbook.Sheets[workbook.SheetNames.find(name => name === 'Tiendas') || workbook.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+        
+        // Validar y procesar los datos
+        const importResults = {
+          imported: 0,
+          errors: [] as string[],
+          skipped: 0
+        };
+        
+        for (const row of data) {
+          try {
+            // Verificar campos obligatorios
+            const storeCode = row['Código*'] as string;
+            const storeName = row['Nombre*'] as string;
+            const storeType = row['Tipo*'] as string;
+            const storeActive = row['Activa*'] as string;
+            
+            if (!storeCode || !storeName || !storeType) {
+              importResults.errors.push(`Fila con datos incompletos: ${JSON.stringify(row)}`);
+              importResults.skipped++;
+              continue;
+            }
+            
+            // Verificar si la tienda ya existe
+            const existingStore = await storage.getStoreByCode(storeCode);
+            if (existingStore) {
+              importResults.errors.push(`Tienda con código ${storeCode} ya existe`);
+              importResults.skipped++;
+              continue;
+            }
+            
+            // Convertir valores a formato esperado
+            const isActive = storeActive?.toLowerCase() === 'sí' || 
+                             storeActive?.toLowerCase() === 'si' || 
+                             storeActive?.toLowerCase() === 'yes' ||
+                             storeActive?.toLowerCase() === 'true';
+            
+            let startDate = null;
+            if (row['Fecha Inicio']) {
+              // Convertir formato DD/MM/YYYY a Date
+              const parts = (row['Fecha Inicio'] as string).split('/');
+              if (parts.length === 3) {
+                startDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+              }
+            }
+            
+            let endDate = null;
+            if (row['Fecha Cese']) {
+              // Convertir formato DD/MM/YYYY a Date
+              const parts = (row['Fecha Cese'] as string).split('/');
+              if (parts.length === 3) {
+                endDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+              }
+            }
+            
+            // Crear la tienda
+            const newStore = {
+              code: storeCode,
+              name: storeName,
+              type: storeType as "Excel" | "PDF",
+              active: isActive ? 1 : 0,
+              district: (row['Distrito'] as string) || null,
+              locality: (row['Localidad'] as string) || null,
+              address: (row['Dirección'] as string) || null,
+              phone: (row['Teléfono'] as string) || null,
+              email: (row['Email'] as string) || null,
+              cif: (row['CIF'] as string) || null,
+              businessName: (row['Razón Social'] as string) || null,
+              ownerName: (row['Nombre Propietario'] as string) || null,
+              ownerIdNumber: (row['DNI Propietario'] as string) || null,
+              startDate: startDate ? startDate.toISOString() : null,
+              endDate: endDate ? endDate.toISOString() : null,
+              notes: (row['Anotaciones'] as string) || null
+            };
+            
+            await storage.createStore(newStore);
+            importResults.imported++;
+            
+          } catch (error) {
+            importResults.errors.push(`Error al procesar fila: ${error instanceof Error ? error.message : String(error)}`);
+            importResults.skipped++;
+          }
+        }
+        
+        // Limpiar el archivo temporal
+        await fs.promises.unlink(tempFilePath);
+        
+        res.status(200).json({
+          imported: importResults.imported,
+          skipped: importResults.skipped,
+          errors: importResults.errors
+        });
+        
+      } catch (err) {
+        console.error('Error processing import:', err);
+        next(err);
+      }
+    });
+  });
+  
+  // System configuration routes
+  app.get("/api/config", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const configs = await storage.getAllConfigs();
+        res.json(configs);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.put("/api/config/:key", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const { key } = req.params;
+        const { value } = req.body;
+        
+        if (!value) {
+          return res.status(400).json({ message: "Value is required" });
+        }
+        
+        const config = await storage.getConfig(key);
+        
+        if (!config) {
+          // Create new config if it doesn't exist
+          const newConfig = await storage.setConfig({ key, value, description: req.body.description });
+          return res.json(newConfig);
+        }
+        
+        const updatedConfig = await storage.updateConfig(key, value);
+        
+        if (!updatedConfig) {
+          return res.status(500).json({ message: "Failed to update configuration" });
+        }
+        
+        // Restart file watchers if related configs are changed
+        if (
+          key === 'EXCEL_WATCH_DIR' ||
+          key === 'PDF_WATCH_DIR' || 
+          key === 'FILE_PROCESSING_ENABLED'
+        ) {
+          if (value === 'true') {
+            await initializeFileWatchers();
+          } else if (key === 'FILE_PROCESSING_ENABLED' && value === 'false') {
+            await stopFileWatchers();
+          }
+        }
+        
+        res.json(updatedConfig);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // File activity routes
+  app.get("/api/file-activities", async (req, res, next) => {
+    try {
+      let activities;
+      if (req.query.storeCode) {
+        activities = await storage.getFileActivitiesByStore(req.query.storeCode as string);
+      } else {
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+        activities = await storage.getRecentFileActivities(limit);
+      }
+      res.json(activities);
+    } catch (err) {
+      next(err);
+    }
+  });
+  
+  // Endpoint para obtener archivos pendientes de asignación de tienda
+  app.get("/api/pending-store-assignments", async (req, res, next) => {
+    try {
+      const pendingActivities = await storage.getPendingStoreAssignmentActivities();
+      res.json(pendingActivities);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Endpoint para asignar una tienda a un archivo pendiente
+  app.post("/api/file-activities/:id/assign-store", async (req, res, next) => {
+    try {
+      const activityId = parseInt(req.params.id);
+      const { storeCode, createNewStore } = req.body;
+      
+      // Verificar que el ID de actividad es válido
+      const activity = await storage.getFileActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Actividad de archivo no encontrada" });
+      }
+      
+      // Verificar que la actividad está en estado pendiente de asignación
+      if (activity.status !== 'PendingStoreAssignment') {
+        return res.status(400).json({ 
+          message: "Esta actividad no está pendiente de asignación de tienda" 
+        });
+      }
+      
+      let targetStoreCode = storeCode;
+      
+      // Si se indicó crear una nueva tienda
+      if (createNewStore === true) {
+        // Usar el código detectado o el proporcionado
+        const newStoreCode = storeCode || activity.detectedStoreCode;
+        
+        if (!newStoreCode) {
+          return res.status(400).json({ 
+            message: "Se requiere un código de tienda para crear una nueva tienda" 
+          });
+        }
+        
+        // Verificar que no exista una tienda con ese código
+        const existingStore = await storage.getStoreByCode(newStoreCode);
+        if (existingStore) {
+          return res.status(400).json({ 
+            message: `Ya existe una tienda con el código ${newStoreCode}` 
+          });
+        }
+        
+        // Crear la nueva tienda
+        const newStore = await storage.createStore({
+          code: newStoreCode,
+          name: `Tienda ${newStoreCode}`,
+          type: activity.fileType,
+          district: "",
+          locality: "",
+          active: 1
+        });
+        
+        targetStoreCode = newStore.code;
+      } else {
+        // Verificar que la tienda existe
+        const store = await storage.getStoreByCode(storeCode);
+        if (!store) {
+          return res.status(404).json({ message: "Tienda no encontrada" });
+        }
+        
+        // Verificar que el tipo de tienda coincide con el tipo de archivo
+        if (store.type !== activity.fileType) {
+          return res.status(400).json({ 
+            message: `Esta tienda es de tipo ${store.type} pero el archivo es ${activity.fileType}` 
+          });
+        }
+      }
+      
+      // Actualizar la actividad con el nuevo código de tienda y cambiar su estado a Pending
+      const updatedActivity = await storage.updateFileActivity(activityId, {
+        storeCode: targetStoreCode,
+        status: 'Pending'
+      });
+      
+      // Volver a procesar el archivo ahora que tiene una tienda asignada
+      const filePath = path.join(
+        activity.fileType === 'Excel' ? './uploads/excel' : './uploads/pdf',
+        activity.filename
+      );
+      
+      if (activity.fileType === 'Excel') {
+        // Para Excel, procesar el archivo
+        processExcelFile(filePath, activityId, targetStoreCode)
+          .catch(err => console.error(`Error al procesar Excel después de asignar tienda:`, err));
+      } else {
+        // Para PDF, procesar el archivo
+        processPdfFile(filePath, activityId, targetStoreCode)
+          .catch(err => console.error(`Error al procesar PDF después de asignar tienda:`, err));
+      }
+      
+      res.json(updatedActivity);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Descargar archivo original
+  app.get("/api/file-activities/:id/download", async (req, res, next) => {
+    try {
+      const activityId = parseInt(req.params.id);
+      if (isNaN(activityId)) {
+        return res.status(400).json({ message: "ID de actividad inválido" });
+      }
+      
+      const activity = await storage.getFileActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Actividad no encontrada" });
+      }
+      
+      // Intentar encontrar el archivo correcto
+      let filePath = '';
+      let fileName = '';
+      
+      if (activity.fileType === 'PDF') {
+        // Para PDFs, primero intentar obtener la ruta desde los documentos PDF si existe
+        const pdfDoc = await storage.getPdfDocumentByActivityId(activityId);
+        
+        if (pdfDoc && pdfDoc.path) {
+          // Probar la ruta con y sin "./" al principio
+          if (fs.existsSync(pdfDoc.path)) {
+            filePath = pdfDoc.path;
+            fileName = activity.filename;
+            console.log(`Usando ruta de documento PDF almacenada: ${filePath}`);
+          } else if (fs.existsSync(`./${pdfDoc.path}`)) {
+            filePath = `./${pdfDoc.path}`;
+            fileName = activity.filename;
+            console.log(`Usando ruta de documento PDF con prefijo ./: ${filePath}`);
+          } else {
+            console.log(`La ruta almacenada ${pdfDoc.path} no existe, buscando alternativas...`);
+          }
+        }
+      }
+      
+      // Si no se encontró en la base de datos o no es un PDF, buscar en el sistema de archivos
+      if (!filePath || !fileName) {
+        // Directorios base a comprobar
+        let baseDirs = [];
+        
+        if (activity.fileType === 'Excel') {
+          baseDirs = ["./uploads/excel", "./data/excel"];
+        } else if (activity.fileType === 'PDF') {
+          baseDirs = ["./uploads/pdf", "./data/pdf"];
+        } else {
+          return res.status(400).json({ message: "Tipo de archivo no soportado" });
+        }
+        
+        // Buscar en todas las rutas posibles
+        for (const baseDir of baseDirs) {
+          // Rutas a comprobar (incluye directorio de "procesados")
+          const pathsToCheck = [
+            path.join(baseDir, activity.filename),                          // Ruta original
+            path.join(baseDir, "procesados", activity.filename)             // Carpeta "procesados"
+          ];
+          
+          // Comprobar todas las rutas
+          for (const checkPath of pathsToCheck) {
+            if (fs.existsSync(checkPath)) {
+              filePath = checkPath;
+              fileName = activity.filename;
+              console.log(`Encontrado archivo en: ${filePath}`);
+              break;
+            }
+          }
+          
+          if (filePath && fileName) break; // Si encontramos el archivo, salir del bucle exterior
+          
+          // Si no se encontró el archivo exacto, buscar por nombre parcial
+          if (!fileName) {
+            const baseFileName = activity.filename.replace(/\.[^/.]+$/, ''); // Nombre sin extensión
+            const extension = path.extname(activity.filename);
+            
+            // Buscar en directorio principal
+            if (fs.existsSync(baseDir)) {
+              const mainDir = fs.readdirSync(baseDir);
+              for (const file of mainDir) {
+                if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+                  filePath = path.join(baseDir, file);
+                  fileName = file;
+                  console.log(`Encontrado archivo por coincidencia parcial: ${filePath}`);
+                  break;
+                }
+              }
+            }
+            
+            // Si no se encontró, buscar en directorio "procesados"
+            if (!fileName) {
+              const processedDir = path.join(baseDir, "procesados");
+              if (fs.existsSync(processedDir)) {
+                const processedFiles = fs.readdirSync(processedDir);
+                for (const file of processedFiles) {
+                  if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+                    filePath = path.join(processedDir, file);
+                    fileName = file;
+                    console.log(`Encontrado archivo por coincidencia parcial en procesados: ${filePath}`);
+                    break;
+                  }
+                }
+              }
+            }
+            
+            if (filePath && fileName) break; // Si encontramos el archivo, salir del bucle exterior
+          }
+        }
+      }
+      
+      // Verificar si encontramos el archivo
+      if (!fileName || !filePath || !fs.existsSync(filePath)) {
+        // Registrar las rutas que se intentaron para depuración
+        console.error(`No se encontró el archivo ${activity.filename} en ninguna de las rutas buscadas`);
+        return res.status(404).json({ 
+          message: "Archivo no encontrado en el sistema. Se intentó buscar en todas las ubicaciones posibles."
+        });
+      }
+      
+      console.log(`Descargando archivo: ${filePath}`);
+      // Enviar el archivo como descarga, manteniendo el nombre original
+      res.download(filePath, activity.filename);
+    } catch (err) {
+      console.error("Error descargando archivo:", err);
+      next(err);
+    }
+  });
+  
+  // Endpoint para visualizar PDFs (solo para PDFs)
+  app.get("/api/file-activities/:id/view", async (req, res, next) => {
+    try {
+      const activityId = parseInt(req.params.id);
+      if (isNaN(activityId)) {
+        return res.status(400).json({ message: "ID de actividad inválido" });
+      }
+      
+      const activity = await storage.getFileActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Actividad no encontrada" });
+      }
+      
+      // Solo permitir visualización de PDFs
+      if (activity.fileType !== 'PDF') {
+        return res.status(400).json({ message: "Solo se pueden visualizar archivos PDF" });
+      }
+      
+      // Intentar encontrar el archivo correcto
+      let filePath = '';
+      
+      // Primero, intentar obtener la ruta desde los documentos PDF si existe
+      const pdfDoc = await storage.getPdfDocumentByActivityId(activityId);
+      
+      if (pdfDoc && pdfDoc.path) {
+        // Probar la ruta con y sin "./" al principio
+        if (fs.existsSync(pdfDoc.path)) {
+          filePath = pdfDoc.path;
+          console.log(`Usando ruta de documento PDF almacenada: ${filePath}`);
+        } else if (fs.existsSync(`./${pdfDoc.path}`)) {
+          filePath = `./${pdfDoc.path}`;
+          console.log(`Usando ruta de documento PDF con prefijo ./: ${filePath}`);
+        } else {
+          console.log(`La ruta almacenada ${pdfDoc.path} no existe, buscando alternativas...`);
+        }
+      }
+      
+      if (!filePath) {
+        // Directorios base a comprobar
+        const baseDirs = ["./uploads/pdf", "./data/pdf"];
+        
+        // Buscar en todas las rutas posibles
+        for (const baseDir of baseDirs) {
+          // Rutas a comprobar (incluye directorio de "procesados")
+          const pathsToCheck = [
+            path.join(baseDir, activity.filename),                          // Ruta original
+            path.join(baseDir, "procesados", activity.filename)             // Carpeta "procesados"
+          ];
+          
+          // Comprobar todas las rutas
+          for (const checkPath of pathsToCheck) {
+            if (fs.existsSync(checkPath)) {
+              filePath = checkPath;
+              console.log(`Encontrado archivo en: ${filePath}`);
+              break;
+            }
+          }
+          
+          if (filePath) break; // Si encontramos el archivo, salir del bucle exterior
+          
+          // Si no se encontró el archivo exacto, buscar por nombre parcial
+          if (!filePath) {
+            const baseFileName = activity.filename.replace(/\.[^/.]+$/, ''); // Nombre sin extensión
+            const extension = path.extname(activity.filename);
+            
+            // Buscar en directorio principal
+            if (fs.existsSync(baseDir)) {
+              const mainDir = fs.readdirSync(baseDir);
+              for (const file of mainDir) {
+                if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+                  filePath = path.join(baseDir, file);
+                  console.log(`Encontrado archivo por coincidencia parcial: ${filePath}`);
+                  break;
+                }
+              }
+            }
+            
+            // Si no se encontró, buscar en directorio "procesados"
+            if (!filePath) {
+              const processedDir = path.join(baseDir, "procesados");
+              if (fs.existsSync(processedDir)) {
+                const processedFiles = fs.readdirSync(processedDir);
+                for (const file of processedFiles) {
+                  if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+                    filePath = path.join(processedDir, file);
+                    console.log(`Encontrado archivo por coincidencia parcial en procesados: ${filePath}`);
+                    break;
+                  }
+                }
+              }
+            }
+            
+            if (filePath) break; // Si encontramos el archivo, salir del bucle exterior
+          }
+        }
+      }
+      
+      if (!filePath || !fs.existsSync(filePath)) {
+        // Registrar las rutas que se intentaron para depuración
+        console.error(`No se encontró el archivo PDF ${activity.filename} en ninguna de las rutas buscadas`);
+        return res.status(404).json({ 
+          message: "Archivo PDF no encontrado en el sistema. Se intentó buscar en todas las ubicaciones posibles."
+        });
+      }
+      
+      console.log(`Visualizando PDF: ${filePath}`);
+      
+      // Configurar el encabezado para mostrar PDF en el navegador
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename=' + activity.filename);
+      
+      // Enviar el archivo PDF como respuesta
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (err) {
+      console.error("Error visualizando PDF:", err);
+      next(err);
+    }
+  });
+  
+  // Eliminar actividad y datos relacionados
+  app.delete("/api/file-activities/:id", async (req, res, next) => {
+    try {
+      const activityId = parseInt(req.params.id);
+      if (isNaN(activityId)) {
+        return res.status(400).json({ message: "ID de actividad inválido" });
+      }
+      
+      const activity = await storage.getFileActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Actividad no encontrada" });
+      }
+      
+      // Eliminar datos relacionados según el tipo de archivo
+      if (activity.fileType === 'Excel') {
+        await storage.deleteExcelDataByActivityId(activityId);
+      } else if (activity.fileType === 'PDF') {
+        await storage.deletePdfDocumentsByActivityId(activityId);
+      }
+      
+      // Eliminar la actividad en sí
+      const result = await storage.deleteFileActivity(activityId);
+      
+      // Eliminar el archivo físico
+      try {
+        // Determinar las rutas base según el tipo de archivo
+        let baseDirs = [];
+        if (activity.fileType === 'Excel') {
+          baseDirs = ["./uploads/excel", "./data/excel"];
+        } else {
+          baseDirs = ["./uploads/pdf", "./data/pdf"];
+        }
+        
+        // Intentar eliminar el archivo original o cualquier versión de él
+        let fileDeleted = false;
+        
+        // Para cada directorio base, comprobar todas las posibles ubicaciones
+        for (const baseDir of baseDirs) {
+          // Rutas a comprobar (incluye directorio de "procesados")
+          const pathsToCheck = [
+            path.join(baseDir, activity.filename),                          // Ruta original
+            path.join(baseDir, "procesados", activity.filename)             // Carpeta "procesados"
+          ];
+        
+          // Intentar eliminar en todas las rutas posibles
+          for (const checkPath of pathsToCheck) {
+            if (fs.existsSync(checkPath)) {
+              fs.unlinkSync(checkPath);
+              fileDeleted = true;
+              console.log(`Archivo eliminado: ${checkPath}`);
+              break;
+            }
+          }
+          
+          // Si no se eliminó por nombre exacto, buscar por nombre parcial
+          if (!fileDeleted) {
+            const baseFileName = activity.filename.replace(/\.[^/.]+$/, ''); // Nombre sin extensión
+            const extension = path.extname(activity.filename);
+            
+            // Buscar en directorio principal
+            const mainDir = fs.existsSync(baseDir) ? fs.readdirSync(baseDir) : [];
+            for (const file of mainDir) {
+              if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+                const filePath = path.join(baseDir, file);
+                fs.unlinkSync(filePath);
+                fileDeleted = true;
+                console.log(`Archivo eliminado: ${filePath}`);
+                break;
+              }
+            }
+            
+            // Si no se encontró en el directorio principal, buscar en "procesados"
+            if (!fileDeleted) {
+              const processedDir = path.join(baseDir, "procesados");
+              if (fs.existsSync(processedDir)) {
+                const processedFiles = fs.readdirSync(processedDir);
+                for (const file of processedFiles) {
+                  if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+                    const filePath = path.join(processedDir, file);
+                    fs.unlinkSync(filePath);
+                    fileDeleted = true;
+                    console.log(`Archivo eliminado de procesados: ${filePath}`);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          
+          // Si encontramos el archivo, no necesitamos buscar en otras ubicaciones
+          if (fileDeleted) break;
+        
+        } // Cierre del bucle for sobre baseDirs
+        
+        if (!fileDeleted) {
+          console.warn(`No se encontró el archivo físico para eliminar: ${activity.filename}`);
+        }
+      } catch (fileErr) {
+        console.warn("No se pudo eliminar el archivo físico:", fileErr);
+        // No detener la operación si el archivo no se puede eliminar
+      }
+      
+      res.json({ success: result, message: "Actividad eliminada correctamente" });
+    } catch (err) {
+      console.error("Error eliminando actividad:", err);
+      next(err);
+    }
+  });
+  
+  // Excel data routes
+  app.get("/api/excel-data", async (req, res, next) => {
+    try {
+      if (!req.query.storeCode) {
+        return res.status(400).json({ message: "storeCode query parameter is required" });
+      }
+      
+      const data = await storage.getExcelDataByStore(req.query.storeCode as string);
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  });
+  
+  // Excel advanced search route for Purchase Control
+  app.post("/api/search/excel-data/advanced", async (req, res, next) => {
+    try {
+      console.log("Búsqueda recibida:", req.body);
+      
+      // Extract all filters from the body
+      const {
+        query = "",
+        storeCode,
+        dateFrom,
+        dateTo,
+        orderNumber,
+        customerName,
+        customerContact,
+        itemDetails,
+        metals,
+        engravings,
+        stones,
+        price,
+        priceOperator = "=",
+        onlyAlerts = false
+      } = req.body;
+      
+      // Verificamos si es búsqueda simple (solo tiene la propiedad query)
+      const isSimpleSearch = Object.keys(req.body).length === 1 && query;
+      
+      // Preparar filtros
+      const filters: any = {};
+      
+      // Agregar filtros solo si no es una búsqueda simple
+      if (!isSimpleSearch) {
+        // Agregar filtros de búsqueda avanzada
+        if (storeCode && storeCode !== "all") filters.storeCode = storeCode;
+        
+        // Filtros de fecha
+        if (dateFrom) filters.fromDate = new Date(dateFrom).toISOString();
+        if (dateTo) filters.toDate = new Date(dateTo).toISOString();
+        
+        // Filtros específicos por campo
+        if (orderNumber) filters.orderNumber = orderNumber;
+        if (customerName) filters.customerName = customerName;
+        if (customerContact) filters.customerContact = customerContact;
+        if (itemDetails) filters.itemDetails = itemDetails;
+        if (metals) filters.metals = metals;
+        if (engravings) filters.engravings = engravings;
+        if (stones) filters.stones = stones;
+        
+        // Manejar filtrado de precios con operadores
+        if (price && !isNaN(parseFloat(price))) {
+          const numericPrice = parseFloat(price);
+          switch (priceOperator) {
+            case ">":
+              filters.priceMin = numericPrice;
+              break;
+            case "<":
+              filters.priceMax = numericPrice;
+              break;
+            case ">=":
+              filters.priceMin = numericPrice;
+              filters.priceIncludeEqual = true;
+              break;
+            case "<=":
+              filters.priceMax = numericPrice;
+              filters.priceIncludeEqual = true;
+              break;
+            case "=":
+            default:
+              filters.priceExact = numericPrice;
+              break;
+          }
+        }
+      }
+      
+      // Ejecutar la búsqueda con los filtros configurados
+      console.log(`Realizando búsqueda ${isSimpleSearch ? 'simple' : 'avanzada'} con:`, { query, filters });
+      let results = await storage.searchExcelData(query, filters);
+      
+      console.log(`Búsqueda completada. Encontrados ${results.length} resultados`);
+      
+      // Si necesitamos filtrar por alertas, obtener alertas para cada registro
+      if (onlyAlerts && !isSimpleSearch) {
+        try {
+          // Obtener todas las alertas
+          const allAlerts = await storage.getAlerts();
+          
+          // Obtener todos los IDs de excelData que tienen alertas
+          const excelDataIdsWithAlerts = new Set(
+            allAlerts.map(alert => alert.excelDataId)
+          );
+          
+          // Filtrar resultados a solo aquellos con alertas
+          results = results.filter(record => excelDataIdsWithAlerts.has(record.id));
+          console.log(`Filtrado por alertas completado. Quedan ${results.length} resultados`);
+        } catch (alertError) {
+          console.error("Error al filtrar por alertas:", alertError);
+          // Continuar con los resultados sin filtrar
+        }
+      }
+      
+      // Para cada resultado, verificar si tiene alertas y agregar una propiedad hasAlerts
+      let resultsWithAlertFlags = results;
+      
+      try {
+        const allAlerts = await storage.getAlerts();
+        resultsWithAlertFlags = results.map(record => {
+          const recordAlerts = allAlerts.filter(alert => alert.excelDataId === record.id);
+          return {
+            ...record,
+            hasAlerts: recordAlerts.length > 0
+          };
+        });
+      } catch (alertError) {
+        console.error("Error al obtener alertas para los resultados:", alertError);
+        // En caso de error, continuamos con los resultados originales
+        resultsWithAlertFlags = results.map(record => ({
+          ...record,
+          hasAlerts: false
+        }));
+      }
+      
+      // Agregar búsqueda al historial si el usuario está autenticado
+      if (req.isAuthenticated() && query.trim()) {
+        try {
+          // Usar "General" como tipo de búsqueda por defecto
+          const searchEntry: any = {
+            userId: req.user!.id,
+            searchType: "General",
+            searchTerms: query || (isSimpleSearch ? "" : "Búsqueda avanzada"),
+            searchDate: new Date(),
+            resultCount: results.length,
+            filters: isSimpleSearch ? "{}" : JSON.stringify(filters)
+          };
+          
+          await storage.addSearchHistory(searchEntry);
+        } catch (historyError) {
+          console.error("Error al guardar historial de búsqueda:", historyError);
+        }
+      }
+      
+      // Devolver resultados con información sobre alertas
+      return res.json({
+        results: resultsWithAlertFlags,
+        count: resultsWithAlertFlags.length,
+        searchType: isSimpleSearch ? "simple" : "advanced"
+      });
+    } catch (err) {
+      console.error("Error en la búsqueda:", err);
+      res.status(500).json({ 
+        error: "Error al realizar la búsqueda", 
+        message: err instanceof Error ? err.message : "Error desconocido" 
+      });
+    }
+  });
+  
+  // Original Excel search route
+  app.get("/api/search/excel-data", async (req, res, next) => {
+    try {
+      // Extract query parameters
+      const searchType = req.query.searchType as string || 'General';
+      const searchTerms = req.query.searchTerms as string;
+      const storeCode = req.query.storeCode as string;
+      
+      // Optional date filters
+      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string).toISOString() : undefined;
+      const toDate = req.query.toDate ? new Date(req.query.toDate as string).toISOString() : undefined;
+      
+      // Optional price filters
+      const priceMin = req.query.priceMin as string;
+      const priceMax = req.query.priceMax as string;
+      
+      // Optional flags
+      const includeArchived = req.query.includeArchived === 'true';
+      
+      // Field-specific search flags
+      const searchCustomerName = req.query.searchCustomerName !== 'false';
+      const searchCustomerContact = req.query.searchCustomerContact !== 'false';
+      const searchItemDetails = req.query.searchItemDetails !== 'false';
+      const searchMetals = req.query.searchMetals !== 'false';
+      const searchStones = req.query.searchStones !== 'false';
+      const searchEngravings = req.query.searchEngravings !== 'false';
+      
+      if (!searchTerms || searchTerms.length < 2) {
+        return res.status(400).json({ error: "Los términos de búsqueda deben tener al menos 2 caracteres" });
+      }
+      
+      // Construct filters object
+      const filters = {
+        storeCode,
+        fromDate,
+        toDate,
+        priceMin,
+        priceMax,
+        includeArchived,
+        searchCustomerName,
+        searchCustomerContact,
+        searchItemDetails,
+        searchMetals,
+        searchStones,
+        searchEngravings
+      };
+      
+      // Perform the search based on type
+      const results = await storage.searchExcelData(searchTerms, filters);
+      
+      // Add search to history if user is authenticated
+      if (req.isAuthenticated()) {
+        try {
+          const searchEntry: InsertSearchHistory = {
+            userId: req.user!.id,
+            searchType,
+            searchTerms,
+            searchDate: new Date(),
+            resultCount: results.length,
+            filters: JSON.stringify(filters)
+          };
+          
+          await storage.addSearchHistory(searchEntry);
+        } catch (historyError) {
+          console.error("Error saving search history:", historyError);
+          // Don't fail the request if history saving fails
+        }
+      }
+      
+      res.json({
+        results,
+        count: results.length,
+        searchType
+      });
+    } catch (error) {
+      console.error("Search error:", error);
+      res.status(500).json({ error: "Error al realizar la búsqueda" });
+    }
+  });
+  
+  // Search history routes
+  app.get("/api/search-history", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "No autorizado" });
+      }
+      
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const history = await storage.getRecentSearches(req.user!.id, limit);
+      
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: "Error al obtener historial de búsqueda" });
+      next(error);
+    }
+  });
+  
+  // Export search results
+  app.get("/api/export/excel-search", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "No autorizado" });
+      }
+      
+      const searchType = req.query.type as string || 'General';
+      const searchTerms = req.query.q as string;
+      
+      if (!searchTerms) {
+        return res.status(400).json({ error: "Se requieren términos de búsqueda" });
+      }
+      
+      // Simple implementation - just return the search results as JSON
+      // In a real implementation, you would format this as an Excel file
+      const results = await storage.searchExcelData(searchTerms, { searchType });
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="search-results-${Date.now()}.json"`);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: "Error al exportar resultados" });
+      next(error);
+    }
+  });
+  
+  // PDF document routes
+  app.get("/api/pdf-documents", async (req, res, next) => {
+    try {
+      if (!req.query.storeCode) {
+        return res.status(400).json({ message: "storeCode query parameter is required" });
+      }
+      
+      const documents = await storage.getPdfDocumentsByStore(req.query.storeCode as string);
+      res.json(documents);
+    } catch (err) {
+      next(err);
+    }
+  });
+  
+  // Ruta para búsqueda avanzada de documentos PDF
+  app.get("/api/pdf-documents/search", async (req, res, next) => {
+    try {
+      const {
+        storeCode,
+        storeName,
+        district,
+        locality,
+        dateFrom,
+        dateTo
+      } = req.query;
+      
+      // Obtener primero las tiendas que coinciden con los criterios
+      let matchingStores = await storage.getStores();
+      
+      // Filtrar tiendas por los criterios
+      if (storeCode) {
+        matchingStores = matchingStores.filter(store => 
+          store.code.toLowerCase().includes((storeCode as string).toLowerCase()));
+      }
+      
+      if (storeName) {
+        matchingStores = matchingStores.filter(store => 
+          store.name.toLowerCase().includes((storeName as string).toLowerCase()));
+      }
+      
+      // location ya no se usa, se filtran por district y locality
+      
+      if (district) {
+        matchingStores = matchingStores.filter(store => 
+          store.district && store.district.toLowerCase().includes((district as string).toLowerCase()));
+      }
+      
+      if (locality) {
+        matchingStores = matchingStores.filter(store => 
+          store.locality && store.locality.toLowerCase().includes((locality as string).toLowerCase()));
+      }
+      
+      // Extraer los códigos de tienda que coinciden
+      const storeCodesArray = matchingStores.map(store => store.code);
+      
+      // Si no hay tiendas coincidentes, devolver array vacío
+      if (storeCodesArray.length === 0) {
+        return res.json([]);
+      }
+      
+      // Obtener documentos PDF basados en los códigos de tienda y fechas
+      const documents = await storage.searchPdfDocuments({
+        storeCodes: storeCodesArray,
+        dateFrom: dateFrom as string | undefined,
+        dateTo: dateTo as string | undefined
+      });
+      
+      // Enriquecer los resultados con información de tienda
+      const enrichedDocuments = documents.map(doc => {
+        const store = matchingStores.find(s => s.code === doc.storeCode);
+        return {
+          ...doc,
+          storeName: store?.name || 'Desconocida',
+          storeDistrict: store?.district || null,
+          storeLocality: store?.locality || null
+        };
+      });
+      
+      res.json(enrichedDocuments);
+    } catch (err) {
+      console.error("Error en búsqueda de documentos PDF:", err);
+      next(err);
+    }
+  });
+  
+  // Obtener documento PDF por ID
+  app.get("/api/pdf-documents/:id", async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const document = await storage.getPdfDocument(id);
+      
+      if (!document) {
+        return res.status(404).json({ message: "Documento PDF no encontrado" });
+      }
+      
+      res.json(document);
+    } catch (err) {
+      console.error('Error obteniendo documento PDF:', err);
+      res.status(500).json({ message: "Error obteniendo documento PDF" });
+    }
+  });
+  
+  // Visualizar documento PDF por ID
+  app.get("/api/pdf-documents/:id/view", async (req, res, next) => {
+    try {
+      const id = parseInt(req.params.id);
+      const document = await storage.getPdfDocument(id);
+      
+      if (!document) {
+        return res.status(404).json({ message: "Documento PDF no encontrado" });
+      }
+      
+      // Verificar si el archivo existe
+      const filePath = document.path;
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Archivo PDF no encontrado en el servidor" });
+      }
+      
+      // Enviar el archivo PDF
+      res.sendFile(path.resolve(filePath));
+    } catch (err) {
+      console.error('Error obteniendo documento PDF:', err);
+      res.status(500).json({ message: "Error obteniendo documento PDF" });
+    }
+  });
+  
+  // File upload routes
+  // Carga individual de archivos Excel
+  app.post("/api/upload/excel", upload.single("file"), async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No se ha cargado ningún archivo" });
+      }
+      
+      // Usamos un código de tienda genérico que será reemplazado automáticamente
+      // durante el procesamiento del archivo basado en su contenido
+      const defaultStoreCode = "PENDIENTE";
+      
+      // Create file activity entry - asegurarnos de que la fecha sea una cadena para SQLite
+      const processingDate = new Date().toISOString();
+      
+      const activity = await storage.createFileActivity({
+        filename: req.file.originalname,
+        storeCode: defaultStoreCode,
+        fileType: 'Excel',
+        status: 'Pending',
+        processingDate,
+        processedBy: 'Carga Manual',
+        errorMessage: null,
+        metadata: null
+      });
+      
+      // Process the file in the background
+      // El código de tienda será determinado automáticamente desde el archivo
+      processExcelFile(req.file.path, activity.id, defaultStoreCode)
+        .catch(err => console.error("Error al procesar archivo Excel cargado:", err));
+      
+      res.status(202).json({
+        message: "Archivo cargado exitosamente y en cola para procesamiento",
+        fileActivity: activity
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+  
+  // Carga masiva de archivos Excel
+  app.post("/api/upload/excel/batch", uploadMultiple, async (req, res, next) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: "No se ha cargado ningún archivo" });
+      }
+      
+      // Usamos un código de tienda vacío, el servidor detectará automáticamente la tienda adecuada
+      const defaultStoreCode = "";
+      const activities = [];
+      
+      // Procesar cada archivo
+      const filePromises = req.files.map(async (file) => {
+        try {
+          // Crear actividad para cada archivo
+          const processingDate = new Date().toISOString();
+          
+          const activity = await storage.createFileActivity({
+            filename: file.originalname,
+            storeCode: defaultStoreCode, // Se actualizará durante el procesamiento
+            fileType: 'Excel',
+            status: 'Pending',
+            processingDate,
+            processedBy: 'Carga Masiva',
+            errorMessage: null,
+            metadata: null
+          });
+          
+          activities.push(activity);
+          
+          // Procesar archivo en segundo plano - La tienda se detectará automáticamente
+          processExcelFile(file.path, activity.id, defaultStoreCode)
+            .catch(err => console.error(`Error al procesar archivo ${file.originalname}:`, err));
+            
+          return { filename: file.originalname, status: 'Encolado' };
+        } catch (err) {
+          console.error(`Error procesando archivo ${file.originalname}:`, err);
+          return { filename: file.originalname, status: 'Error', error: err.message };
+        }
+      });
+      
+      // Esperar a que todos los archivos sean procesados
+      const results = await Promise.all(filePromises);
+      
+      res.status(202).json({
+        message: `${req.files.length} archivos cargados exitosamente y en cola para procesamiento`,
+        files: results,
+        activities: activities
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+  
+  app.post("/api/upload/pdf", upload.single("file"), async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      
+      // Usamos un código de tienda vacío, que será reemplazado automáticamente
+      // durante el procesamiento del archivo basado en su nombre
+      const defaultStoreCode = "";
+      
+      // Si se proporciona un código de tienda explícitamente, lo usamos
+      const storeCode = req.body.storeCode || defaultStoreCode;
+      
+      // Create file activity entry
+      const processingDate = new Date().toISOString();
+      
+      const activity = await storage.createFileActivity({
+        filename: req.file.originalname,
+        storeCode,
+        fileType: 'PDF',
+        status: 'Pending',
+        processingDate,
+        processedBy: 'Carga Manual',
+        errorMessage: null,
+        metadata: null
+      });
+      
+      // Process the file in the background
+      processPdfFile(req.file.path, activity.id, storeCode)
+        .catch(err => console.error("Error processing uploaded PDF file:", err));
+      
+      res.status(202).json({
+        message: "File uploaded successfully and queued for processing",
+        fileActivity: activity
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+  
+  // Carga masiva de archivos PDF
+  app.post("/api/upload/pdf/batch", uploadMultiple, async (req, res, next) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ message: "No se ha cargado ningún archivo" });
+      }
+      
+      // Usamos un código de tienda vacío, que será reemplazado automáticamente
+      // durante el procesamiento del archivo basado en su nombre
+      const defaultStoreCode = "";
+      // Si se proporciona un código de tienda explícitamente, lo usamos
+      const storeCode = req.body.storeCode || defaultStoreCode;
+      const activities = [];
+      
+      // Procesar cada archivo
+      const filePromises = req.files.map(async (file) => {
+        try {
+          // Crear actividad para cada archivo
+          const processingDate = new Date().toISOString();
+          
+          const activity = await storage.createFileActivity({
+            filename: file.originalname,
+            storeCode, // Usamos el código de tienda proporcionado o el predeterminado
+            fileType: 'PDF',
+            status: 'Pending',
+            processingDate,
+            processedBy: 'Carga Masiva',
+            errorMessage: null,
+            metadata: null
+          });
+          
+          activities.push(activity);
+          
+          // Procesar archivo en segundo plano
+          processPdfFile(file.path, activity.id, storeCode)
+            .catch(err => console.error(`Error al procesar archivo ${file.originalname}:`, err));
+            
+          return { filename: file.originalname, status: 'Encolado' };
+        } catch (err) {
+          console.error(`Error procesando archivo ${file.originalname}:`, err);
+          return { filename: file.originalname, status: 'Error', error: err.message };
+        }
+      });
+      
+      // Esperar a que todos los archivos sean procesados
+      const results = await Promise.all(filePromises);
+      
+      res.status(202).json({
+        message: `${req.files.length} archivos PDF cargados exitosamente y en cola para procesamiento`,
+        files: results,
+        activities: activities
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+  
+  // System status routes
+  app.get("/api/system/status", async (req, res) => {
+    try {
+      // Get system stats
+      const [excelStores, pdfStores, recentActivities] = await Promise.all([
+        storage.getStoresByType('Excel'),
+        storage.getStoresByType('PDF'),
+        storage.getRecentFileActivities(50)
+      ]);
+      
+      // Calculate processed today count
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const processedToday = recentActivities.filter(activity => {
+        const activityDate = new Date(activity.processingDate);
+        return activityDate >= today && activity.status === 'Processed';
+      }).length;
+      
+      // Count pending files
+      const pendingFiles = recentActivities.filter(activity => 
+        activity.status === 'Pending' || activity.status === 'Processing'
+      ).length;
+      
+      // Check if file watchers are enabled
+      const fileProcessingConfig = await storage.getConfig('FILE_PROCESSING_ENABLED');
+      const fileWatchingActive = fileProcessingConfig?.value === 'true';
+      
+      // Calcular el tamaño de la base de datos SQLite (en porcentaje respecto a 1TB máximo)
+      const getDatabaseSize = async () => {
+        try {
+          // Obtener estadísticas del archivo de la BD (SQLite)
+          const dbPath = process.env.DATABASE_PATH || './aureo_app/datos.sqlite';
+          const stats = await fs.promises.stat(dbPath);
+          const sizeInBytes = stats.size;
+          const sizeInGB = sizeInBytes / (1024 * 1024 * 1024);
+          
+          // Calcular porcentaje relativo a 1TB
+          // 1TB = 1024GB, por lo que el porcentaje sería (tamaño en GB / 1024) * 100
+          const percentageOfMaxSize = (sizeInGB / 1024) * 100;
+          
+          // Redondear a 2 decimales
+          return Math.round(percentageOfMaxSize * 100) / 100;
+        } catch (error) {
+          console.error("Error al obtener el tamaño de la base de datos:", error);
+          return 0; // Valor por defecto en caso de error
+        }
+      };
+      
+      const databaseSize = await getDatabaseSize();
+      
+      res.json({
+        totalStores: excelStores.length + pdfStores.length,
+        excelStores: excelStores.length,
+        pdfStores: pdfStores.length,
+        processedToday,
+        pendingFiles,
+        fileWatchingActive,
+        lastSystemCheck: new Date().toISOString(),
+        databaseSize
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching system status" });
+    }
+  });
+  
+  // Database purge routes (SuperAdmin only)
+  app.post("/api/system/purge/stores", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const { password, storeType } = req.body;
+        
+        // Verify password
+        if (!req.user || !await verifyAdminPassword(req.user.id, password)) {
+          return res.status(401).json({ message: "Contraseña incorrecta. Operación cancelada." });
+        }
+        
+        let result;
+        if (storeType === 'Excel') {
+          result = await storage.purgeExcelStores();
+        } else if (storeType === 'PDF') {
+          result = await storage.purgePdfStores();
+        } else {
+          result = await storage.purgeAllStores();
+        }
+        
+        res.json({ 
+          message: `Tiendas de tipo ${storeType || 'todas'} eliminadas correctamente`, 
+          count: result.count 
+        });
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.post("/api/system/purge/data", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const { password, dataType, fromDate, toDate } = req.body;
+        
+        // Verify password
+        if (!req.user || !await verifyAdminPassword(req.user.id, password)) {
+          return res.status(401).json({ message: "Contraseña incorrecta. Operación cancelada." });
+        }
+        
+        let result;
+        let dateRange = null;
+        
+        if (fromDate || toDate) {
+          dateRange = {
+            from: fromDate || null,
+            to: toDate || null
+          };
+        }
+        
+        if (dataType === 'Excel') {
+          result = await storage.purgeExcelData(dateRange);
+        } else if (dataType === 'PDF') {
+          result = await storage.purgePdfData(dateRange);
+        } else if (dataType === 'Activities') {
+          result = await storage.purgeFileActivities(dateRange);
+        } else if (dataType === 'All') {
+          result = await storage.purgeAllData(dateRange);
+        } else {
+          return res.status(400).json({ message: "Tipo de datos no válido" });
+        }
+        
+        res.json({ 
+          message: `Datos de tipo ${dataType} eliminados correctamente`, 
+          count: result.count 
+        });
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.post("/api/system/purge/all", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const { password, confirmation } = req.body;
+        
+        // Require a special confirmation phrase
+        if (confirmation !== "CONFIRMAR-ELIMINAR-TODO") {
+          return res.status(400).json({ message: "Frase de confirmación incorrecta. Operación cancelada." });
+        }
+        
+        // Verify password
+        if (!req.user || !await verifyAdminPassword(req.user.id, password)) {
+          return res.status(401).json({ message: "Contraseña incorrecta. Operación cancelada." });
+        }
+        
+        const result = await storage.purgeEntireDatabase();
+        
+        res.json({ 
+          message: "Base de datos eliminada completamente", 
+          tablesAffected: result.tablesAffected 
+        });
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Helper function to verify admin password
+  async function verifyAdminPassword(userId: number, password: string): Promise<boolean> {
+    try {
+      const user = await storage.getUser(userId);
+      if (!user) return false;
+      
+      // Comparar contraseñas manualmente ya que no podemos usar require
+      const [hashed, salt] = user.password.split(".");
+      const crypto = await import('crypto');
+      const hashedBuffer = Buffer.from(hashed, "hex");
+      const suppliedBuffer = crypto.scryptSync(password, salt, 64) as Buffer;
+      return crypto.timingSafeEqual(hashedBuffer, suppliedBuffer);
+    } catch (err) {
+      console.error("Error verifying admin password:", err);
+      return false;
+    }
+  }
+  
+  // Endpoint para verificar contraseña de administrador (utilizado para operaciones destructivas)
+  app.post("/api/verify-admin-password", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "No autenticado" });
+      }
+      
+      const { password } = req.body;
+      if (!password) {
+        return res.status(400).json({ error: "Se requiere contraseña" });
+      }
+      
+      const isValid = await verifyAdminPassword(req.user.id, password);
+      
+      if (!isValid) {
+        return res.status(403).json({ error: "Contraseña incorrecta o usuario no tiene permisos de administrador" });
+      }
+      
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error al verificar contraseña de administrador:", error);
+      res.status(500).json({ error: "Error al verificar contraseña" });
+    }
+  });
+  
+  // Start file watchers
+  app.post("/api/system/start-watchers", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Update config
+        await storage.updateConfig('FILE_PROCESSING_ENABLED', 'true');
+        
+        // Initialize watchers
+        await initializeFileWatchers();
+        
+        res.json({ message: "File watchers started successfully" });
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Stop file watchers
+  app.post("/api/system/stop-watchers", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Update config
+        await storage.updateConfig('FILE_PROCESSING_ENABLED', 'false');
+        
+        // Stop watchers
+        await stopFileWatchers();
+        
+        res.json({ message: "File watchers stopped successfully" });
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Watchlist Person routes
+  app.get("/api/watchlist/persons", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const includeInactive = req.query.includeInactive === 'true';
+        const persons = await storage.getWatchlistPersons(includeInactive);
+        res.json(persons);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.get("/api/watchlist/persons/search", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const { query } = req.query;
+        if (!query || typeof query !== 'string') {
+          return res.status(400).json({ message: "Se requiere parámetro de búsqueda" });
+        }
+        
+        // Registrar la búsqueda en el historial
+        await storage.addSearchHistory({
+          userId: req.user!.id,
+          searchType: "Cliente",
+          searchTerms: query,
+          resultCount: 0 // Se actualizará después
+        });
+        
+        const results = await storage.searchWatchlistPersons(query);
+        
+        // Actualizar el recuento de resultados
+        // En un sistema de producción, consideraríamos si vale la pena esta segunda llamada
+        // o si podríamos usar una cola de trabajos para actualizar el recuento de forma asíncrona
+        
+        res.json(results);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.post("/api/watchlist/persons", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Añadir createdBy al objeto
+        const personData = {
+          ...req.body,
+          createdBy: req.user!.id
+        };
+        
+        const person = await storage.createWatchlistPerson(personData);
+        res.status(201).json(person);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.get("/api/watchlist/persons/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const person = await storage.getWatchlistPerson(id);
+        if (!person) {
+          return res.status(404).json({ message: "Persona no encontrada" });
+        }
+        
+        res.json(person);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.patch("/api/watchlist/persons/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const updatedPerson = await storage.updateWatchlistPerson(id, req.body);
+        if (!updatedPerson) {
+          return res.status(404).json({ message: "Persona no encontrada" });
+        }
+        
+        res.json(updatedPerson);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.delete("/api/watchlist/persons/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const success = await storage.deleteWatchlistPerson(id);
+        if (!success) {
+          return res.status(404).json({ message: "Persona no encontrada" });
+        }
+        
+        res.status(204).send();
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Watchlist Item routes
+  app.get("/api/watchlist/items", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const includeInactive = req.query.includeInactive === 'true';
+        const items = await storage.getWatchlistItems(includeInactive);
+        res.json(items);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.get("/api/watchlist/items/search", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const { query } = req.query;
+        if (!query || typeof query !== 'string') {
+          return res.status(400).json({ message: "Se requiere parámetro de búsqueda" });
+        }
+        
+        // Registrar la búsqueda en el historial
+        await storage.addSearchHistory({
+          userId: req.user!.id,
+          searchType: "Artículo",
+          searchTerms: query,
+          resultCount: 0 // Se actualizará después
+        });
+        
+        const results = await storage.searchWatchlistItems(query);
+        
+        res.json(results);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.post("/api/watchlist/items", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Añadir createdBy al objeto
+        const itemData = {
+          ...req.body,
+          createdBy: req.user!.id
+        };
+        
+        const item = await storage.createWatchlistItem(itemData);
+        res.status(201).json(item);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.get("/api/watchlist/items/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const item = await storage.getWatchlistItem(id);
+        if (!item) {
+          return res.status(404).json({ message: "Artículo no encontrado" });
+        }
+        
+        res.json(item);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.patch("/api/watchlist/items/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const updatedItem = await storage.updateWatchlistItem(id, req.body);
+        if (!updatedItem) {
+          return res.status(404).json({ message: "Artículo no encontrado" });
+        }
+        
+        res.json(updatedItem);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.delete("/api/watchlist/items/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const success = await storage.deleteWatchlistItem(id);
+        if (!success) {
+          return res.status(404).json({ message: "Artículo no encontrado" });
+        }
+        
+        res.status(204).send();
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Alert routes
+  app.get("/api/alerts", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+        
+        const alerts = await storage.getAlerts(status, limit);
+        res.json(alerts);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.get("/api/alerts/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const alert = await storage.getAlert(id);
+        if (!alert) {
+          return res.status(404).json({ message: "Alerta no encontrada" });
+        }
+        
+        res.json(alert);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.post("/api/alerts", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Añadir createdBy al objeto
+        const alertData = {
+          ...req.body,
+          createdBy: req.user!.id
+        };
+        
+        const alert = await storage.createAlert(alertData);
+        res.status(201).json(alert);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.patch("/api/alerts/:id/status", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const { status, notes } = req.body;
+        if (!status) {
+          return res.status(400).json({ message: "Se requiere estado" });
+        }
+        
+        const updatedAlert = await storage.updateAlertStatus(id, status, req.user!.id, notes);
+        if (!updatedAlert) {
+          return res.status(404).json({ message: "Alerta no encontrada" });
+        }
+        
+        res.json(updatedAlert);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  app.get("/api/alerts/excel/:excelDataId", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const excelDataId = parseInt(req.params.excelDataId);
+        if (isNaN(excelDataId)) {
+          return res.status(400).json({ message: "ID inválido" });
+        }
+        
+        const alerts = await storage.getAlertsByExcelDataId(excelDataId);
+        res.json(alerts);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Search History routes
+  app.get("/api/search-history", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin", "User"])(req, res, async () => {
+      try {
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+        
+        const searchHistory = await storage.getRecentSearches(req.user!.id, limit);
+        res.json(searchHistory);
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // ===== ENDPOINTS PARA SEÑALAMIENTOS =====
+  
+  // 1. Endpoints para Señalamientos de Personas
+  app.get("/api/senalamiento/personas", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Por defecto solo mostrar activos, a menos que se indique lo contrario
+        const incluirInactivos = req.query.incluirInactivos === "true";
+        
+        const personas = await storage.getSenalPersonas(incluirInactivos);
+        res.json(personas);
+      } catch (error) {
+        console.error("Error al obtener señalamientos de personas:", error);
+        next(error);
+      }
+    });
+  });
+  
+  app.post("/api/senalamiento/personas", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const data = req.body;
+        
+        // Validar datos requeridos
+        if (!data.nombre && !data.documentoId) {
+          return res.status(400).json({ error: "Debe proporcionar al menos un nombre o un documento de identidad" });
+        }
+        
+        // Agregar ID del usuario creador
+        const senalPersona: InsertSenalPersona = {
+          ...data,
+          // Si el nombre es una cadena vacía, establecerlo como null para la base de datos
+          nombre: data.nombre || null,
+          creadoPor: req.user!.id
+        };
+        
+        const nuevaPersona = await storage.createSenalPersona(senalPersona);
+        res.status(201).json(nuevaPersona);
+      } catch (error) {
+        console.error("Error al crear señalamiento de persona:", error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/senalamiento/personas/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const persona = await storage.getSenalPersona(id);
+        if (!persona) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        res.json(persona);
+      } catch (error) {
+        console.error(`Error al obtener señalamiento de persona con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.put("/api/senalamiento/personas/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        // Obtener el señalamiento para verificar permisos
+        const persona = await storage.getSenalPersona(id);
+        if (!persona) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        // Si es Admin (no SuperAdmin), solo puede editar sus propios señalamientos
+        if (req.user!.role === "Admin" && persona.creadoPor !== req.user!.id) {
+          return res.status(403).json({ error: "Solo puedes modificar tus propios señalamientos" });
+        }
+        
+        const data = req.body;
+        
+        // Validar datos requeridos
+        if (!data.nombre && !data.documentoId) {
+          return res.status(400).json({ error: "Debe proporcionar al menos un nombre o un documento de identidad" });
+        }
+        
+        // Agregar ID del usuario que modifica
+        const updates: Partial<SenalPersona> = {
+          ...data,
+          // Si el nombre es una cadena vacía, establecerlo como null para la base de datos
+          nombre: data.nombre || null,
+          modificadoPor: req.user!.id
+        };
+        
+        const personaActualizada = await storage.updateSenalPersona(id, updates);
+        if (!personaActualizada) {
+          return res.status(404).json({ error: "No se pudo actualizar el señalamiento" });
+        }
+        
+        res.json(personaActualizada);
+      } catch (error) {
+        console.error(`Error al actualizar señalamiento de persona con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.delete("/api/senalamiento/personas/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        // Obtener el señalamiento para verificar permisos
+        const persona = await storage.getSenalPersona(id);
+        if (!persona) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        // Si es Admin (no SuperAdmin), solo puede eliminar sus propios señalamientos
+        if (req.user!.role === "Admin" && persona.creadoPor !== req.user!.id) {
+          return res.status(403).json({ error: "Solo puedes eliminar tus propios señalamientos" });
+        }
+        
+        const resultado = await storage.deleteSenalPersona(id, req.user!.id);
+        if (!resultado) {
+          return res.status(404).json({ error: "No se pudo eliminar el señalamiento" });
+        }
+        
+        res.json({ success: true, message: "Señalamiento eliminado correctamente" });
+      } catch (error) {
+        console.error(`Error al eliminar señalamiento de persona con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/senalamiento/personas/buscar/:query", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const query = req.params.query || "";
+        
+        const personas = await storage.searchSenalPersonas(query);
+        res.json(personas);
+      } catch (error) {
+        console.error(`Error al buscar señalamientos de personas con query ${req.params.query}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  // 2. Endpoints para Señalamientos de Objetos
+  app.get("/api/senalamiento/objetos", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        // Por defecto solo mostrar activos, a menos que se indique lo contrario
+        const incluirInactivos = req.query.incluirInactivos === "true";
+        
+        const objetos = await storage.getSenalObjetos(incluirInactivos);
+        res.json(objetos);
+      } catch (error) {
+        console.error("Error al obtener señalamientos de objetos:", error);
+        next(error);
+      }
+    });
+  });
+  
+  app.post("/api/senalamiento/objetos", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const data = req.body;
+        
+        // Validar que al menos uno de los campos tenga información
+        if (!data.descripcion && !data.grabacion && !data.notas) {
+          return res.status(400).json({ error: "Debe proporcionar al menos una descripción, grabación o notas" });
+        }
+        
+        // Agregar ID del usuario creador
+        const senalObjeto: InsertSenalObjeto = {
+          ...data,
+          // Si la descripción es una cadena vacía, establecerla como null para la base de datos
+          descripcion: data.descripcion || null,
+          creadoPor: req.user!.id
+        };
+        
+        const nuevoObjeto = await storage.createSenalObjeto(senalObjeto);
+        res.status(201).json(nuevoObjeto);
+      } catch (error) {
+        console.error("Error al crear señalamiento de objeto:", error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/senalamiento/objetos/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const objeto = await storage.getSenalObjeto(id);
+        if (!objeto) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        res.json(objeto);
+      } catch (error) {
+        console.error(`Error al obtener señalamiento de objeto con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.put("/api/senalamiento/objetos/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        // Obtener el señalamiento para verificar permisos
+        const objeto = await storage.getSenalObjeto(id);
+        if (!objeto) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        // Si es Admin (no SuperAdmin), solo puede editar sus propios señalamientos
+        if (req.user!.role === "Admin" && objeto.creadoPor !== req.user!.id) {
+          return res.status(403).json({ error: "Solo puedes modificar tus propios señalamientos" });
+        }
+        
+        const data = req.body;
+        
+        // Validar que al menos uno de los campos tenga información
+        if (!data.descripcion && !data.grabacion && !data.notas) {
+          return res.status(400).json({ error: "Debe proporcionar al menos una descripción, grabación o notas" });
+        }
+        
+        // Agregar ID del usuario que modifica
+        const updates: Partial<SenalObjeto> = {
+          ...data,
+          // Si la descripción es una cadena vacía, establecerla como null para la base de datos
+          descripcion: data.descripcion || null,
+          modificadoPor: req.user!.id
+        };
+        
+        const objetoActualizado = await storage.updateSenalObjeto(id, updates);
+        if (!objetoActualizado) {
+          return res.status(404).json({ error: "No se pudo actualizar el señalamiento" });
+        }
+        
+        res.json(objetoActualizado);
+      } catch (error) {
+        console.error(`Error al actualizar señalamiento de objeto con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.delete("/api/senalamiento/objetos/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        // Obtener el señalamiento para verificar permisos
+        const objeto = await storage.getSenalObjeto(id);
+        if (!objeto) {
+          return res.status(404).json({ error: "Señalamiento no encontrado" });
+        }
+        
+        // Si es Admin (no SuperAdmin), solo puede eliminar sus propios señalamientos
+        if (req.user!.role === "Admin" && objeto.creadoPor !== req.user!.id) {
+          return res.status(403).json({ error: "Solo puedes eliminar tus propios señalamientos" });
+        }
+        
+        const resultado = await storage.deleteSenalObjeto(id, req.user!.id);
+        if (!resultado) {
+          return res.status(404).json({ error: "No se pudo eliminar el señalamiento" });
+        }
+        
+        res.json({ success: true, message: "Señalamiento eliminado correctamente" });
+      } catch (error) {
+        console.error(`Error al eliminar señalamiento de objeto con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/senalamiento/objetos/buscar/:query", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const query = req.params.query || "";
+        
+        const objetos = await storage.searchSenalObjetos(query);
+        res.json(objetos);
+      } catch (error) {
+        console.error(`Error al buscar señalamientos de objetos con query ${req.params.query}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  // 3. Endpoints para Coincidencias
+  app.get("/api/coincidencias", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const estado = req.query.estado as "NoLeido" | "Leido" | "Descartado" | undefined;
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+        
+        const coincidencias = await storage.getCoincidencias(estado, limit);
+        res.json(coincidencias);
+      } catch (error) {
+        console.error("Error al obtener coincidencias:", error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/coincidencias/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const coincidencia = await storage.getCoincidencia(id);
+        if (!coincidencia) {
+          return res.status(404).json({ error: "Coincidencia no encontrada" });
+        }
+        
+        res.json(coincidencia);
+      } catch (error) {
+        console.error(`Error al obtener coincidencia con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.put("/api/coincidencias/:id/estado", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const { estado, notas } = req.body;
+        if (!estado || !["NoLeido", "Leido", "Descartado"].includes(estado)) {
+          return res.status(400).json({ error: "Estado inválido" });
+        }
+        
+        const coincidenciaActualizada = await storage.updateCoincidenciaEstado(
+          id,
+          estado as "NoLeido" | "Leido" | "Descartado",
+          req.user!.id,
+          notas
+        );
+        
+        if (!coincidenciaActualizada) {
+          return res.status(404).json({ error: "No se pudo actualizar la coincidencia" });
+        }
+        
+        res.json(coincidenciaActualizada);
+      } catch (error) {
+        console.error(`Error al actualizar estado de coincidencia con ID ${req.params.id}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/coincidencias/excel/:excelDataId", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const excelDataId = parseInt(req.params.excelDataId);
+        if (isNaN(excelDataId)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const coincidencias = await storage.getCoincidenciasByExcelDataId(excelDataId);
+        res.json(coincidencias);
+      } catch (error) {
+        console.error(`Error al obtener coincidencias para excelDataId ${req.params.excelDataId}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  app.get("/api/coincidencias/noleidas/count", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const count = await storage.getNumeroCoincidenciasNoLeidas();
+        res.json({ count });
+      } catch (error) {
+        console.error("Error al obtener número de coincidencias no leídas:", error);
+        next(error);
+      }
+    });
+  });
+  
+  // 4. Endpoint para detectar coincidencias manualmente (para pruebas)
+  app.post("/api/coincidencias/detectar/:excelDataId", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const excelDataId = parseInt(req.params.excelDataId);
+        if (isNaN(excelDataId)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        // Ejecutar detección de coincidencias
+        await storage.detectarCoincidencias(excelDataId);
+        
+        res.json({ success: true, message: "Detección de coincidencias ejecutada correctamente" });
+      } catch (error) {
+        console.error(`Error al detectar coincidencias para excelDataId ${req.params.excelDataId}:`, error);
+        next(error);
+      }
+    });
+  });
+  
+  // Initialize file watchers on startup
+  initializeFileWatchers().catch(err => 
+    console.error("Error initializing file watchers on startup:", err)
+  );
+  
+  return httpServer;
+}
 
 // Helper function to set up multer for file uploads
 function setupFileUpload() {
@@ -84,844 +2597,4 @@ function setupFileUpload() {
       }
     }
   });
-}
-
-export async function registerRoutes(app: Express): Promise<Server> {
-  // Set up authentication
-  setupAuth(app);
-  
-  // Create HTTP server for both Express and Socket.IO
-  const httpServer = createServer(app);
-  
-  // Set up Socket.IO
-  const io = setupSocketIO(httpServer);
-  
-  // Set up file upload middleware
-  const upload = setupFileUpload();
-  const uploadMultiple = setupFileUpload().array('files', 20); // Permitir hasta 20 archivos a la vez
-  
-  // User routes
-  app.get("/api/users", (req, res, next) => {
-    req.authorize(["SuperAdmin"])(req, res, async () => {
-      try {
-        const users = await storage.getUsers();
-        // Remove passwords from response
-        const sanitizedUsers = users.map(user => {
-          const { password, ...userWithoutPassword } = user;
-          return userWithoutPassword;
-        });
-        
-        res.json(sanitizedUsers);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.post("/api/users", (req, res, next) => {
-    req.authorize(["SuperAdmin"])(req, res, async () => {
-      try {
-        // Check if user already exists
-        const existingUser = await storage.getUserByUsername(req.body.username);
-        if (existingUser) {
-          return res.status(400).json({ error: "Ya existe un usuario con ese nombre de usuario" });
-        }
-        
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(req.body.password, salt);
-        
-        // Create new user with hashed password
-        const newUser = await storage.createUser({
-          ...req.body,
-          password: hashedPassword
-        });
-        
-        // Remove password from response
-        const { password, ...userWithoutPassword } = newUser;
-        
-        res.status(201).json(userWithoutPassword);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.get("/api/users/:id", (req, res, next) => {
-    req.authorize(["SuperAdmin"])(req, res, async () => {
-      try {
-        const user = await storage.getUser(parseInt(req.params.id));
-        if (!user) {
-          return res.status(404).json({ error: "Usuario no encontrado" });
-        }
-        
-        // Remove password from response
-        const { password, ...userWithoutPassword } = user;
-        
-        res.json(userWithoutPassword);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.put("/api/users/:id", (req, res, next) => {
-    req.authorize(["SuperAdmin"])(req, res, async () => {
-      try {
-        // Check if user exists
-        const user = await storage.getUser(parseInt(req.params.id));
-        if (!user) {
-          return res.status(404).json({ error: "Usuario no encontrado" });
-        }
-        
-        // Prepare update data
-        const updateData: Partial<User> = { ...req.body };
-        delete updateData.id; // Can't update ID
-        
-        // Hash password if it's being updated
-        if (updateData.password) {
-          const salt = await bcrypt.genSalt(10);
-          updateData.password = await bcrypt.hash(updateData.password, salt);
-        }
-        
-        // Update user
-        const updatedUser = await storage.updateUser(parseInt(req.params.id), updateData);
-        
-        // Remove password from response
-        const { password, ...userWithoutPassword } = updatedUser;
-        
-        res.json(userWithoutPassword);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.delete("/api/users/:id", (req, res, next) => {
-    req.authorize(["SuperAdmin"])(req, res, async () => {
-      try {
-        // Check if user exists
-        const user = await storage.getUser(parseInt(req.params.id));
-        if (!user) {
-          return res.status(404).json({ error: "Usuario no encontrado" });
-        }
-        
-        // Don't allow deleting the SuperAdmin with ID 1
-        if (user.id === 1) {
-          return res.status(403).json({ error: "No se puede eliminar el usuario SuperAdmin principal" });
-        }
-        
-        // Delete user
-        await storage.deleteUser(parseInt(req.params.id));
-        
-        res.status(204).send();
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  // Change password route with admin verification
-  app.post("/api/users/:id/change-password", (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const userId = parseInt(req.params.id);
-        const { currentPassword, newPassword } = req.body;
-        
-        // Verify if current admin password is correct
-        if (!(await verifyAdminPassword(req.user.id, currentPassword))) {
-          return res.status(403).json({ error: "Contraseña de administrador incorrecta" });
-        }
-        
-        // Hash new password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(newPassword, salt);
-        
-        // Update user's password
-        await storage.updateUserPassword(userId, hashedPassword);
-        
-        res.json({ success: true, message: "Contraseña actualizada correctamente" });
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  // Excel data routes
-  app.get("/api/excel-data", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        let { page = "1", limit = "10", ...filters } = req.query;
-        
-        // Convert to numbers
-        const pageNum = parseInt(page as string);
-        const limitNum = parseInt(limit as string);
-        
-        // Get excel data with pagination
-        const result = await storage.getExcelDataPaginated(pageNum, limitNum, filters);
-        
-        res.json(result);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.get("/api/excel-data/:id", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const excelData = await storage.getExcelData(parseInt(req.params.id));
-        if (!excelData) {
-          return res.status(404).json({ error: "Datos Excel no encontrados" });
-        }
-        
-        res.json(excelData);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  // Excel file upload route
-  app.post("/api/upload/excel", upload.single('file'), (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        if (!req.file) {
-          return res.status(400).json({ error: "No se ha subido ningún archivo" });
-        }
-        
-        const filePath = req.file.path;
-        const activityId = parseInt(req.body.activityId || "0");
-        const storeCode = req.body.storeCode || "";
-        
-        // Process Excel file and save data to storage
-        const processedData = await processExcelFile(filePath, activityId, storeCode);
-        
-        res.json({
-          success: true,
-          message: "Archivo Excel procesado correctamente",
-          data: processedData
-        });
-      } catch (err) {
-        console.error("Error processing Excel file:", err);
-        if (req.file && fs.existsSync(req.file.path)) {
-          try {
-            fs.unlinkSync(req.file.path); // Delete file on error
-          } catch (e) {
-            console.error("Error deleting file:", e);
-          }
-        }
-        next(err);
-      }
-    });
-  });
-  
-  // Excel file search route
-  app.post("/api/excel-data/search", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const { 
-          searchTerm, 
-          filters = {}, 
-          page = 1, 
-          limit = 10,
-          sortField = 'fechaCompra',
-          sortOrder = 'desc'
-        } = req.body;
-        
-        console.log("Search request:", { searchTerm, filters, page, limit, sortField, sortOrder });
-        
-        // Add search term to search history if provided
-        if (searchTerm && searchTerm.trim().length > 0) {
-          const searchEntry: InsertSearchHistory = {
-            userId: req.user.id,
-            searchTerm: searchTerm.trim(),
-            searchDate: new Date(),
-          };
-          
-          await storage.addSearchHistory(searchEntry);
-        }
-        
-        // Perform search with pagination and sorting
-        const results = await storage.searchExcelData(
-          searchTerm, 
-          filters, 
-          page, 
-          limit, 
-          sortField, 
-          sortOrder
-        );
-        
-        res.json(results);
-      } catch (err) {
-        console.error("Search error:", err);
-        next(err);
-      }
-    });
-  });
-  
-  // PDF file routes
-  app.get("/api/pdf-documents", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        let { page = "1", limit = "10", ...filters } = req.query;
-        
-        // Convert to numbers
-        const pageNum = parseInt(page as string);
-        const limitNum = parseInt(limit as string);
-        
-        // Get PDF documents with pagination
-        const result = await storage.getPdfDocumentsPaginated(pageNum, limitNum, filters);
-        
-        res.json(result);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.get("/api/pdf-documents/:id", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const pdfDocument = await storage.getPdfDocument(parseInt(req.params.id));
-        if (!pdfDocument) {
-          return res.status(404).json({ error: "Documento PDF no encontrado" });
-        }
-        
-        res.json(pdfDocument);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  // PDF file download route
-  app.get("/api/pdf-documents/:id/download", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const pdfDocument = await storage.getPdfDocument(parseInt(req.params.id));
-        if (!pdfDocument || !pdfDocument.filePath) {
-          return res.status(404).json({ error: "Documento PDF no encontrado" });
-        }
-        
-        const filePath = pdfDocument.filePath;
-        
-        // Check if file exists
-        if (!fs.existsSync(filePath)) {
-          return res.status(404).json({ error: "Archivo PDF no encontrado en el servidor" });
-        }
-        
-        // Set headers
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${pdfDocument.fileName}"`);
-        
-        // Stream file
-        const fileStream = fs.createReadStream(filePath);
-        fileStream.pipe(res);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  // PDF file upload route
-  app.post("/api/upload/pdf", upload.single('file'), (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        if (!req.file) {
-          return res.status(400).json({ error: "No se ha subido ningún archivo" });
-        }
-        
-        const filePath = req.file.path;
-        const activityId = parseInt(req.body.activityId || "0");
-        const storeCode = req.body.storeCode || "";
-        
-        // Process PDF file and save data to storage
-        const processedData = await processPdfFile(filePath, activityId, storeCode);
-        
-        res.json({
-          success: true,
-          message: "Archivo PDF procesado correctamente",
-          data: processedData
-        });
-      } catch (err) {
-        console.error("Error processing PDF file:", err);
-        if (req.file && fs.existsSync(req.file.path)) {
-          try {
-            fs.unlinkSync(req.file.path); // Delete file on error
-          } catch (e) {
-            console.error("Error deleting file:", e);
-          }
-        }
-        next(err);
-      }
-    });
-  });
-  
-  // Multiple PDF files upload route
-  app.post("/api/upload/pdfs", (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      uploadMultiple(req, res, async (err) => {
-        if (err) {
-          console.error("Error uploading multiple files:", err);
-          return res.status(400).json({ error: err.message });
-        }
-        
-        if (!req.files || (req.files as Express.Multer.File[]).length === 0) {
-          return res.status(400).json({ error: "No se han subido archivos" });
-        }
-        
-        const files = req.files as Express.Multer.File[];
-        const activityId = parseInt(req.body.activityId || "0");
-        const storeCode = req.body.storeCode || "";
-        
-        try {
-          // Process each PDF file
-          const results = [];
-          const errors = [];
-          
-          for (const file of files) {
-            try {
-              const processedData = await processPdfFile(file.path, activityId, storeCode);
-              results.push({
-                fileName: file.originalname,
-                success: true,
-                data: processedData
-              });
-            } catch (fileErr) {
-              console.error(`Error processing file ${file.originalname}:`, fileErr);
-              errors.push({
-                fileName: file.originalname,
-                error: fileErr.message
-              });
-              
-              // Delete file on error
-              if (fs.existsSync(file.path)) {
-                try {
-                  fs.unlinkSync(file.path);
-                } catch (e) {
-                  console.error("Error deleting file:", e);
-                }
-              }
-            }
-          }
-          
-          res.json({
-            success: true,
-            message: `Procesados ${results.length} archivos PDF con éxito, ${errors.length} con errores`,
-            results,
-            errors
-          });
-        } catch (err) {
-          console.error("Error processing PDF files:", err);
-          next(err);
-        }
-      });
-    });
-  });
-  
-  // Store and activity routes for dropdown lists
-  app.get("/api/stores", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const stores = await storage.getStores();
-        res.json(stores);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.get("/api/activities", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const activities = await storage.getActivities();
-        res.json(activities);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  // File watcher status route
-  app.get("/api/watcher/status", (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const status = await storage.getWatcherStatus();
-        res.json(status);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  // Toggle file watcher route
-  app.post("/api/watcher/toggle", (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const { active } = req.body;
-        
-        if (active) {
-          await initializeFileWatchers();
-        } else {
-          await stopFileWatchers();
-        }
-        
-        await storage.updateWatcherStatus(active);
-        
-        res.json({ success: true, active });
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  // Search history routes
-  app.get("/api/search-history", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const userId = req.user.id;
-        const searchHistory = await storage.getUserSearchHistory(userId);
-        res.json(searchHistory);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.delete("/api/search-history/:id", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const searchId = parseInt(req.params.id);
-        const userId = req.user.id;
-        
-        // Check if search belongs to user
-        const search = await storage.getSearchHistory(searchId);
-        if (!search || search.userId !== userId) {
-          return res.status(403).json({ error: "No tienes permiso para eliminar esta búsqueda" });
-        }
-        
-        await storage.deleteSearchHistory(searchId);
-        res.status(204).send();
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.delete("/api/search-history", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const userId = req.user.id;
-        await storage.clearUserSearchHistory(userId);
-        res.status(204).send();
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  // System status route
-  app.get("/api/system/status", (req, res) => {
-    const status = {
-      uptime: process.uptime(),
-      timestamp: Date.now(),
-      hostname: os.hostname(),
-      memory: {
-        free: os.freemem(),
-        total: os.totalmem()
-      },
-      cpu: os.cpus(),
-      network: os.networkInterfaces()
-    };
-    
-    res.json(status);
-  });
-  
-  // Storage stats route
-  app.get("/api/system/storage-stats", (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const stats = await storage.getStorageStats();
-        res.json(stats);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  // Señalamiento de personas routes
-  app.get("/api/senalamiento/personas", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        let { page = "1", limit = "10", ...filters } = req.query;
-        
-        // Convert to numbers
-        const pageNum = parseInt(page as string);
-        const limitNum = parseInt(limit as string);
-        
-        // Get señalamiento personas with pagination
-        const result = await storage.getSenalPersonasPaginated(pageNum, limitNum, filters);
-        
-        res.json(result);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.post("/api/senalamiento/personas", (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const senalPersona: InsertSenalPersona = {
-          ...req.body,
-          createdAt: new Date(),
-          createdBy: req.user.id
-        };
-        
-        const created = await storage.createSenalPersona(senalPersona);
-        res.status(201).json(created);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.get("/api/senalamiento/personas/:id", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const id = parseInt(req.params.id);
-        const senalPersona = await storage.getSenalPersona(id);
-        
-        if (!senalPersona) {
-          return res.status(404).json({ error: "Señalamiento de persona no encontrado" });
-        }
-        
-        res.json(senalPersona);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.put("/api/senalamiento/personas/:id", (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const id = parseInt(req.params.id);
-        const updateData = {
-          ...req.body,
-          updatedAt: new Date(),
-          updatedBy: req.user.id
-        };
-        
-        const updated = await storage.updateSenalPersona(id, updateData);
-        
-        if (!updated) {
-          return res.status(404).json({ error: "Señalamiento de persona no encontrado" });
-        }
-        
-        res.json(updated);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.delete("/api/senalamiento/personas/:id", (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const id = parseInt(req.params.id);
-        const deleted = await storage.deleteSenalPersona(id);
-        
-        if (!deleted) {
-          return res.status(404).json({ error: "Señalamiento de persona no encontrado" });
-        }
-        
-        res.status(204).send();
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  // Señalamiento de objetos routes
-  app.get("/api/senalamiento/objetos", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        let { page = "1", limit = "10", ...filters } = req.query;
-        
-        // Convert to numbers
-        const pageNum = parseInt(page as string);
-        const limitNum = parseInt(limit as string);
-        
-        // Get señalamiento objetos with pagination
-        const result = await storage.getSenalObjetosPaginated(pageNum, limitNum, filters);
-        
-        res.json(result);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.post("/api/senalamiento/objetos", (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const senalObjeto: InsertSenalObjeto = {
-          ...req.body,
-          createdAt: new Date(),
-          createdBy: req.user.id
-        };
-        
-        const created = await storage.createSenalObjeto(senalObjeto);
-        res.status(201).json(created);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.get("/api/senalamiento/objetos/:id", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const id = parseInt(req.params.id);
-        const senalObjeto = await storage.getSenalObjeto(id);
-        
-        if (!senalObjeto) {
-          return res.status(404).json({ error: "Señalamiento de objeto no encontrado" });
-        }
-        
-        res.json(senalObjeto);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.put("/api/senalamiento/objetos/:id", (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const id = parseInt(req.params.id);
-        const updateData = {
-          ...req.body,
-          updatedAt: new Date(),
-          updatedBy: req.user.id
-        };
-        
-        const updated = await storage.updateSenalObjeto(id, updateData);
-        
-        if (!updated) {
-          return res.status(404).json({ error: "Señalamiento de objeto no encontrado" });
-        }
-        
-        res.json(updated);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.delete("/api/senalamiento/objetos/:id", (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const id = parseInt(req.params.id);
-        const deleted = await storage.deleteSenalObjeto(id);
-        
-        if (!deleted) {
-          return res.status(404).json({ error: "Señalamiento de objeto no encontrado" });
-        }
-        
-        res.status(204).send();
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  // Coincidencias routes
-  app.get("/api/coincidencias", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        let { page = "1", limit = "10", ...filters } = req.query;
-        
-        // Convert to numbers
-        const pageNum = parseInt(page as string);
-        const limitNum = parseInt(limit as string);
-        
-        // Get coincidencias with pagination
-        const result = await storage.getCoincidenciasPaginated(pageNum, limitNum, filters);
-        
-        res.json(result);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.get("/api/coincidencias/:id", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const id = parseInt(req.params.id);
-        const coincidencia = await storage.getCoincidencia(id);
-        
-        if (!coincidencia) {
-          return res.status(404).json({ error: "Coincidencia no encontrada" });
-        }
-        
-        res.json(coincidencia);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.get("/api/excel-data/:excelDataId/coincidencias", (req, res, next) => {
-    req.authorize(["User", "Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const excelDataId = parseInt(req.params.excelDataId);
-        const coincidencias = await storage.getCoincidenciasByExcelDataId(excelDataId);
-        
-        res.json(coincidencias);
-      } catch (err) {
-        next(err);
-      }
-    });
-  });
-  
-  app.post("/api/excel-data/:excelDataId/detectar-coincidencias", (req, res, next) => {
-    req.authorize(["Admin", "SuperAdmin"])(req, res, async () => {
-      try {
-        const excelDataId = parseInt(req.params.excelDataId);
-        
-        // Get the excel data record
-        const excelData = await storage.getExcelData(excelDataId);
-        if (!excelData) {
-          return res.status(404).json({ error: "Datos Excel no encontrados" });
-        }
-        
-        // Detect coincidencias for this excel data
-        await storage.detectCoincidencias(excelDataId);
-        
-        res.json({ success: true, message: "Detección de coincidencias ejecutada correctamente" });
-      } catch (error) {
-        console.error(`Error al detectar coincidencias para excelDataId ${req.params.excelDataId}:`, error);
-        next(error);
-      }
-    });
-  });
-  
-  // Initialize file watchers on startup
-  initializeFileWatchers().catch(err => 
-    console.error("Error initializing file watchers on startup:", err)
-  );
-  
-  return httpServer;
-}
-
-// Helper function to verify admin password
-async function verifyAdminPassword(userId: number, password: string): Promise<boolean> {
-  const user = await storage.getUser(userId);
-  if (!user) return false;
-  
-  return await bcrypt.compare(password, user.password);
 }
