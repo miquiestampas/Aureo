@@ -2437,10 +2437,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/coincidencias", (req, res, next) => {
     req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
       try {
-        const estado = req.query.estado as "NoLeido" | "Leido" | "Descartado" | undefined;
+        // Convertir los valores del frontend al formato de la base de datos
+        let estado: "NoLeido" | "Leido" | "Descartado" | undefined = undefined;
+        
+        if (req.query.estado === "noleidas") {
+          estado = "NoLeido";
+        } else if (req.query.estado === "leidas") {
+          estado = "Leido";
+        } else if (req.query.estado === "descartadas") {
+          estado = "Descartado";
+        } else if (req.query.estado === "all") {
+          estado = undefined; // Todas
+        } else if (req.query.estado) {
+          estado = req.query.estado as any; // Si ya viene en el formato correcto
+        }
+        
         const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
         
+        console.log(`Buscando coincidencias con estado: ${estado || 'todas'}`);
         const coincidencias = await storage.getCoincidencias(estado, limit);
+        console.log(`Encontradas ${coincidencias.length} coincidencias`);
         res.json(coincidencias);
       } catch (error) {
         console.error("Error al obtener coincidencias:", error);
@@ -2478,14 +2494,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "ID inválido" });
         }
         
-        const { estado, notas } = req.body;
-        if (!estado || !["NoLeido", "Leido", "Descartado"].includes(estado)) {
+        // Convertir los valores del frontend al formato de la base de datos
+        let estado: "NoLeido" | "Leido" | "Descartado";
+        
+        if (req.body.estado === "noleida") {
+          estado = "NoLeido";
+        } else if (req.body.estado === "leida") {
+          estado = "Leido";
+        } else if (req.body.estado === "descartada") {
+          estado = "Descartado";
+        } else if (["NoLeido", "Leido", "Descartado"].includes(req.body.estado)) {
+          estado = req.body.estado as "NoLeido" | "Leido" | "Descartado";
+        } else {
           return res.status(400).json({ error: "Estado inválido" });
         }
         
+        const { notas } = req.body;
+        
+        console.log(`Actualizando coincidencia ${id} a estado: ${estado}`);
         const coincidenciaActualizada = await storage.updateCoincidenciaEstado(
           id,
-          estado as "NoLeido" | "Leido" | "Descartado",
+          estado,
           req.user!.id,
           notas
         );
@@ -2494,6 +2523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ error: "No se pudo actualizar la coincidencia" });
         }
         
+        console.log(`Coincidencia ${id} actualizada correctamente`);
         res.json(coincidenciaActualizada);
       } catch (error) {
         console.error(`Error al actualizar estado de coincidencia con ID ${req.params.id}:`, error);
