@@ -2856,16 +2856,16 @@ export class DatabaseStorage implements IStorage {
   
   async getAlerts(status?: string, limit: number = 50): Promise<Alert[]> {
     try {
-      // Usar SQL directo para evitar problemas con los nombres de las columnas
+      // Usar SQL directo con placeholders de SQLite (?) en lugar de $N
       let sql = `SELECT * FROM alerts`;
       const params: any[] = [];
       
       if (status) {
-        sql += ` WHERE status = $1`;
+        sql += ` WHERE status = ?`;
         params.push(status);
       }
       
-      sql += ` ORDER BY created_at DESC LIMIT $${params.length + 1}`;
+      sql += ` ORDER BY created_at DESC LIMIT ?`;
       params.push(limit);
       
       // Ejecutar la consulta SQL directa con sqlite
