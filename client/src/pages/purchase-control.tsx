@@ -79,6 +79,7 @@ import {
   AlertTriangle,
   Quote,
   Gem,
+  FileDown as FileDownIcon,
 } from "lucide-react";
 
 // Types
@@ -866,15 +867,26 @@ export default function PurchaseControlPage() {
                         </TableCell>
                         <TableCell>{record.price} €</TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewDetails(record)}
-                            title="Ver detalles"
-                            aria-label="Ver detalles de la compra"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => window.open(`/api/file-activities/${record.fileActivityId}/download`, '_blank')}
+                              title="Descargar archivo Excel"
+                              aria-label="Descargar archivo Excel original"
+                            >
+                              <FileDownIcon className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewDetails(record)}
+                              title="Ver detalles"
+                              aria-label="Ver detalles de la compra"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1061,9 +1073,13 @@ export default function PurchaseControlPage() {
                       <Printer className="h-4 w-4 mr-2" />
                       Imprimir
                     </Button>
-                    <Button variant="outline" size="sm">
-                      <Download className="h-4 w-4 mr-2" />
-                      Exportar
+                    <Button
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => window.open(`/api/file-activities/${selectedRecord.fileActivityId}/download`, '_blank')}
+                    >
+                      <FileDownIcon className="h-4 w-4 mr-2" />
+                      Descargar Excel
                     </Button>
                   </div>
                 </div>
