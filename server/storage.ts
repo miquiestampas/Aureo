@@ -2126,6 +2126,94 @@ export class DatabaseStorage implements IStorage {
         let searchTerm = query.trim();
         const isNumericQuery = !isNaN(Number(searchTerm));
         
+        // Búsqueda especial para países/provincias en búsqueda simple
+        // Verificar si el término puede ser un país/provincia (generalmente pocas palabras y no parece número)
+        const isPossibleLocation = !isNumericQuery && searchTerm.length > 2 && searchTerm.split(' ').length <= 2;
+        
+        if (isPossibleLocation) {
+          console.log("Posible búsqueda de ubicación detectada en búsqueda simple:", searchTerm);
+          
+          // Preparar variantes para búsqueda directa
+          const upperSearchTerm = searchTerm.toUpperCase();
+          
+          // Lista de países comunes con variaciones ortográficas
+          const variantesRumania = ['RUMANIA', 'RUMANÍA', 'ROMANIA', 'RUMANÌA'];
+          const variantesPeru = ['PERU', 'PERÚ', 'PERÙ'];
+          const variantesEspana = ['ESPANA', 'ESPAÑA', 'ESPANHA'];
+          
+          // Determinar si estamos buscando por algunos países específicos con variantes
+          let paisesAlternativos = [];
+          
+          if (variantesRumania.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
+            paisesAlternativos = variantesRumania;
+          } else if (variantesPeru.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
+            paisesAlternativos = variantesPeru;
+          } else if (variantesEspana.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
+            paisesAlternativos = variantesEspana;
+          }
+          
+          // Usar el mismo método que en la búsqueda avanzada para países
+          // Crear consulta SQL directa para búsqueda de países en mayúsculas
+          let sqlQuery = `
+            SELECT * FROM excel_data 
+            WHERE 
+              customer_location = '${upperSearchTerm}' OR
+              customer_location LIKE '%${upperSearchTerm}%'
+          `;
+          
+          // Agregar variantes de países si existen
+          if (paisesAlternativos.length > 0) {
+            const variantesCondition = paisesAlternativos.map(v => `customer_location = '${v}' OR customer_location LIKE '%${v}%'`).join(' OR ');
+            sqlQuery += ` OR ${variantesCondition}`;
+          }
+          
+          // Finalizar la consulta
+          sqlQuery += `
+            ORDER BY order_date DESC
+            LIMIT 100
+          `;
+          
+          console.log("Ejecutando SQL directa para búsqueda simple de ubicación:", sqlQuery);
+          
+          try {
+            // Ejecutar consulta SQL directa
+            const rawResults = sqlite.prepare(sqlQuery).all();
+            console.log(`Resultados de búsqueda simple SQL directa: ${rawResults.length}`);
+            
+            if (rawResults.length > 0) {
+              // Convertir resultados SQL crudos a objetos ExcelData
+              return rawResults.map(row => ({
+                id: row.id,
+                storeCode: row.store_code,
+                orderNumber: row.order_number,
+                orderDate: row.order_date,
+                customerName: row.customer_name,
+                customerContact: row.customer_contact,
+                customerAddress: row.customer_address,
+                customerLocation: row.customer_location,
+                itemDetails: row.item_details,
+                stones: row.stones,
+                metals: row.metals,
+                engravings: row.engravings,
+                weight: row.item_weight || null,
+                price: row.price,
+                deposit: row.deposit || null,
+                balance: row.balance || null,
+                saleDate: row.sale_date,
+                notes: row.notes || null,
+                fileActivityId: row.file_activity_id,
+                pawnTicket: row.pawn_ticket
+              }));
+            }
+          } catch (error) {
+            console.error("Error ejecutando consulta SQL directa para búsqueda simple:", error);
+          }
+        }
+        
+        // Si no se encontraron resultados con la búsqueda directa o no es una búsqueda de ubicación,
+        // continuar con la búsqueda normal
+        console.log("Continuando con búsqueda simple estándar");
+        
         // Condiciones de texto para la búsqueda - usando LOWER para ignorar mayúsculas
         // SQLite no tiene una función integrada para eliminar acentos, pero LOWER ayuda con las mayúsculas
         const textCondition = or(
