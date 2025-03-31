@@ -175,6 +175,12 @@ export default function PurchaseControlPage() {
   // Excel stores (type: Excel) for the filter
   const excelStores = stores?.filter(store => store.type === "Excel" && store.active) || [];
 
+  // Función para obtener el nombre de la tienda a partir del código
+  const getStoreName = (storeCode: string): string => {
+    const store = stores?.find(s => s.code === storeCode);
+    return store?.name || '';
+  };
+
   // Search mutation
   const searchMutation = useMutation({
     mutationFn: async (params: SearchParams) => {
@@ -804,7 +810,10 @@ export default function PurchaseControlPage() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="font-medium">{record.storeCode}</TableCell>
+                        <TableCell className="font-medium">
+                          <div>{record.storeCode}</div>
+                          <div className="text-xs text-muted-foreground">{getStoreName(record.storeCode)}</div>
+                        </TableCell>
                         <TableCell>{formatDate(record.orderDate)}</TableCell>
                         <TableCell>{record.orderNumber}</TableCell>
                         <TableCell>{record.customerName}</TableCell>
@@ -854,7 +863,10 @@ export default function PurchaseControlPage() {
                     <Label className="text-xs text-gray-500">Tienda</Label>
                     <div className="flex items-center">
                       <Store className="h-4 w-4 mr-2 text-primary" />
-                      <span className="font-medium">{selectedRecord.storeCode}</span>
+                      <div>
+                        <div className="font-medium">{selectedRecord.storeCode}</div>
+                        <div className="text-xs text-muted-foreground">{getStoreName(selectedRecord.storeCode)}</div>
+                      </div>
                     </div>
                   </div>
 
