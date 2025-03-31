@@ -856,6 +856,15 @@ export class MemStorage implements IStorage {
         console.log(`Filtrado por contacto del cliente: ${prefilteredRecords.length} registros`);
       }
       
+      // Filtro por país
+      if (filters.country) {
+        const countrySearch = filters.country.toLowerCase();
+        prefilteredRecords = prefilteredRecords.filter(record => 
+          record.country && record.country.toLowerCase().includes(countrySearch)
+        );
+        console.log(`Filtrado por país: ${prefilteredRecords.length} registros`);
+      }
+      
       // Filtro por detalles del artículo
       if (filters.itemDetails) {
         const itemDetailsSearch = filters.itemDetails.toLowerCase();
@@ -933,6 +942,7 @@ export class MemStorage implements IStorage {
           return (
             (record.customerName && record.customerName.toLowerCase().includes(searchTerms)) ||
             (record.customerContact && record.customerContact.toLowerCase().includes(searchTerms)) ||
+            (record.country && record.country.toLowerCase().includes(searchTerms)) ||
             (record.orderNumber && record.orderNumber.toLowerCase().includes(searchTerms)) ||
             (record.itemDetails && record.itemDetails.toLowerCase().includes(searchTerms)) ||
             (record.metals && record.metals.toLowerCase().includes(searchTerms)) ||
@@ -2107,6 +2117,7 @@ export class DatabaseStorage implements IStorage {
         const textCondition = or(
           like(excelData.customerName, `%${searchTerm}%`),
           like(excelData.customerContact, `%${searchTerm}%`),
+          like(excelData.country, `%${searchTerm}%`),
           like(excelData.orderNumber, `%${searchTerm}%`),
           like(excelData.itemDetails, `%${searchTerm}%`),
           like(excelData.metals, `%${searchTerm}%`),
@@ -2148,6 +2159,10 @@ export class DatabaseStorage implements IStorage {
         
         if (filters.customerContact) {
           conditions.push(like(excelData.customerContact, `%${filters.customerContact}%`));
+        }
+        
+        if (filters.country) {
+          conditions.push(like(excelData.country, `%${filters.country}%`));
         }
         
         if (filters.orderNumber) {

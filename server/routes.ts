@@ -953,6 +953,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderNumber,
         customerName,
         customerContact,
+        country,
         itemDetails,
         metals,
         engravings,
@@ -981,6 +982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (orderNumber) filters.orderNumber = orderNumber;
         if (customerName) filters.customerName = customerName;
         if (customerContact) filters.customerContact = customerContact;
+        if (country) filters.country = country;
         if (itemDetails) filters.itemDetails = itemDetails;
         if (metals) filters.metals = metals;
         if (engravings) filters.engravings = engravings;

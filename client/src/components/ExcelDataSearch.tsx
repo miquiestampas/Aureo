@@ -102,6 +102,7 @@ const searchSchema = z.object({
   toDate: z.date().optional(),
   priceMin: z.string().optional(),
   priceMax: z.string().optional(),
+  country: z.string().optional(), // Campo para búsqueda por país
   // Eliminamos la opción de incluir archivados - siempre estarán incluidos
   searchCustomerName: z.boolean().default(true),
   searchCustomerContact: z.boolean().default(true),
@@ -109,6 +110,7 @@ const searchSchema = z.object({
   searchMetals: z.boolean().default(true),
   searchStones: z.boolean().default(true),
   searchEngravings: z.boolean().default(true),
+  searchCountry: z.boolean().default(true), // Opción para buscar en campo de país
 });
 
 type SearchValues = z.infer<typeof searchSchema>;
@@ -131,6 +133,7 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       searchMetals: true,
       searchStones: true,
       searchEngravings: true,
+      searchCountry: true,
     },
   });
   
@@ -162,6 +165,11 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
         params.append('priceMax', values.priceMax);
       }
       
+      // Añadir el parámetro de país si está definido
+      if (values.country) {
+        params.append('country', values.country);
+      }
+        
       // Los registros archivados siempre se incluyen por defecto
       params.append('includeArchived', 'true');
       params.append('searchCustomerName', values.searchCustomerName.toString());
@@ -170,6 +178,7 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       params.append('searchMetals', values.searchMetals.toString());
       params.append('searchStones', values.searchStones.toString());
       params.append('searchEngravings', values.searchEngravings.toString());
+      params.append('searchCountry', values.searchCountry.toString());
       
       const response = await fetch(`/api/search/excel-data?${params.toString()}`, {
         method: 'GET',
@@ -276,12 +285,14 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       toDate: undefined,
       priceMin: undefined,
       priceMax: undefined,
+      country: undefined,
       searchCustomerName: true,
       searchCustomerContact: true,
       searchItemDetails: true,
       searchMetals: true,
       searchStones: true,
       searchEngravings: true,
+      searchCountry: true,
     });
     setSearchResults([]);
     setTotalResults(0);
@@ -531,6 +542,28 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
                       />
                     </div>
                     
+                    <FormField
+                      control={form.control}
+                      name="country"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>País</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              placeholder="Ingrese país"
+                              {...field}
+                              value={field.value || ""}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Filtrar por país de origen
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
                     <div className="space-y-2">
                       <FormLabel>Opciones de búsqueda</FormLabel>
                       <div className="space-y-2">
@@ -579,6 +612,24 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
                           </FormControl>
                           <div className="space-y-1 leading-none">
                             <FormLabel>Contacto del cliente</FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="searchCountry"
+                      render={({ field }) => (
+                        <FormItem className="flex items-start space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>País</FormLabel>
                           </div>
                         </FormItem>
                       )}

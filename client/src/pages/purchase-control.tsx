@@ -125,6 +125,7 @@ interface SearchParams {
   orderNumber?: string;
   customerName?: string;
   customerContact?: string;
+  country?: string; // Campo para país
   itemDetails?: string;
   metals?: string;
   engravings?: string; // Agregamos campo para grabaciones
@@ -143,6 +144,7 @@ export default function PurchaseControlPage() {
     storeCode: "",
     customerName: "",
     customerContact: "",
+    country: "",
     itemDetails: "",
     metals: "",
     engravings: "",
@@ -229,6 +231,7 @@ export default function PurchaseControlPage() {
         orderNumber: searchParams.orderNumber || undefined,
         customerName: searchParams.customerName || undefined,
         customerContact: searchParams.customerContact || undefined,
+        country: searchParams.country || undefined,
         itemDetails: searchParams.itemDetails || undefined,
         metals: searchParams.metals || undefined,
         engravings: searchParams.engravings || undefined,
@@ -491,6 +494,23 @@ export default function PurchaseControlPage() {
                   </div>
 
                   <div>
+                    <Label htmlFor="country">País</Label>
+                    <Input
+                      id="country"
+                      placeholder="País de origen"
+                      value={searchParams.country || ""}
+                      onChange={(e) =>
+                        setSearchParams({
+                          ...searchParams,
+                          country: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
                     <Label htmlFor="order-number">Número de Orden</Label>
                     <Input
                       id="order-number"
@@ -649,8 +669,14 @@ export default function PurchaseControlPage() {
                         storeCode: "all",
                         customerName: "",
                         customerContact: "",
+                        country: "",
                         itemDetails: "",
                         metals: "",
+                        engravings: "",
+                        stones: "",
+                        price: "",
+                        priceOperator: "=",
+                        onlyAlerts: false
                       });
                       setDateFrom(undefined);
                       setDateTo(undefined);
