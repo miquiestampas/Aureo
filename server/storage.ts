@@ -2100,19 +2100,21 @@ export class DatabaseStorage implements IStorage {
       
       // Procesar la consulta general si existe
       if (query && query.trim() !== '') {
-        const searchTerm = query.trim();
+        // Normalizar el término de búsqueda: convertir a minúsculas y quitar acentos
+        let searchTerm = query.trim();
         const isNumericQuery = !isNaN(Number(searchTerm));
         
-        // Condiciones de texto para la búsqueda
+        // Condiciones de texto para la búsqueda - usando LOWER para ignorar mayúsculas
+        // SQLite no tiene una función integrada para eliminar acentos, pero LOWER ayuda con las mayúsculas
         const textCondition = or(
-          like(excelData.customerName, `%${searchTerm}%`),
-          like(excelData.customerContact, `%${searchTerm}%`),
-          like(excelData.orderNumber, `%${searchTerm}%`),
-          like(excelData.itemDetails, `%${searchTerm}%`),
-          like(excelData.metals, `%${searchTerm}%`),
-          like(excelData.engravings, `%${searchTerm}%`),
-          like(excelData.stones, `%${searchTerm}%`),
-          like(excelData.pawnTicket, `%${searchTerm}%`)
+          like(sql`LOWER(${excelData.customerName})`, `%${searchTerm.toLowerCase()}%`),
+          like(sql`LOWER(${excelData.customerContact})`, `%${searchTerm.toLowerCase()}%`),
+          like(sql`LOWER(${excelData.orderNumber})`, `%${searchTerm.toLowerCase()}%`),
+          like(sql`LOWER(${excelData.itemDetails})`, `%${searchTerm.toLowerCase()}%`),
+          like(sql`LOWER(${excelData.metals})`, `%${searchTerm.toLowerCase()}%`),
+          like(sql`LOWER(${excelData.engravings})`, `%${searchTerm.toLowerCase()}%`),
+          like(sql`LOWER(${excelData.stones})`, `%${searchTerm.toLowerCase()}%`),
+          like(sql`LOWER(${excelData.pawnTicket})`, `%${searchTerm.toLowerCase()}%`)
         );
         
         conditions.push(textCondition);
@@ -2141,37 +2143,37 @@ export class DatabaseStorage implements IStorage {
           conditions.push(eq(excelData.storeCode, filters.storeCode));
         }
         
-        // Filtros específicos por campo de texto
+        // Filtros específicos por campo de texto - usando LOWER para ignorar mayúsculas
         if (filters.customerName) {
-          conditions.push(like(excelData.customerName, `%${filters.customerName}%`));
+          conditions.push(like(sql`LOWER(${excelData.customerName})`, `%${filters.customerName.toLowerCase()}%`));
         }
         
         if (filters.customerContact) {
-          conditions.push(like(excelData.customerContact, `%${filters.customerContact}%`));
+          conditions.push(like(sql`LOWER(${excelData.customerContact})`, `%${filters.customerContact.toLowerCase()}%`));
         }
         
         if (filters.customerLocation) {
-          conditions.push(like(excelData.customerLocation, `%${filters.customerLocation}%`));
+          conditions.push(like(sql`LOWER(${excelData.customerLocation})`, `%${filters.customerLocation.toLowerCase()}%`));
         }
         
         if (filters.orderNumber) {
-          conditions.push(like(excelData.orderNumber, `%${filters.orderNumber}%`));
+          conditions.push(like(sql`LOWER(${excelData.orderNumber})`, `%${filters.orderNumber.toLowerCase()}%`));
         }
         
         if (filters.itemDetails) {
-          conditions.push(like(excelData.itemDetails, `%${filters.itemDetails}%`));
+          conditions.push(like(sql`LOWER(${excelData.itemDetails})`, `%${filters.itemDetails.toLowerCase()}%`));
         }
         
         if (filters.metals) {
-          conditions.push(like(excelData.metals, `%${filters.metals}%`));
+          conditions.push(like(sql`LOWER(${excelData.metals})`, `%${filters.metals.toLowerCase()}%`));
         }
         
         if (filters.engravings) {
-          conditions.push(like(excelData.engravings, `%${filters.engravings}%`));
+          conditions.push(like(sql`LOWER(${excelData.engravings})`, `%${filters.engravings.toLowerCase()}%`));
         }
         
         if (filters.stones) {
-          conditions.push(like(excelData.stones, `%${filters.stones}%`));
+          conditions.push(like(sql`LOWER(${excelData.stones})`, `%${filters.stones.toLowerCase()}%`));
         }
         
         // Filtros de fecha
