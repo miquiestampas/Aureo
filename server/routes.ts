@@ -953,7 +953,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderNumber,
         customerName,
         customerContact,
-        customerLocation,
         itemDetails,
         metals,
         engravings,
@@ -982,7 +981,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (orderNumber) filters.orderNumber = orderNumber;
         if (customerName) filters.customerName = customerName;
         if (customerContact) filters.customerContact = customerContact;
-        if (customerLocation) filters.customerLocation = customerLocation;
         if (itemDetails) filters.itemDetails = itemDetails;
         if (metals) filters.metals = metals;
         if (engravings) filters.engravings = engravings;
@@ -1117,7 +1115,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Field-specific search flags
       const searchCustomerName = req.query.searchCustomerName !== 'false';
       const searchCustomerContact = req.query.searchCustomerContact !== 'false';
-      const searchCustomerLocation = req.query.searchCustomerLocation !== 'false';
       const searchItemDetails = req.query.searchItemDetails !== 'false';
       const searchMetals = req.query.searchMetals !== 'false';
       const searchStones = req.query.searchStones !== 'false';
@@ -1137,7 +1134,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         includeArchived,
         searchCustomerName,
         searchCustomerContact,
-        searchCustomerLocation,
         searchItemDetails,
         searchMetals,
         searchStones,

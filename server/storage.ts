@@ -1930,9 +1930,6 @@ export class DatabaseStorage implements IStorage {
           ? insertData.orderDate 
           : (insertData.orderDate instanceof Date ? insertData.orderDate.toISOString() : new Date().toISOString()),
         
-        // Asegurarse de que customerLocation es string o null
-        customerLocation: insertData.customerLocation || null,
-        
         // Asegurarse de que saleDate es string o null
         saleDate: insertData.saleDate 
           ? (typeof insertData.saleDate === 'string' 
@@ -2110,7 +2107,6 @@ export class DatabaseStorage implements IStorage {
         const textCondition = or(
           like(excelData.customerName, `%${searchTerm}%`),
           like(excelData.customerContact, `%${searchTerm}%`),
-          like(excelData.customerLocation, `%${searchTerm}%`),
           like(excelData.orderNumber, `%${searchTerm}%`),
           like(excelData.itemDetails, `%${searchTerm}%`),
           like(excelData.metals, `%${searchTerm}%`),
@@ -2152,10 +2148,6 @@ export class DatabaseStorage implements IStorage {
         
         if (filters.customerContact) {
           conditions.push(like(excelData.customerContact, `%${filters.customerContact}%`));
-        }
-        
-        if (filters.customerLocation) {
-          conditions.push(like(excelData.customerLocation, `%${filters.customerLocation}%`));
         }
         
         if (filters.orderNumber) {

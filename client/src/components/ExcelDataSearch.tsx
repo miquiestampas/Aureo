@@ -56,7 +56,6 @@ interface ExcelData {
   orderDate: string;
   customerName: string;
   customerContact: string;
-  customerLocation: string | null; // Añadido campo customerLocation
   itemDetails: string;
   metals: string;
   engravings: string;
@@ -106,7 +105,6 @@ const searchSchema = z.object({
   // Eliminamos la opción de incluir archivados - siempre estarán incluidos
   searchCustomerName: z.boolean().default(true),
   searchCustomerContact: z.boolean().default(true),
-  searchCustomerLocation: z.boolean().default(true), // Añadido campo para buscar en ubicación del cliente
   searchItemDetails: z.boolean().default(true),
   searchMetals: z.boolean().default(true),
   searchStones: z.boolean().default(true),
@@ -129,7 +127,6 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       searchTerms: "",
       searchCustomerName: true,
       searchCustomerContact: true,
-      searchCustomerLocation: true, // Añadido valor predeterminado para customerLocation
       searchItemDetails: true,
       searchMetals: true,
       searchStones: true,
@@ -169,7 +166,6 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       params.append('includeArchived', 'true');
       params.append('searchCustomerName', values.searchCustomerName.toString());
       params.append('searchCustomerContact', values.searchCustomerContact.toString());
-      params.append('searchCustomerLocation', values.searchCustomerLocation.toString());
       params.append('searchItemDetails', values.searchItemDetails.toString());
       params.append('searchMetals', values.searchMetals.toString());
       params.append('searchStones', values.searchStones.toString());
@@ -249,11 +245,6 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       header: "Cliente",
     },
     {
-      accessorKey: "customerLocation",
-      header: "Ubicación",
-      cell: ({ row }) => row.original.customerLocation || "-",
-    },
-    {
       accessorKey: "itemDetails",
       header: "Artículo",
     },
@@ -287,7 +278,6 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       priceMax: undefined,
       searchCustomerName: true,
       searchCustomerContact: true,
-      searchCustomerLocation: true,
       searchItemDetails: true,
       searchMetals: true,
       searchStones: true,
@@ -379,7 +369,7 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
                             </div>
                           </FormControl>
                           <FormDescription>
-                            {form.getValues("searchType") === "Cliente" && "Buscar por nombre, contacto o ubicación del cliente"}
+                            {form.getValues("searchType") === "Cliente" && "Buscar por nombre o contacto del cliente"}
                             {form.getValues("searchType") === "Artículo" && "Buscar por detalles, metales, piedras o grabados"}
                             {form.getValues("searchType") === "Orden" && "Buscar por número de orden o boleta"}
                             {form.getValues("searchType") === "General" && "Buscar en todos los campos disponibles"}
@@ -589,24 +579,6 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
                           </FormControl>
                           <div className="space-y-1 leading-none">
                             <FormLabel>Contacto del cliente</FormLabel>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="searchCustomerLocation"
-                      render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Ubicación del cliente</FormLabel>
                           </div>
                         </FormItem>
                       )}
