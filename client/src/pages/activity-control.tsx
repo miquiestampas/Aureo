@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { StoreSelector } from "@/components/StoreSelector";
 
 // Definición del tipo para Store
 type StoreType = "Excel" | "PDF";
@@ -84,6 +85,7 @@ export default function ActivityControlPage() {
   const [showActivityDialog, setShowActivityDialog] = useState(false);
   const [storeActivityHistory, setStoreActivityHistory] = useState<FileActivity[]>([]);
   const [isLoadingActivityHistory, setIsLoadingActivityHistory] = useState(false);
+  const [selectedStoreId, setSelectedStoreId] = useState("");
 
   // Fetch stores
   const { data: storesData = [], isLoading: isLoadingStores } = useQuery<Store[]>({
@@ -223,6 +225,22 @@ export default function ActivityControlPage() {
     
     // Abrir en una nueva pestaña
     window.open(`/api/file-activities/${activity.id}/view`, '_blank');
+  };
+  
+  // Manejar selección de tienda en el StoreSelector
+  const handleStoreChange = (storeId: string) => {
+    setSelectedStoreId(storeId);
+    
+    if (storeId && stores) {
+      const store = stores.find(s => s.id.toString() === storeId);
+      if (store) {
+        setCodeFilter(store.code);
+        setNameFilter(store.name);
+      }
+    } else {
+      setCodeFilter("");
+      setNameFilter("");
+    }
   };
 
   // Columnas para la tabla de tiendas
@@ -550,6 +568,23 @@ export default function ActivityControlPage() {
                 </Select>
               </div>
             </div>
+            
+            <div className="mt-4 flex justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setSelectedStoreId("");
+                  setCodeFilter("");
+                  setNameFilter("");
+                  setLocalityFilter("");
+                  setDistrictFilter("");
+                  setTypeFilter("all");
+                  setStatusFilter("all");
+                }}
+              >
+                Limpiar Filtros
+              </Button>
+            </div>
           </CardContent>
         </Card>
         
@@ -572,6 +607,16 @@ export default function ActivityControlPage() {
             ) : (
               <>
                 <div className="rounded-md border">
+                  <div className="mb-4 p-4 border-b w-full">
+                    <div className="flex flex-col space-y-2">
+                      <label className="text-sm font-medium">Buscar tienda</label>
+                      <StoreSelector 
+                        value={selectedStoreId}
+                        onChange={handleStoreChange}
+                        placeholder="Seleccione o busque una tienda"
+                      />
+                    </div>
+                  </div>
                   <DataTable 
                     columns={storeColumns} 
                     data={filteredStoreActivities}
