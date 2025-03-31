@@ -7,6 +7,13 @@ import { es } from "date-fns/locale";
 
 // Components
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -143,6 +150,8 @@ interface SearchParams {
 export default function PurchaseControlPage() {
   const { toast } = useToast();
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isStoreDetailDialogOpen, setIsStoreDetailDialogOpen] = useState(false);
+  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchParams, setSearchParams] = useState<SearchParams>({
     query: "",
@@ -179,6 +188,21 @@ export default function PurchaseControlPage() {
   const getStoreName = (storeCode: string): string => {
     const store = stores?.find(s => s.code === storeCode);
     return store?.name || '';
+  };
+  
+  // Función para manejar el clic en el código de tienda y mostrar detalles
+  const handleViewStoreDetails = (storeCode: string) => {
+    const store = stores?.find(s => s.code === storeCode);
+    if (store) {
+      setSelectedStore(store);
+      setIsStoreDetailDialogOpen(true);
+    } else {
+      toast({
+        title: "Tienda no encontrada",
+        description: `No se encontró información de la tienda con código ${storeCode}`,
+        variant: "destructive",
+      });
+    }
   };
 
   // Search mutation
@@ -811,8 +835,22 @@ export default function PurchaseControlPage() {
                           )}
                         </TableCell>
                         <TableCell className="font-medium">
-                          <div>{record.storeCode}</div>
-                          <div className="text-xs text-muted-foreground">{getStoreName(record.storeCode)}</div>
+                          <div>
+                            <button 
+                              onClick={() => handleViewStoreDetails(record.storeCode)}
+                              className="text-primary hover:underline cursor-pointer"
+                            >
+                              {record.storeCode}
+                            </button>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            <button 
+                              onClick={() => handleViewStoreDetails(record.storeCode)}
+                              className="hover:underline cursor-pointer"
+                            >
+                              {getStoreName(record.storeCode)}
+                            </button>
+                          </div>
                         </TableCell>
                         <TableCell>{formatDate(record.orderDate)}</TableCell>
                         <TableCell>{record.orderNumber}</TableCell>
@@ -864,8 +902,20 @@ export default function PurchaseControlPage() {
                     <div className="flex items-center">
                       <Store className="h-4 w-4 mr-2 text-primary" />
                       <div>
-                        <div className="font-medium">{selectedRecord.storeCode}</div>
-                        <div className="text-xs text-muted-foreground">{getStoreName(selectedRecord.storeCode)}</div>
+                        <button 
+                          onClick={() => handleViewStoreDetails(selectedRecord.storeCode)}
+                          className="font-medium text-primary hover:underline cursor-pointer"
+                        >
+                          {selectedRecord.storeCode}
+                        </button>
+                        <div className="text-xs text-muted-foreground">
+                          <button 
+                            onClick={() => handleViewStoreDetails(selectedRecord.storeCode)}
+                            className="hover:underline cursor-pointer"
+                          >
+                            {getStoreName(selectedRecord.storeCode)}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1021,6 +1071,62 @@ export default function PurchaseControlPage() {
           </Sheet>
         )}
       </div>
+
+      {/* Diálogo de detalles de la tienda */}
+      <Dialog open={isStoreDetailDialogOpen} onOpenChange={setIsStoreDetailDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Detalles de la Tienda</DialogTitle>
+            <DialogDescription>
+              Información completa sobre la tienda seleccionada.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedStore && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-[120px_1fr] gap-2">
+                <span className="font-medium text-gray-500">Código:</span>
+                <span>{selectedStore.code}</span>
+                
+                <span className="font-medium text-gray-500">Nombre:</span>
+                <span>{selectedStore.name}</span>
+                
+                <span className="font-medium text-gray-500">Tipo:</span>
+                <span>{selectedStore.type}</span>
+                
+                <span className="font-medium text-gray-500">Ubicación:</span>
+                <span>{selectedStore.location}</span>
+                
+                {selectedStore.district && (
+                  <>
+                    <span className="font-medium text-gray-500">Distrito:</span>
+                    <span>{selectedStore.district}</span>
+                  </>
+                )}
+                
+                {selectedStore.locality && (
+                  <>
+                    <span className="font-medium text-gray-500">Localidad:</span>
+                    <span>{selectedStore.locality}</span>
+                  </>
+                )}
+                
+                <span className="font-medium text-gray-500">Estado:</span>
+                <span>
+                  {selectedStore.active ? (
+                    <Badge variant="outline" className="bg-green-100 text-green-800">
+                      Activa
+                    </Badge>
+                  ) : (
+                    <Badge variant="destructive" className="bg-red-100 text-red-800">
+                      Inactiva
+                    </Badge>
+                  )}
+                </span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
