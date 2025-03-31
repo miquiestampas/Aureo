@@ -37,6 +37,7 @@ import {
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { StoreSelector } from "@/components/StoreSelector";
 
 interface PdfDocument {
   id: number;
@@ -54,6 +55,7 @@ interface PdfDocument {
 }
 
 export default function PdfListingsPage() {
+  const [selectedStoreId, setSelectedStoreId] = useState("");
   const [storeCode, setStoreCode] = useState("");
   const [storeName, setStoreName] = useState("");
   const [location, setLocation] = useState("");
@@ -63,6 +65,28 @@ export default function PdfListingsPage() {
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
+  
+  // Obtener información de la tienda seleccionada
+  const { data: stores } = useQuery<any[]>({
+    queryKey: ['/api/stores'],
+  });
+  
+  // Manejar cambio de tienda seleccionada
+  const handleStoreChange = (storeId: string) => {
+    setSelectedStoreId(storeId);
+    
+    if (storeId && stores) {
+      const selectedStore = stores.find(store => store.id.toString() === storeId);
+      if (selectedStore) {
+        setStoreCode(selectedStore.code);
+        setStoreName(selectedStore.name);
+      }
+    } else {
+      // Limpiar campos si no se selecciona ninguna tienda
+      setStoreCode("");
+      setStoreName("");
+    }
+  };
 
   // Construir los parámetros de búsqueda
   const buildSearchParams = () => {
@@ -132,6 +156,7 @@ export default function PdfListingsPage() {
 
   // Limpiar filtros
   const clearFilters = () => {
+    setSelectedStoreId("");
     setStoreCode("");
     setStoreName("");
     setLocation("");
@@ -186,6 +211,14 @@ export default function PdfListingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Columna 1: Tienda */}
             <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Selector de Tienda</label>
+                <StoreSelector 
+                  value={selectedStoreId}
+                  onChange={handleStoreChange}
+                  placeholder="Seleccione una tienda"
+                />
+              </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Código de Tienda</label>
                 <Input 
