@@ -804,12 +804,7 @@ export default function PurchaseControlPage() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="font-medium">
-                          <div>{record.storeCode}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {excelStores.find(store => store.code === record.storeCode)?.name || ''}
-                          </div>
-                        </TableCell>
+                        <TableCell className="font-medium">{record.storeCode}</TableCell>
                         <TableCell>{formatDate(record.orderDate)}</TableCell>
                         <TableCell>{record.orderNumber}</TableCell>
                         <TableCell>{record.customerName}</TableCell>
@@ -859,12 +854,7 @@ export default function PurchaseControlPage() {
                     <Label className="text-xs text-gray-500">Tienda</Label>
                     <div className="flex items-center">
                       <Store className="h-4 w-4 mr-2 text-primary" />
-                      <div>
-                        <span className="font-medium">{selectedRecord.storeCode}</span>
-                        <div className="text-xs text-muted-foreground">
-                          {excelStores.find(store => store.code === selectedRecord.storeCode)?.name || ''}
-                        </div>
-                      </div>
+                      <span className="font-medium">{selectedRecord.storeCode}</span>
                     </div>
                   </div>
 
