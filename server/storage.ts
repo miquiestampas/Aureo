@@ -2237,10 +2237,12 @@ export class DatabaseStorage implements IStorage {
                 stones: row.stones,
                 metals: row.metals,
                 engravings: row.engravings,
-                itemWeight: row.item_weight || null,
-                carats: row.carats || null,
+                weight: row.item_weight || null,
                 price: row.price,
+                deposit: row.deposit || null,
+                balance: row.balance || null,
                 saleDate: row.sale_date,
+                notes: row.notes || null,
                 fileActivityId: row.file_activity_id,
                 pawnTicket: row.pawn_ticket
               }));
@@ -2377,10 +2379,12 @@ export class DatabaseStorage implements IStorage {
                 stones: row.stones,
                 metals: row.metals,
                 engravings: row.engravings,
-                itemWeight: row.item_weight || null,
-                carats: row.carats || null,
+                weight: row.item_weight || null, // Corregido: weight → item_weight
                 price: row.price,
+                deposit: row.deposit || null,
+                balance: row.balance || null,
                 saleDate: row.sale_date,
+                notes: row.notes || null,
                 fileActivityId: row.file_activity_id,
                 pawnTicket: row.pawn_ticket
               }));
