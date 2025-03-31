@@ -1179,7 +1179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Crear un nuevo libro de Excel
-      const workbook = new ExcelJS.Workbook();
+      const workbook = new ExcelJS.default.Workbook();
       const worksheet = workbook.addWorksheet('Resultados de Búsqueda');
 
       // Definir las cabeceras
