@@ -122,8 +122,16 @@ export default function StoreInfoDialog({ store, open, onClose }: StoreInfoDialo
                 <div className="flex items-start">
                   <MapPin className="h-4 w-4 mr-2 mt-1 text-muted-foreground" />
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground">Ubicación</h4>
+                    <h4 className="text-sm font-medium text-muted-foreground">Localidad-Distrito</h4>
                     <p className="text-base">{store.location || "No especificada"}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start">
+                  <MapPin className="h-4 w-4 mr-2 mt-1 text-muted-foreground" />
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground">Dirección</h4>
+                    <p className="text-base">{store.address || "No especificada"}</p>
                   </div>
                 </div>
                 

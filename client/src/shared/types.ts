@@ -7,6 +7,7 @@ export interface Store {
   type: string;
   location: string;
   active: boolean;
+  address?: string;
   phone?: string;
   email?: string;
   details?: string;
