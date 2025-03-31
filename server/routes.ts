@@ -265,7 +265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let validPrices = 0;
       
       orders.forEach(order => {
-        const price = parseFloat(order.price.replace(/[^\d.-]/g, ''));
+        const price = parseFloat(order.price?.replace(/[^\d.-]/g, '') || "0");
         if (!isNaN(price)) {
           totalPrice += price;
           validPrices++;
@@ -322,6 +322,187 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (err) {
       console.error("Error al obtener estadísticas de tienda:", err);
+      next(err);
+    }
+  });
+  
+  // Endpoint para obtener estadísticas avanzadas de una tienda
+  app.get("/api/stores/:storeCode/advanced-stats", async (req, res, next) => {
+    try {
+      const storeCode = req.params.storeCode.trim();
+      
+      // Obtener órdenes para la tienda
+      const orders = await storage.getExcelDataByStore(storeCode);
+      
+      // Si no hay órdenes, devolver estadísticas vacías
+      if (!orders || orders.length === 0) {
+        return res.status(200).json({
+          ordersByMonth: [],
+          priceDistribution: [],
+          topMetals: [],
+          topStones: [],
+          customerMetrics: {
+            totalCustomers: 0,
+            returningCustomers: 0,
+            returningRate: "0%"
+          },
+          performanceMetrics: {
+            avgOrdersPerMonth: 0,
+            peakMonth: "N/A",
+            peakMonthValue: 0
+          }
+        });
+      }
+      
+      // Calcular distribución de órdenes por mes
+      const ordersByMonth: {month: string, count: number}[] = [];
+      const monthCounts: Record<string, number> = {};
+      
+      // Calcular distribución de precios
+      const priceRanges: Record<string, number> = {
+        "0-50€": 0,
+        "51-100€": 0,
+        "101-200€": 0,
+        "201-500€": 0,
+        "501-1000€": 0,
+        "+1000€": 0
+      };
+      
+      // Clientes únicos
+      const uniqueCustomers = new Set<string>();
+      const customerOrders: Record<string, number> = {};
+      
+      // Contador para metales y piedras
+      const metalCounts: Record<string, number> = {};
+      const stoneCounts: Record<string, number> = {};
+      
+      // Procesar cada orden
+      orders.forEach(order => {
+        // Conteo por mes
+        const date = new Date(order.orderDate);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
+        
+        // Distribución de precio
+        const price = parseFloat(order.price?.replace(/[^\d.-]/g, '') || "0");
+        if (!isNaN(price)) {
+          if (price <= 50) priceRanges["0-50€"]++;
+          else if (price <= 100) priceRanges["51-100€"]++;
+          else if (price <= 200) priceRanges["101-200€"]++;
+          else if (price <= 500) priceRanges["201-500€"]++;
+          else if (price <= 1000) priceRanges["501-1000€"]++;
+          else priceRanges["+1000€"]++;
+        }
+        
+        // Clientes
+        if (order.customerName) {
+          const customerKey = order.customerName.toUpperCase().trim();
+          uniqueCustomers.add(customerKey);
+          customerOrders[customerKey] = (customerOrders[customerKey] || 0) + 1;
+        }
+        
+        // Metales
+        if (order.metals) {
+          const metals = order.metals.split(',').map(m => m.trim().toUpperCase());
+          metals.forEach(metal => {
+            if (metal && metal.length > 0) {
+              metalCounts[metal] = (metalCounts[metal] || 0) + 1;
+            }
+          });
+        }
+        
+        // Piedras
+        if (order.stones) {
+          const stones = order.stones.split(',').map(s => s.trim().toUpperCase());
+          stones.forEach(stone => {
+            if (stone && stone.length > 0) {
+              stoneCounts[stone] = (stoneCounts[stone] || 0) + 1;
+            }
+          });
+        }
+      });
+      
+      // Convertir conteo de meses a array ordenado
+      const monthEntries = Object.entries(monthCounts);
+      monthEntries.sort((a, b) => a[0].localeCompare(b[0]));
+      
+      const ordersByMonthArray = monthEntries.map(([month, count]) => {
+        const [year, monthNum] = month.split('-');
+        const monthName = new Date(parseInt(year), parseInt(monthNum) - 1, 1)
+          .toLocaleDateString('es-ES', { month: 'long' });
+        return {
+          month: `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`,
+          count
+        };
+      });
+      
+      // Convertir distribución de precios a array
+      const priceDistribution = Object.entries(priceRanges).map(([range, count]) => {
+        return { range, count };
+      });
+      
+      // Top metales
+      const topMetals = Object.entries(metalCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([metal, count]) => {
+          return { metal, count, percentage: Math.round((count / orders.length) * 100) };
+        });
+      
+      // Top piedras
+      const topStones = Object.entries(stoneCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([stone, count]) => {
+          return { stone, count, percentage: Math.round((count / orders.length) * 100) };
+        });
+      
+      // Métricas de clientes
+      const totalCustomers = uniqueCustomers.size;
+      const returningCustomers = Object.values(customerOrders).filter(count => count > 1).length;
+      const returningRate = totalCustomers > 0 
+        ? `${Math.round((returningCustomers / totalCustomers) * 100)}%` 
+        : "0%";
+      
+      // Métricas de rendimiento
+      let peakMonth = "N/A";
+      let peakMonthValue = 0;
+      
+      Object.entries(monthCounts).forEach(([month, count]) => {
+        if (count > peakMonthValue) {
+          peakMonthValue = count;
+          const [year, monthNum] = month.split('-');
+          const monthName = new Date(parseInt(year), parseInt(monthNum) - 1, 1)
+            .toLocaleDateString('es-ES', { month: 'long' });
+          peakMonth = `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
+        }
+      });
+      
+      // Calcular promedio de órdenes por mes si hay datos
+      const uniqueMonths = Object.keys(monthCounts).length;
+      const avgOrdersPerMonth = uniqueMonths > 0 
+        ? Math.round(orders.length / uniqueMonths) 
+        : 0;
+      
+      res.status(200).json({
+        ordersByMonth: ordersByMonthArray,
+        priceDistribution,
+        topMetals,
+        topStones,
+        customerMetrics: {
+          totalCustomers,
+          returningCustomers,
+          returningRate
+        },
+        performanceMetrics: {
+          avgOrdersPerMonth,
+          peakMonth,
+          peakMonthValue
+        }
+      });
+      
+    } catch (err) {
+      console.error("Error al obtener estadísticas avanzadas de tienda:", err);
       next(err);
     }
   });

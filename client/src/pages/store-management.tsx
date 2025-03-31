@@ -8,6 +8,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { StoreSelector } from "@/components/StoreSelector";
+import { StoreActivityStats } from "@/components/StoreActivityStats";
+import { StoreAdvancedStats } from "@/components/StoreAdvancedStats";
 
 // Lista de localidades de Madrid
 const MADRID_LOCALITIES = [
@@ -123,6 +125,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1992,7 +2001,7 @@ export default function StoreManagementPage() {
         {/* Store Details Dialog */}
         {selectedStore && (
           <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-            <DialogContent className="max-w-4xl">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-xl flex items-center">
                   <Store className="h-5 w-5 mr-2 text-primary" />
@@ -2002,143 +2011,167 @@ export default function StoreManagementPage() {
                   Información completa de la tienda
                 </DialogDescription>
               </DialogHeader>
+              
+              <Tabs defaultValue="info" className="mt-3">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="info">Información Básica</TabsTrigger>
+                  <TabsTrigger value="activity">Actividad</TabsTrigger>
+                  <TabsTrigger value="statistics">Estadísticas Avanzadas</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="info" className="mt-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="border rounded-md p-4">
+                        <h3 className="font-medium mb-3 border-b pb-2">Información Básica</h3>
 
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="border rounded-md p-4">
-                    <h3 className="font-medium mb-3 border-b pb-2">Información Básica</h3>
+                        <div className="space-y-2">
+                          <div>
+                            <span className="font-medium">Código:</span> 
+                            <span className="ml-2">{selectedStore.code}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Nombre:</span> 
+                            <span className="ml-2">{selectedStore.name}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Tipo:</span> 
+                            <span className="ml-2 flex items-center">
+                              {selectedStore.type === "Excel" ? (
+                                <><FileSpreadsheet className="h-4 w-4 mr-1 text-green-500" /> Excel</>
+                              ) : (
+                                <><FileText className="h-4 w-4 mr-1 text-red-500" /> PDF</>
+                              )}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Localidad:</span> 
+                            <span className="ml-2">{selectedStore.locality || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Distrito:</span> 
+                            <span className="ml-2">{selectedStore.district || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Estado:</span> 
+                            <span className="ml-2">
+                              {selectedStore.active ? (
+                                <Badge variant="outline" className="bg-green-100 text-green-800">
+                                  <CheckCircle className="h-3 w-3 mr-1" /> Activa
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-red-100 text-red-800">
+                                  <XCircle className="h-3 w-3 mr-1" /> Inactiva
+                                </Badge>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-                    <div className="space-y-2">
-                      <div>
-                        <span className="font-medium">Código:</span> 
-                        <span className="ml-2">{selectedStore.code}</span>
+                      <div className="border rounded-md p-4">
+                        <h3 className="font-medium mb-3 border-b pb-2">Fechas</h3>
+
+                        <div className="space-y-2">
+                          <div>
+                            <span className="font-medium">Fecha de grabación:</span> 
+                            <span className="ml-2">
+                              {selectedStore.createdAt 
+                                ? new Date(selectedStore.createdAt).toLocaleDateString('es-ES', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric'
+                                  }) 
+                                : "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Fecha de inicio:</span> 
+                            <span className="ml-2">
+                              {selectedStore.startDate 
+                                ? new Date(selectedStore.startDate).toLocaleDateString() 
+                                : "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Fecha de cese:</span> 
+                            <span className="ml-2">
+                              {selectedStore.endDate 
+                                ? new Date(selectedStore.endDate).toLocaleDateString() 
+                                : "—"}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-medium">Nombre:</span> 
-                        <span className="ml-2">{selectedStore.name}</span>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="border rounded-md p-4">
+                        <h3 className="font-medium mb-3 border-b pb-2">Información de Contacto</h3>
+
+                        <div className="space-y-2">
+                          <div>
+                            <span className="font-medium">Dirección:</span> 
+                            <span className="ml-2">{selectedStore.address || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Teléfono:</span> 
+                            <span className="ml-2">{selectedStore.phone || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Correo electrónico:</span> 
+                            <span className="ml-2">{selectedStore.email || "—"}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-medium">Tipo:</span> 
-                        <span className="ml-2 flex items-center">
-                          {selectedStore.type === "Excel" ? (
-                            <><FileSpreadsheet className="h-4 w-4 mr-1 text-green-500" /> Excel</>
-                          ) : (
-                            <><FileText className="h-4 w-4 mr-1 text-red-500" /> PDF</>
-                          )}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Localidad:</span> 
-                        <span className="ml-2">{selectedStore.locality || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Distrito:</span> 
-                        <span className="ml-2">{selectedStore.district || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Estado:</span> 
-                        <span className="ml-2">
-                          {selectedStore.active ? (
-                            <Badge variant="outline" className="bg-green-100 text-green-800">
-                              <CheckCircle className="h-3 w-3 mr-1" /> Activa
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-red-100 text-red-800">
-                              <XCircle className="h-3 w-3 mr-1" /> Inactiva
-                            </Badge>
-                          )}
-                        </span>
+
+                      <div className="border rounded-md p-4">
+                        <h3 className="font-medium mb-3 border-b pb-2">Información Empresarial</h3>
+
+                        <div className="space-y-2">
+                          <div>
+                            <span className="font-medium">CIF:</span> 
+                            <span className="ml-2">{selectedStore.cif || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Razón social:</span> 
+                            <span className="ml-2">{selectedStore.businessName || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Propietario:</span> 
+                            <span className="ml-2">{selectedStore.ownerName || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">DNI Propietario:</span> 
+                            <span className="ml-2">{selectedStore.ownerIdNumber || "—"}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="border rounded-md p-4">
-                    <h3 className="font-medium mb-3 border-b pb-2">Fechas</h3>
-
-                    <div className="space-y-2">
-                      <div>
-                        <span className="font-medium">Fecha de grabación:</span> 
-                        <span className="ml-2">
-                          {selectedStore.createdAt 
-                            ? new Date(selectedStore.createdAt).toLocaleDateString('es-ES', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric'
-                              }) 
-                            : "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Fecha de inicio:</span> 
-                        <span className="ml-2">
-                          {selectedStore.startDate 
-                            ? new Date(selectedStore.startDate).toLocaleDateString() 
-                            : "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Fecha de cese:</span> 
-                        <span className="ml-2">
-                          {selectedStore.endDate 
-                            ? new Date(selectedStore.endDate).toLocaleDateString() 
-                            : "—"}
-                        </span>
-                      </div>
+                  {selectedStore.notes && (
+                    <div className="border rounded-md p-4 mt-4">
+                      <h3 className="font-medium mb-3 border-b pb-2">Anotaciones</h3>
+                      <p className="whitespace-pre-wrap text-sm">{selectedStore.notes}</p>
                     </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="activity" className="mt-3">
                   <div className="border rounded-md p-4">
-                    <h3 className="font-medium mb-3 border-b pb-2">Información de Contacto</h3>
-
-                    <div className="space-y-2">
-                      <div>
-                        <span className="font-medium">Dirección:</span> 
-                        <span className="ml-2">{selectedStore.address || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Teléfono:</span> 
-                        <span className="ml-2">{selectedStore.phone || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Correo electrónico:</span> 
-                        <span className="ml-2">{selectedStore.email || "—"}</span>
-                      </div>
-                    </div>
+                    <h3 className="font-medium mb-3 border-b pb-2">Estadísticas Básicas</h3>
+                    <StoreActivityStats storeCode={selectedStore.code} />
                   </div>
-
+                </TabsContent>
+                
+                <TabsContent value="statistics" className="mt-3">
                   <div className="border rounded-md p-4">
-                    <h3 className="font-medium mb-3 border-b pb-2">Información Empresarial</h3>
-
-                    <div className="space-y-2">
-                      <div>
-                        <span className="font-medium">CIF:</span> 
-                        <span className="ml-2">{selectedStore.cif || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Razón social:</span> 
-                        <span className="ml-2">{selectedStore.businessName || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium">Propietario:</span> 
-                        <span className="ml-2">{selectedStore.ownerName || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="font-medium">DNI Propietario:</span> 
-                        <span className="ml-2">{selectedStore.ownerIdNumber || "—"}</span>
-                      </div>
-                    </div>
+                    <h3 className="font-medium mb-3 border-b pb-2">Estadísticas Avanzadas</h3>
+                    <StoreAdvancedStats storeCode={selectedStore.code} />
                   </div>
-                </div>
-              </div>
-
-              {selectedStore.notes && (
-                <div className="border rounded-md p-4 mt-4">
-                  <h3 className="font-medium mb-3 border-b pb-2">Anotaciones</h3>
-                  <p className="whitespace-pre-wrap text-sm">{selectedStore.notes}</p>
-                </div>
-              )}
+                </TabsContent>
+              </Tabs>
 
               <DialogFooter className="mt-6">
                 <Button 
