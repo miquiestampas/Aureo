@@ -318,10 +318,26 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
   console.log(`Procesando valores para Excel: ${JSON.stringify(values)}`);
   
   // Si los valores son null, undefined o un array vacío, retornar null
-  if (!values || !Array.isArray(values) || values.length < 4) {
-    console.log("Ignorando fila con datos insuficientes");
+  if (!values || !Array.isArray(values)) {
+    console.log("Ignorando fila con valores nulos o no es un array");
     return null;
   }
+  
+  // Crear una función de ayuda para acceder a valores de forma segura
+  const safeGetValue = (index: number, defaultValue: string = ''): string => {
+    // Si el índice está fuera de rango o el valor es null/undefined, devolver el valor por defecto
+    if (index < 0 || index >= values.length || values[index] === null || values[index] === undefined) {
+      return defaultValue;
+    }
+    
+    // Convertir a string y eliminar espacios
+    try {
+      return values[index].toString().trim();
+    } catch (error) {
+      console.warn(`Error al convertir valor en índice ${index} a string:`, error);
+      return defaultValue;
+    }
+  };
   
   // Verificar si estamos trabajando con valores desplazados
   // En un array estándar, values[0] generalmente es undefined o un valor interno
@@ -334,7 +350,7 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
   console.log(`Usando offset: ${offset} para valores ${JSON.stringify(values.slice(0, 5))}`);
   
   // Columna A: Código de tienda
-  const excelStoreCode = values[offset]?.toString().trim() || '';
+  const excelStoreCode = safeGetValue(offset);
   // Si no tenemos código de tienda en la celda ni como parámetro, no podemos procesar la fila
   const finalStoreCode = excelStoreCode || storeCode;
   if (!finalStoreCode) {
@@ -346,8 +362,15 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
     console.log(`Excel file has store code ${excelStoreCode} in cell A`);
   }
   
-  // Columna B: Número de orden
-  const orderNumber = values[offset + 1]?.toString().trim() || '';
+  // Columna B: Número de orden (requerido)
+  const orderNumber = safeGetValue(offset + 1);
+  
+  // Si no hay filas suficientes o faltan datos críticos, mostrar más información y salir
+  if (values.length < 4 + offset) {
+    console.log(`Fila con datos insuficientes. Longitud: ${values.length}, Offset: ${offset}, Valores disponibles: ${JSON.stringify(values)}`);
+    return null;
+  }
+  
   if (!orderNumber) {
     console.log("Ignorando fila sin número de orden");
     return null;
@@ -356,9 +379,13 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
   // Columna C: Fecha de orden
   let orderDate;
   try {
-    orderDate = validateDate(values[offset + 2]);
-    if (!values[offset + 2] || isNaN(orderDate.getTime())) {
-      console.log("Ignorando fila sin fecha de orden válida");
+    // Obtener valor original para diagnóstico
+    const rawOrderDateValue = offset + 2 < values.length ? values[offset + 2] : null;
+    console.log(`Valor de fecha original: ${rawOrderDateValue}`);
+    
+    orderDate = validateDate(rawOrderDateValue);
+    if (!rawOrderDateValue || isNaN(orderDate.getTime())) {
+      console.log(`Ignorando fila sin fecha de orden válida. Valor: ${rawOrderDateValue}`);
       return null;
     }
   } catch (error) {
@@ -367,57 +394,61 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
   }
   
   // Columna D: Nombre del cliente
-  const customerName = values[offset + 3]?.toString().trim() || '';
+  const customerName = safeGetValue(offset + 3);
   if (!customerName) {
     console.log("Ignorando fila sin nombre del cliente");
     return null;
   }
   
   // Columna E: Contacto del cliente (DNI/Pasaporte)
-  const customerContact = values[offset + 4]?.toString().trim() || '';
+  const customerContact = safeGetValue(offset + 4);
   
   // Columna F y G: Dirección y Provincia (guardamos información combinada en un campo)
   const addressInfo = [
-    values[offset + 5]?.toString().trim() || '', // Dirección
-    values[offset + 6]?.toString().trim() || ''  // Provincia/país
+    safeGetValue(offset + 5), // Dirección
+    safeGetValue(offset + 6)  // Provincia/país
   ].filter(Boolean).join(', ');
   
   // Columna H: Objeto (Detalles del artículo)
-  const itemDetails = values[offset + 7]?.toString().trim() || '';
+  const itemDetails = safeGetValue(offset + 7);
   
   // Columna I: Peso
-  const weight = values[offset + 8]?.toString().trim() || '';
+  const weight = safeGetValue(offset + 8);
   
   // Columna J: Clase de metal
-  const metals = values[offset + 9]?.toString().trim() || '';
+  const metals = safeGetValue(offset + 9);
   
   // Columna K: Grabaciones/Número de serie
-  const engravings = values[offset + 10]?.toString().trim() || '';
+  const engravings = safeGetValue(offset + 10);
   
   // Columna L: Piedras/Kilates
-  const stones = values[offset + 11]?.toString().trim() || '';
+  const stones = safeGetValue(offset + 11);
   
   // Quilates, extraemos del mismo campo que piedras o procesamos si está separado
-  const carats = stones && stones.match(/(\d+(\.\d+)?)\s*[kK]/) ? 
-                stones.match(/(\d+(\.\d+)?)\s*[kK]/)![1] : 
-                '';
+  let carats = '';
+  if (stones) {
+    const caratsMatch = stones.match(/(\d+(\.\d+)?)\s*[kK]/);
+    if (caratsMatch && caratsMatch[1]) {
+      carats = caratsMatch[1];
+    }
+  }
   
   // Columna M: Precio
-  const price = values[offset + 12]?.toString().trim() || '';
+  const price = safeGetValue(offset + 12);
   
   // Columna N: Empeño (Boleta)
-  const pawnTicket = values[offset + 13]?.toString().trim() || '';
+  const pawnTicket = safeGetValue(offset + 13);
   
   // Columna O: Fecha de venta
   let saleDate: Date | null = null;
-  if (values[offset + 14]) {
+  if (offset + 14 < values.length && values[offset + 14]) {
     try {
       const date = validateDate(values[offset + 14]);
       if (date && !isNaN(date.getTime())) {
         saleDate = date;
       }
     } catch (error) {
-      console.warn(`Error al procesar fecha de venta: ${values[offset + 14]}, usando null`, error);
+      console.warn(`Error al procesar fecha de venta: ${safeGetValue(offset + 14)}, usando null`, error);
     }
   }
   
@@ -498,15 +529,41 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       // Procesar archivo CSV para obtener código de tienda con soporte de caracteres especiales
       const rows: any[] = [];
       await new Promise<void>((resolve, reject) => {
+        // Leer el contenido completo del archivo primero para determinar su estructura
+        const fileContent = fs.readFileSync(filePath, { encoding: 'utf8' });
+        
+        // Log para depuración
+        console.log(`Contenido del CSV (primeras 200 caracteres): ${fileContent.substring(0, 200)}...`);
+        
+        // Detectar el tipo de separador (puede ser que usen punto y coma en lugar de coma)
+        const commaCount = (fileContent.match(/,/g) || []).length;
+        const semicolonCount = (fileContent.match(/;/g) || []).length;
+        const separator = semicolonCount > commaCount ? ';' : ',';
+        
+        console.log(`Usando separador: "${separator}" (comas: ${commaCount}, punto y coma: ${semicolonCount})`);
+        
+        // Analizar si el archivo tiene encabezados o no
+        const firstLineBreak = fileContent.indexOf('\n');
+        const firstLine = firstLineBreak > 0 ? fileContent.substring(0, firstLineBreak) : fileContent;
+        const estimatedColumnCount = firstLine.split(separator).length;
+        
+        console.log(`Primera línea: "${firstLine}"`);
+        console.log(`Número estimado de columnas: ${estimatedColumnCount}`);
+        
+        // Crear headers predeterminados si son necesarios
+        const defaultHeaders = Array.from({ length: estimatedColumnCount }, (_, i) => `column${i}`);
+        
         // Usar utf8 para asegurar que se leen correctamente los caracteres especiales
         fs.createReadStream(filePath, { encoding: 'utf8' })
           .pipe(csvParser({
             // Opciones para mejorar compatibilidad con caracteres especiales
-            separator: ',',        // Separador de columnas
-            escape: '"',           // Carácter de escape
-            quote: '"',            // Carácter de comillas
-            strict: true,          // Modo estricto para mejor detección de formatos
-            skipComments: true     // Saltar líneas de comentarios
+            separator: separator,    // Usar el separador detectado
+            escape: '"',             // Carácter de escape
+            quote: '"',              // Carácter de comillas
+            strict: false,           // Desactivar modo estricto para ser más tolerante
+            skipComments: true,      // Saltar líneas de comentarios
+            headers: defaultHeaders, // Usar headers predeterminados si son necesarios
+            skipLines: 0             // No saltar líneas al inicio
           }))
           .on('data', (row) => {
             // Procesar los valores que llegan para asegurar que se manejan correctamente
