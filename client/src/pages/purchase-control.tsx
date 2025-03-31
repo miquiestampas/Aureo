@@ -134,6 +134,10 @@ export default function PurchaseControlPage() {
     key: keyof ExcelData;
     direction: 'asc' | 'desc';
   }>({ key: 'orderDate', direction: 'desc' });
+  
+  // Estado para el diálogo de información de tienda
+  const [storeInfoOpen, setStoreInfoOpen] = useState(false);
+  const [selectedStore, setSelectedStore] = useState<StoreType | null>(null);
 
   const today = new Date();
 
@@ -190,6 +194,21 @@ export default function PurchaseControlPage() {
     setSelectedRecord(record);
     getAlerts(record.id);
     setIsDetailOpen(true);
+  };
+  
+  // Mostrar información de la tienda
+  const handleShowStore = (storeCode: string) => {
+    const store = stores?.find(s => s.code.trim() === storeCode.trim());
+    if (store) {
+      setSelectedStore(store);
+      setStoreInfoOpen(true);
+    } else {
+      toast({
+        title: "Tienda no encontrada",
+        description: `No se encontró información para la tienda ${storeCode}`,
+        variant: "destructive",
+      });
+    }
   };
 
   // Handle search form submit
@@ -774,7 +793,15 @@ export default function PurchaseControlPage() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="font-medium">{record.storeCode}</TableCell>
+                        <TableCell className="font-medium">
+                          <Button 
+                            variant="link" 
+                            className="p-0 h-auto font-medium hover:text-primary" 
+                            onClick={() => handleShowStore(record.storeCode)}
+                          >
+                            {record.storeCode}
+                          </Button>
+                        </TableCell>
                         <TableCell>{formatDate(record.orderDate)}</TableCell>
                         <TableCell>{record.orderNumber}</TableCell>
                         <TableCell>{record.customerName}</TableCell>
@@ -979,6 +1006,13 @@ export default function PurchaseControlPage() {
           </Sheet>
         )}
       </div>
+      
+      {/* Diálogo de información de tienda */}
+      <StoreInfoDialog 
+        store={selectedStore} 
+        open={storeInfoOpen} 
+        onClose={() => setStoreInfoOpen(false)} 
+      />
     </div>
   );
 }

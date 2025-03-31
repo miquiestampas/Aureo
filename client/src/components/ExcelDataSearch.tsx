@@ -736,12 +736,10 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
     </Dialog>
 
     {/* Diálogo de información de tienda */}
-    {storeInfoDialog.store && (
-      <StoreInfoDialog 
-        store={storeInfoDialog.store} 
-        open={storeInfoDialog.open} 
-        onClose={() => setStoreInfoDialog({ open: false, store: null })} 
-      />
-    )}
+    <StoreInfoDialog 
+      store={storeInfoDialog.store} 
+      open={storeInfoDialog.open} 
+      onClose={() => setStoreInfoDialog({ open: false, store: null })} 
+    />
   );
 }
