@@ -140,8 +140,7 @@ export const insertExcelDataSchema = createInsertSchema(excelData).pick({
   orderDate: true,
   customerName: true,
   customerContact: true,
-  customerAddress: true,
-  customerLocation: true,
+  // Eliminadas las columnas customerAddress y customerLocation que no existen en la DB
   itemDetails: true,
   metals: true,
   engravings: true,
