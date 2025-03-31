@@ -19,27 +19,14 @@ import createMemoryStore from "memorystore";
 // No necesitamos connectPg para SQLite
 import { db, sqlite } from "./db";
 
-// Función para normalizar texto: eliminar acentos y convertir a minúsculas
-function normalizeText(text: string): string {
-  if (!text) return '';
-  
-  // Reemplazos específicos para caracteres problemáticos
-  let normalized = text;
-  
-  // Eliminar comillas que pueden estar en los datos como "Madrid, España"
-  normalized = normalized.replace(/"/g, '');
-  
-  // Reemplazar 'ñ' por 'n' antes de la normalización Unicode
-  normalized = normalized.replace(/ñ/g, 'n').replace(/Ñ/g, 'n');
-  
-  // Aplicar normalización Unicode para eliminar acentos
-  normalized = normalized.normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Eliminar acentos
-    .toLowerCase(); // Convertir a minúsculas
-    
-  console.log(`Normalización: "${text}" → "${normalized}"`);
-  return normalized;
-}
+// Importar las funciones mejoradas para la búsqueda de ubicaciones
+import { 
+  normalizeText, 
+  buscarVariantesPais, 
+  construirCondicionesUbicacion, 
+  extraerCodigoPostal, 
+  procesarUbicacionCompleja 
+} from './improved-location-search';
 import { eq, desc, like, or, and, gte, lte, inArray, sql, count } from "drizzle-orm";
 // SQLite no necesita pool
 
@@ -2178,36 +2165,30 @@ export class DatabaseStorage implements IStorage {
           // Preparar variantes para búsqueda directa
           const upperSearchTerm = searchTerm.toUpperCase();
           
-          // Lista de países comunes con variaciones ortográficas
-          const variantesRumania = ['RUMANIA', 'RUMANÍA', 'ROMANIA', 'RUMANÌA'];
-          const variantesPeru = ['PERU', 'PERÚ', 'PERÙ'];
-          const variantesEspana = ['ESPANA', 'ESPAÑA', 'ESPANHA'];
+          // Usar la función mejorada para buscar variantes de países y ciudades
+          const paisesAlternativos = buscarVariantesPais(searchTerm);
           
-          // Determinar si estamos buscando por algunos países específicos con variantes
-          let paisesAlternativos = [];
-          
-          if (variantesRumania.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
-            paisesAlternativos = variantesRumania;
-          } else if (variantesPeru.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
-            paisesAlternativos = variantesPeru;
-          } else if (variantesEspana.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
-            paisesAlternativos = variantesEspana;
+          // Extraer posible código postal para mejor búsqueda
+          const codigoPostal = extraerCodigoPostal(searchTerm);
+          if (codigoPostal) {
+            console.log(`Código postal detectado: ${codigoPostal}`);
           }
           
-          // Usar el mismo método que en la búsqueda avanzada para países
-          // Crear consulta SQL directa para búsqueda de países en mayúsculas
+          // Procesar ubicación compleja (Ej: "Madrid, España")
+          const ubicacionProcesada = procesarUbicacionCompleja(searchTerm);
+          if (ubicacionProcesada.ciudad || ubicacionProcesada.pais) {
+            console.log(`Ubicación procesada: Ciudad - ${ubicacionProcesada.ciudad || 'N/A'}, País - ${ubicacionProcesada.pais || 'N/A'}`);
+          }
+          
+          // Construir condición SQL usando la función mejorada
+          const condicionSQL = construirCondicionesUbicacion('customer_location', searchTerm);
+          
+          // Crear una consulta SQL directa con todas las mejoras
           let sqlQuery = `
             SELECT * FROM excel_data 
             WHERE 
-              customer_location = '${upperSearchTerm}' OR
-              customer_location LIKE '%${upperSearchTerm}%'
+              ${condicionSQL}
           `;
-          
-          // Agregar variantes de países si existen
-          if (paisesAlternativos.length > 0) {
-            const variantesCondition = paisesAlternativos.map(v => `customer_location = '${v}' OR customer_location LIKE '%${v}%'`).join(' OR ');
-            sqlQuery += ` OR ${variantesCondition}`;
-          }
           
           // Finalizar la consulta
           sqlQuery += `
@@ -2307,48 +2288,38 @@ export class DatabaseStorage implements IStorage {
         }
         
         if (filters.customerLocation) {
-          console.log("Búsqueda de ubicación detectada, usando consulta SQL directa");
+          console.log("Búsqueda de ubicación detectada, usando búsqueda mejorada de ubicaciones");
           
           // Preparar los términos de búsqueda
           const searchTerm = filters.customerLocation.trim();
           const upperSearchTerm = searchTerm.toUpperCase(); // Los países están en mayúsculas
-          const lowerSearchTerm = searchTerm.toLowerCase();
           
           console.log(`Búsqueda de país/provincia: "${searchTerm}" en mayúsculas: "${upperSearchTerm}"`);
           
-          // Lista de países comunes con variaciones ortográficas
-          const variantesRumania = ['RUMANIA', 'RUMANÍA', 'ROMANIA', 'RUMANÌA'];
-          const variantesPeru = ['PERU', 'PERÚ', 'PERÙ'];
-          const variantesEspana = ['ESPANA', 'ESPAÑA', 'ESPANHA'];
+          // Buscar variantes del país/ciudad usando nuestra función mejorada
+          const paisesAlternativos = buscarVariantesPais(searchTerm);
           
-          // Determinar si estamos buscando por algunos países específicos con variantes
-          let paisesAlternativos = [];
-          
-          if (variantesRumania.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
-            paisesAlternativos = variantesRumania;
-          } else if (variantesPeru.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
-            paisesAlternativos = variantesPeru;
-          } else if (variantesEspana.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
-            paisesAlternativos = variantesEspana;
+          // Extraer posible código postal para mejor búsqueda
+          const codigoPostal = extraerCodigoPostal(searchTerm);
+          if (codigoPostal) {
+            console.log(`Código postal detectado: ${codigoPostal}`);
           }
           
-          // Crear condiciones OR para cada variante
-          const variantesCondition = paisesAlternativos.length > 0 
-            ? paisesAlternativos.map(v => `customer_location = '${v}'`).join(' OR ') 
-            : '';
-            
-          // Crear una consulta SQL directa que busque exactamente en el formato que tiene la base de datos
+          // Procesar ubicación compleja (Ej: "Madrid, España")
+          const ubicacionProcesada = procesarUbicacionCompleja(searchTerm);
+          if (ubicacionProcesada.ciudad || ubicacionProcesada.pais) {
+            console.log(`Ubicación procesada: Ciudad - ${ubicacionProcesada.ciudad || 'N/A'}, País - ${ubicacionProcesada.pais || 'N/A'}`);
+          }
+          
+          // Construir condición SQL usando la función mejorada
+          const condicionSQL = construirCondicionesUbicacion('customer_location', searchTerm);
+          
+          // Crear una consulta SQL directa con todas las mejoras
           let sqlQuery = `
             SELECT * FROM excel_data 
             WHERE 
-              customer_location = '${upperSearchTerm}' OR
-              customer_location LIKE '%${upperSearchTerm}%'
+              ${condicionSQL}
           `;
-          
-          // Agregar variantes de países si existen
-          if (variantesCondition) {
-            sqlQuery += ` OR ${variantesCondition}`;
-          }
           
           // Finalizar la consulta
           sqlQuery += `
