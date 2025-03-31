@@ -83,6 +83,9 @@ export interface IStorage {
   getFileActivitiesByStore(storeCode: string): Promise<FileActivity[]>;
   getPendingStoreAssignmentActivities(): Promise<FileActivity[]>;
   deleteFileActivity(id: number): Promise<boolean>;
+  findDuplicateFileByName(filename: string): Promise<FileActivity | undefined>;
+  findDuplicatePdfBySize(filename: string, fileSize: number): Promise<FileActivity | undefined>;
+  findDuplicateExcelContent(excelData: InsertExcelData[]): Promise<FileActivity | undefined>;
   
   // ExcelData methods
   createExcelData(data: InsertExcelData): Promise<ExcelData>;
@@ -564,6 +567,68 @@ export class MemStorage implements IStorage {
   
   async deleteFileActivity(id: number): Promise<boolean> {
     return this.fileActivities.delete(id);
+  }
+  
+  async findDuplicateFileByName(filename: string): Promise<FileActivity | undefined> {
+    return Array.from(this.fileActivities.values()).find(
+      activity => activity.filename === filename && activity.status !== 'Failed'
+    );
+  }
+  
+  async findDuplicatePdfBySize(filename: string, fileSize: number): Promise<FileActivity | undefined> {
+    // Buscar en documentos PDF con el mismo tamaño
+    const sameFileSizeDocs = Array.from(this.pdfDocuments.values()).filter(
+      doc => doc.fileSize === fileSize
+    );
+    
+    if (sameFileSizeDocs.length === 0) return undefined;
+    
+    // Obtener las actividades asociadas con estos documentos
+    const activityIds = sameFileSizeDocs.map(doc => doc.fileActivityId);
+    return Array.from(this.fileActivities.values()).find(
+      activity => activityIds.includes(activity.id) && activity.status === 'Processed'
+    );
+  }
+  
+  async findDuplicateExcelContent(excelDataItems: InsertExcelData[]): Promise<FileActivity | undefined> {
+    if (excelDataItems.length === 0) return undefined;
+    
+    // Para cada archivo existente, comprobar si contiene las mismas compras
+    const allExcelData = Array.from(this.excelData.values());
+    const activityIdGroups = new Map<number, ExcelData[]>();
+    
+    // Agrupar datos de Excel por activityId
+    allExcelData.forEach(data => {
+      if (!activityIdGroups.has(data.fileActivityId)) {
+        activityIdGroups.set(data.fileActivityId, []);
+      }
+      activityIdGroups.get(data.fileActivityId)!.push(data);
+    });
+    
+    // Comprobar si algún grupo contiene exactamente los mismos datos
+    for (const [activityId, dataGroup] of activityIdGroups.entries()) {
+      if (dataGroup.length !== excelDataItems.length) continue;
+      
+      // Comprobar si todos los elementos son iguales
+      const allMatch = excelDataItems.every(newItem => {
+        return dataGroup.some(existingItem => 
+          existingItem.orderNumber === newItem.orderNumber &&
+          existingItem.customerName === newItem.customerName &&
+          existingItem.customerContact === newItem.customerContact &&
+          existingItem.itemDetails === newItem.itemDetails &&
+          existingItem.price === newItem.price
+        );
+      });
+      
+      if (allMatch) {
+        const activity = this.fileActivities.get(activityId);
+        if (activity && activity.status === 'Processed') {
+          return activity;
+        }
+      }
+    }
+    
+    return undefined;
   }
   
   async deleteExcelDataByActivityId(activityId: number): Promise<boolean> {
@@ -1331,6 +1396,83 @@ export class MemStorage implements IStorage {
 
 export class DatabaseStorage implements IStorage {
   sessionStore: any;
+
+  // Implementación de los métodos para detectar archivos duplicados
+  async findDuplicateFileByName(filename: string): Promise<FileActivity | undefined> {
+    try {
+      // Buscar actividades con el mismo nombre de archivo que ya fueron procesadas correctamente
+      const activities = await db.select().from(fileActivities)
+        .where(and(
+          eq(fileActivities.filename, filename),
+          eq(fileActivities.status, 'Processed')
+        ))
+        .limit(1);
+      
+      return activities[0];
+    } catch (error) {
+      console.error('Error al buscar archivo duplicado por nombre:', error);
+      return undefined;
+    }
+  }
+
+  async findDuplicatePdfBySize(filename: string, fileSize: number): Promise<FileActivity | undefined> {
+    try {
+      // Primero buscamos todos los documentos PDF con el mismo tamaño
+      const docs = await db.select().from(pdfDocuments)
+        .where(eq(pdfDocuments.fileSize, fileSize));
+      
+      if (docs.length === 0) return undefined;
+      
+      // Si encontramos alguno, obtenemos las actividades relacionadas
+      const activityIds = docs.map(doc => doc.fileActivityId);
+      if (activityIds.length === 0) return undefined;
+      
+      const activities = await db.select().from(fileActivities)
+        .where(and(
+          inArray(fileActivities.id, activityIds),
+          eq(fileActivities.status, 'Processed')
+        ))
+        .limit(1);
+      
+      return activities[0];
+    } catch (error) {
+      console.error('Error al buscar archivo PDF duplicado por tamaño:', error);
+      return undefined;
+    }
+  }
+
+  async findDuplicateExcelContent(excelDataArr: InsertExcelData[]): Promise<FileActivity | undefined> {
+    try {
+      // Esta implementación es simplificada y solo compara coincidencias exactas de ciertos campos clave
+      // Si no hay datos, no puede ser duplicado
+      if (!excelDataArr || excelDataArr.length === 0) return undefined;
+      
+      // Tomar el primer registro para comparación
+      const sampleData = excelDataArr[0];
+      
+      // Verificar si hay un registro con los mismos orderNumber y orderDate (indicador de duplicado)
+      const query = db.select()
+        .from(fileActivities)
+        .innerJoin(excelData, eq(fileActivities.id, excelData.fileActivityId))
+        .where(and(
+          eq(excelData.orderNumber, sampleData.orderNumber),
+          eq(excelData.orderDate, sampleData.orderDate),
+          eq(fileActivities.status, 'Processed')
+        ))
+        .limit(1);
+      
+      const existingData = await query;
+      
+      if (existingData && existingData.length > 0) {
+        return existingData[0].file_activities;
+      }
+      
+      return undefined;
+    } catch (error) {
+      console.error('Error al buscar Excel duplicado por contenido:', error);
+      return undefined;
+    }
+  }
 
   constructor() {
     // En SQLite usamos MemoryStore para las sesiones
@@ -4157,6 +4299,146 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`Error al detectar coincidencias para excelDataId ${excelDataId}:`, error);
       return { nuevasCoincidencias: 0 };
+    }
+  }
+  
+  // Métodos para detección de archivos duplicados
+  async findDuplicateFileByName(filename: string): Promise<FileActivity | undefined> {
+    try {
+      console.log(`Buscando archivos duplicados por nombre: ${filename}`);
+      const [duplicate] = await db
+        .select()
+        .from(fileActivities)
+        .where(
+          and(
+            eq(fileActivities.filename, filename),
+            not(eq(fileActivities.status, 'Failed'))
+          )
+        );
+      
+      if (duplicate) {
+        console.log(`Encontrado archivo duplicado: ${duplicate.filename} con ID ${duplicate.id}`);
+      } else {
+        console.log(`No se encontró un archivo duplicado para ${filename}`);
+      }
+      
+      return duplicate;
+    } catch (error) {
+      console.error(`Error al buscar duplicados por nombre (${filename}):`, error);
+      return undefined;
+    }
+  }
+  
+  async findDuplicatePdfBySize(filename: string, fileSize: number): Promise<FileActivity | undefined> {
+    try {
+      console.log(`Buscando PDF duplicado por tamaño: ${filename}, tamaño: ${fileSize} bytes`);
+      
+      // Buscar documentos PDF con el mismo tamaño
+      const docsWithSameSize = await db
+        .select()
+        .from(pdfDocuments)
+        .where(eq(pdfDocuments.fileSize, fileSize));
+      
+      if (docsWithSameSize.length === 0) {
+        console.log(`No se encontraron documentos PDF con el tamaño ${fileSize} bytes`);
+        return undefined;
+      }
+      
+      // Obtener IDs de actividades asociadas a estos documentos
+      const activityIds = docsWithSameSize.map(doc => doc.fileActivityId);
+      
+      // Buscar la actividad correspondiente
+      const [duplicate] = await db
+        .select()
+        .from(fileActivities)
+        .where(
+          and(
+            inArray(fileActivities.id, activityIds),
+            eq(fileActivities.status, 'Processed')
+          )
+        );
+      
+      if (duplicate) {
+        console.log(`Encontrado PDF duplicado: ${duplicate.filename} con ID ${duplicate.id}`);
+      } else {
+        console.log(`No se encontró un PDF duplicado con el mismo tamaño para ${filename}`);
+      }
+      
+      return duplicate;
+    } catch (error) {
+      console.error(`Error al buscar duplicados PDF por tamaño (${filename}, ${fileSize}):`, error);
+      return undefined;
+    }
+  }
+  
+  async findDuplicateExcelContent(excelDataItems: InsertExcelData[]): Promise<FileActivity | undefined> {
+    try {
+      if (excelDataItems.length === 0) return undefined;
+      
+      console.log(`Buscando Excel duplicado con ${excelDataItems.length} registros`);
+      
+      // Obtener la lista de números de orden de los datos a insertar
+      const orderNumbers = excelDataItems.map(item => item.orderNumber);
+      
+      // Buscar actividades existentes que tengan al menos un registro con alguno de estos números de orden
+      const existingData = await db
+        .select()
+        .from(excelData)
+        .where(inArray(excelData.orderNumber, orderNumbers));
+      
+      if (existingData.length === 0) {
+        console.log("No se encontraron datos de Excel con números de orden coincidentes");
+        return undefined;
+      }
+      
+      // Agrupar por fileActivityId
+      const activityGroups = new Map<number, ExcelData[]>();
+      existingData.forEach(item => {
+        if (!activityGroups.has(item.fileActivityId)) {
+          activityGroups.set(item.fileActivityId, []);
+        }
+        activityGroups.get(item.fileActivityId)!.push(item);
+      });
+      
+      // Revisar cada grupo para ver si coincide exactamente con los nuevos datos
+      for (const [activityId, dataGroup] of activityGroups.entries()) {
+        if (dataGroup.length !== excelDataItems.length) continue;
+        
+        // Verificar si todos los elementos coinciden
+        const allMatch = excelDataItems.every(newItem => {
+          return dataGroup.some(existingItem => 
+            existingItem.orderNumber === newItem.orderNumber &&
+            existingItem.customerName === newItem.customerName &&
+            existingItem.customerContact === newItem.customerContact &&
+            existingItem.itemDetails === newItem.itemDetails &&
+            existingItem.price === newItem.price
+          );
+        });
+        
+        if (allMatch) {
+          // Encontramos un duplicado exacto
+          const [activity] = await db
+            .select()
+            .from(fileActivities)
+            .where(
+              and(
+                eq(fileActivities.id, activityId),
+                eq(fileActivities.status, 'Processed')
+              )
+            );
+          
+          if (activity) {
+            console.log(`Encontrado Excel duplicado: actividad ID ${activity.id}, ${activity.filename}`);
+            return activity;
+          }
+        }
+      }
+      
+      console.log("No se encontró un Excel duplicado con el mismo contenido");
+      return undefined;
+    } catch (error) {
+      console.error("Error al buscar duplicados Excel por contenido:", error);
+      return undefined;
     }
   }
   

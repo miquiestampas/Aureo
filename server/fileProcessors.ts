@@ -495,6 +495,28 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
 // Process Excel file (xls, xlsx, csv)
 export async function processExcelFile(filePath: string, activityId: number, storeCode: string) {
   try {
+    // Obtener información de la actividad
+    const activity = await storage.getFileActivity(activityId);
+    if (!activity) {
+      throw new Error(`No se encontró la actividad con ID ${activityId}`);
+    }
+    
+    // Verificar si es un archivo duplicado por nombre
+    const duplicateByName = await storage.findDuplicateFileByName(activity.filename);
+    if (duplicateByName && duplicateByName.id !== activityId) {
+      console.log(`El archivo ${activity.filename} ya fue procesado anteriormente (ID: ${duplicateByName.id})`);
+      await storage.updateFileActivity(activityId, {
+        status: 'Duplicado',
+        processingDate: new Date().toISOString(),
+        metadata: JSON.stringify({
+          duplicateType: 'filename',
+          duplicateId: duplicateByName.id
+        })
+      });
+      emitFileProcessingStatus(activityId, 'Duplicado');
+      return;
+    }
+    
     // Update file activity to Processing status
     await storage.updateFileActivityStatus(activityId, 'Processing');
     emitFileProcessingStatus(activityId, 'Processing');
@@ -847,14 +869,56 @@ export async function processExcelFile(filePath: string, activityId: number, sto
 // Process PDF file
 export async function processPdfFile(filePath: string, activityId: number, storeCode: string) {
   try {
-    // Update file activity to Processing status
-    await storage.updateFileActivityStatus(activityId, 'Processing');
-    emitFileProcessingStatus(activityId, 'Processing');
+    // Obtener información de la actividad
+    const activity = await storage.getFileActivity(activityId);
+    if (!activity) {
+      throw new Error(`No se encontró la actividad con ID ${activityId}`);
+    }
+    
+    // Verificar si es un archivo duplicado por nombre
+    const duplicateByName = await storage.findDuplicateFileByName(activity.filename);
+    if (duplicateByName && duplicateByName.id !== activityId) {
+      console.log(`El archivo ${activity.filename} ya fue procesado anteriormente (ID: ${duplicateByName.id})`);
+      await storage.updateFileActivity(activityId, {
+        status: 'Duplicado',
+        processingDate: new Date().toISOString(),
+        metadata: JSON.stringify({
+          duplicateType: 'filename',
+          duplicateId: duplicateByName.id
+        })
+      });
+      emitFileProcessingStatus(activityId, 'Duplicado');
+      return;
+    }
     
     // Verify file exists and is readable
     if (!fs.existsSync(filePath)) {
       throw new Error(`File ${filePath} does not exist`);
     }
+    
+    // Verificar si es un archivo duplicado por tamaño (para PDFs)
+    const stats = fs.statSync(filePath);
+    const size = stats.size;
+    
+    const duplicateBySize = await storage.findDuplicatePdfBySize(activity.filename, size);
+    if (duplicateBySize && duplicateBySize.id !== activityId) {
+      console.log(`El archivo PDF ${activity.filename} (${size} bytes) ya fue procesado anteriormente (ID: ${duplicateBySize.id})`);
+      await storage.updateFileActivity(activityId, {
+        status: 'Duplicado',
+        processingDate: new Date().toISOString(),
+        metadata: JSON.stringify({
+          duplicateType: 'fileSize',
+          duplicateId: duplicateBySize.id,
+          fileSize: size
+        })
+      });
+      emitFileProcessingStatus(activityId, 'Duplicado');
+      return;
+    }
+    
+    // Update file activity to Processing status
+    await storage.updateFileActivityStatus(activityId, 'Processing');
+    emitFileProcessingStatus(activityId, 'Processing');
     
     // Extraer el nombre del archivo para la detección de tienda
     const filename = path.basename(filePath);
@@ -1028,8 +1092,6 @@ export async function processPdfFile(filePath: string, activityId: number, store
     
     // Extract basic info
     const title = path.basename(filePath, '.pdf');
-    const fileStats = await fs.promises.stat(filePath);
-    const fileSize = fileStats.size;
     
     let documentType = 'PDF';  // Cambiamos el valor por defecto a PDF en lugar de Desconocido
     let pdfText = '';
@@ -1066,7 +1128,7 @@ export async function processPdfFile(filePath: string, activityId: number, store
       title,
       path: filePath,
       uploadDate: now,
-      fileSize,
+      fileSize: size, // Use 'size' from the duplicate check earlier
       fileActivityId: activityId
     };
     
