@@ -2163,6 +2163,7 @@ export class DatabaseStorage implements IStorage {
           conditions.push(like(excelData.customerContact, `%${filters.customerContact}%`));
         }
         
+        // Filtro de país
         if (filters.country) {
           conditions.push(like(excelData.country, `%${filters.country}%`));
         }
