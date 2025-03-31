@@ -233,6 +233,63 @@ export default function PurchaseControlPage() {
       });
     },
   });
+  
+  // Export to Excel mutation
+  const exportToExcelMutation = useMutation({
+    mutationFn: async () => {
+      // Preparar los parámetros de búsqueda para la exportación
+      const params = advancedSearch 
+        ? { ...searchParams } 
+        : { query: searchQuery };
+        
+      // Añadir filtros de fecha si están presentes
+      if (dateFrom) {
+        params.dateFrom = format(dateFrom, "yyyy-MM-dd");
+      }
+      if (dateTo) {
+        params.dateTo = format(dateTo, "yyyy-MM-dd");
+      }
+      
+      // Realizar la solicitud con un blob para la descarga
+      const response = await fetch('/api/search/excel-data/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al exportar a Excel');
+      }
+      
+      // Obtener el blob y crear un enlace de descarga
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Resultados_Busqueda_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      return { success: true };
+    },
+    onSuccess: () => {
+      toast({
+        title: "Exportación completada",
+        description: "Los resultados se han exportado a Excel correctamente.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error en la exportación",
+        description: "No se pudieron exportar los resultados: " + error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   // Get alerts for a specific record
   const getAlerts = async (excelDataId: number) => {
@@ -743,11 +800,34 @@ export default function PurchaseControlPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Resultados de la Búsqueda</CardTitle>
-                <div className="text-sm text-gray-500">
-                  {searchMutation.data.results.length}{" "}
-                  {searchMutation.data.results.length === 1
-                    ? "registro encontrado"
-                    : "registros encontrados"}
+                <div className="flex items-center space-x-4">
+                  <div className="text-sm text-gray-500">
+                    {searchMutation.data.results.length}{" "}
+                    {searchMutation.data.results.length === 1
+                      ? "registro encontrado"
+                      : "registros encontrados"}
+                  </div>
+                  {searchMutation.data.results.length > 0 && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => exportToExcelMutation.mutate()}
+                      disabled={exportToExcelMutation.isPending}
+                      className="flex items-center"
+                    >
+                      {exportToExcelMutation.isPending ? (
+                        <>
+                          <div className="h-4 w-4 animate-spin mr-2 border-2 border-primary border-t-transparent rounded-full" />
+                          Exportando...
+                        </>
+                      ) : (
+                        <>
+                          <FileDownIcon className="h-4 w-4 mr-2" />
+                          Exportar a Excel
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
