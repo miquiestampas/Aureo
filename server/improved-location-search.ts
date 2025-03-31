@@ -5,38 +5,59 @@ export function normalizeText(text: string): string {
   // Reemplazos específicos para caracteres problemáticos
   let normalized = text;
   
-  // Eliminar comillas que pueden estar en los datos como "Madrid, España"
-  normalized = normalized.replace(/"/g, '');
-  normalized = normalized.replace(/'/g, '');
+  // Preservar el texto original para diagnóstico
+  const original = text;
   
-  // Reemplazos específicos para manejo adecuado de caracteres españoles
-  const replacements: {[key: string]: string} = {
-    'ñ': 'n', 'Ñ': 'n',
-    'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'Á': 'a', 'À': 'a', 'Ä': 'a', 'Â': 'a',
-    'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e', 'É': 'e', 'È': 'e', 'Ë': 'e', 'Ê': 'e',
-    'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i', 'Í': 'i', 'Ì': 'i', 'Ï': 'i', 'Î': 'i',
-    'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'Ó': 'o', 'Ò': 'o', 'Ö': 'o', 'Ô': 'o',
-    'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u', 'Ú': 'u', 'Ù': 'u', 'Ü': 'u', 'Û': 'u',
-    'ç': 'c', 'Ç': 'c'
-  };
-  
-  // Aplicar reemplazos específicos
-  for (const [original, replacement] of Object.entries(replacements)) {
-    normalized = normalized.replace(new RegExp(original, 'g'), replacement);
+  try {
+    // Eliminar comillas que pueden estar en los datos como "Madrid, España"
+    normalized = normalized.replace(/"/g, '');
+    normalized = normalized.replace(/'/g, '');
+    
+    // Reemplazos específicos para manejo adecuado de caracteres españoles
+    // El orden es importante: primero reemplazar caracteres compuestos, luego individuales
+    const replacements: {[key: string]: string} = {
+      // Caracteres españoles
+      'ñ': 'n', 'Ñ': 'n',
+      'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'Á': 'a', 'À': 'a', 'Ä': 'a', 'Â': 'a',
+      'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e', 'É': 'e', 'È': 'e', 'Ë': 'e', 'Ê': 'e',
+      'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i', 'Í': 'i', 'Ì': 'i', 'Ï': 'i', 'Î': 'i',
+      'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'Ó': 'o', 'Ò': 'o', 'Ö': 'o', 'Ô': 'o',
+      'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u', 'Ú': 'u', 'Ù': 'u', 'Ü': 'u', 'Û': 'u',
+      // Caracteres latinos adicionales
+      'ç': 'c', 'Ç': 'c',
+      'ã': 'a', 'Ã': 'a', 'õ': 'o', 'Õ': 'o', // Portugués
+      'ø': 'o', 'Ø': 'o', 'æ': 'ae', 'Æ': 'ae', // Nórdicos
+      'ß': 'ss', // Alemán
+      'ł': 'l', 'Ł': 'l', // Polaco
+      'œ': 'oe', 'Œ': 'oe', // Francés
+    };
+    
+    // Aplicar reemplazos específicos
+    for (const [original, replacement] of Object.entries(replacements)) {
+      normalized = normalized.replace(new RegExp(original, 'g'), replacement);
+    }
+    
+    // Aplicar normalización Unicode para cualquier otro acento o diacrítico
+    normalized = normalized.normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Eliminar acentos
+      .toLowerCase(); // Convertir a minúsculas
+    
+    // Eliminar caracteres no alfanuméricos excepto espacios y comas (importantes para ubicaciones)
+    normalized = normalized.replace(/[^\w\s,]/g, ' ');
+    
+    // Eliminar espacios múltiples
+    normalized = normalized.replace(/\s+/g, ' ').trim();
+    
+    // Log detallado para análisis
+    if (normalized !== original.toLowerCase()) {
+      console.log(`Normalización mejorada: "${original}" → "${normalized}"`);
+    }
+  } catch (error) {
+    console.error(`Error normalizando texto "${original}":`, error);
+    // En caso de error, devolver una versión simple del texto
+    return text.toLowerCase().trim();
   }
   
-  // Aplicar normalización Unicode para cualquier otro acento o diacrítico
-  normalized = normalized.normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Eliminar acentos
-    .toLowerCase(); // Convertir a minúsculas
-  
-  // Eliminar caracteres no alfanuméricos excepto espacios y comas (importantes para ubicaciones)
-  normalized = normalized.replace(/[^\w\s,]/g, ' ');
-  
-  // Eliminar espacios múltiples
-  normalized = normalized.replace(/\s+/g, ' ').trim();
-    
-  console.log(`Normalización mejorada: "${text}" → "${normalized}"`);
   return normalized;
 }
 
@@ -327,36 +348,97 @@ export function procesarUbicacionCompleja(ubicacion: string): { ciudad?: string,
   
   const resultado: { ciudad?: string, provincia?: string, pais?: string } = {};
   
-  // Limpiar comillas y espacios extras
-  const ubicacionLimpia = ubicacion.replace(/"/g, '').replace(/'/g, '').trim();
-  
-  // Si contiene comas, dividir en partes (común en formato "Ciudad, País")
-  const partes = ubicacionLimpia.split(',').map(p => p.trim());
-  
-  if (partes.length > 1) {
-    // Asumimos que el último elemento es el país
-    resultado.pais = partes[partes.length - 1];
+  try {
+    // Conservar el valor original para logs
+    const original = ubicacion;
     
-    // El primer elemento puede ser la ciudad o provincia
-    resultado.ciudad = partes[0];
+    // Limpiar comillas y espacios extras
+    const ubicacionLimpia = ubicacion.replace(/"/g, '').replace(/'/g, '').trim();
     
-    // Si hay un elemento intermedio, puede ser la provincia
-    if (partes.length > 2) {
-      resultado.provincia = partes[1];
-    }
-  } else {
-    // Si no hay coma, puede ser solo país o ciudad
-    // Intentamos determinar si es país o ciudad usando el diccionario
+    // Log para depuración
+    console.log(`Procesando ubicación compleja: "${original}" → "${ubicacionLimpia}"`);
     
-    const esUnPais = Object.values(listaVariantesPaises).some(variantes => 
-      variantes.some(v => normalizeText(v) === normalizeText(ubicacionLimpia))
-    );
+    // Caso especial: Si la ubicación ya está en mayúsculas, probablemente es un país
+    const esTodoMayusculas = ubicacionLimpia === ubicacionLimpia.toUpperCase() && ubicacionLimpia.length > 2;
     
-    if (esUnPais) {
-      resultado.pais = ubicacionLimpia;
+    // Si contiene comas, dividir en partes (común en formato "Ciudad, País")
+    if (ubicacionLimpia.includes(',')) {
+      const partes = ubicacionLimpia.split(',').map(p => p.trim());
+      
+      console.log(`Ubicación dividida en ${partes.length} partes: ${partes.join(' | ')}`);
+      
+      if (partes.length > 1) {
+        // Asumimos que el último elemento es el país
+        const paisCandidato = partes[partes.length - 1];
+        
+        // Verificar si realmente es un país conocido
+        const esPais = Object.values(listaVariantesPaises).some(variantes => 
+          variantes.some(v => normalizeText(v) === normalizeText(paisCandidato) || 
+                        paisCandidato.toUpperCase() === v ||
+                        v.includes(paisCandidato.toUpperCase()))
+        );
+        
+        if (esPais) {
+          resultado.pais = paisCandidato;
+          console.log(`País detectado: "${paisCandidato}"`);
+        }
+        
+        // El primer elemento suele ser la ciudad
+        const ciudadCandidata = partes[0];
+        resultado.ciudad = ciudadCandidata;
+        console.log(`Ciudad detectada: "${ciudadCandidata}"`);
+        
+        // Si hay un elemento intermedio, puede ser la provincia (solo si hay más de 2 partes)
+        if (partes.length > 2) {
+          resultado.provincia = partes[1];
+          console.log(`Provincia detectada: "${partes[1]}"`);
+        }
+      }
     } else {
+      // Si no hay coma, puede ser solo país o ciudad
+      // Intentamos determinar si es país o ciudad usando el diccionario
+      
+      // Primero verificar coincidencia directa con países (más preciso)
+      const esUnPais = Object.values(listaVariantesPaises).some(variantes => 
+        variantes.some(v => {
+          // Comparar normalizado o coincidencia exacta en mayúsculas
+          return normalizeText(v) === normalizeText(ubicacionLimpia) || 
+                v === ubicacionLimpia.toUpperCase() ||
+                (esTodoMayusculas && v.includes(ubicacionLimpia));
+        })
+      );
+      
+      // Buscar coincidencia con ciudades/provincias españolas importantes
+      const esUnaCiudad = ['madrid', 'barcelona', 'valencia', 'sevilla', 'zaragoza', 'malaga', 'bilbao'].includes(
+        normalizeText(ubicacionLimpia)
+      );
+      
+      if (esUnPais) {
+        resultado.pais = ubicacionLimpia;
+        console.log(`Ubicación identificada como país: "${ubicacionLimpia}"`);
+      } else if (esUnaCiudad) {
+        resultado.ciudad = ubicacionLimpia;
+        console.log(`Ubicación identificada como ciudad española: "${ubicacionLimpia}"`);
+      } else if (esTodoMayusculas) {
+        // Si está todo en mayúsculas y no es una ciudad conocida, probablemente es un país
+        resultado.pais = ubicacionLimpia;
+        console.log(`Ubicación en mayúsculas asumida como país: "${ubicacionLimpia}"`);
+      } else {
+        // Por defecto, asumir que es una ciudad si no podemos determinar
+        resultado.ciudad = ubicacionLimpia;
+        console.log(`Ubicación asumida como ciudad por defecto: "${ubicacionLimpia}"`);
+      }
+    }
+    
+    // Verificación final: si no se identificó nada, guardar el valor original como ubicación
+    if (!resultado.ciudad && !resultado.provincia && !resultado.pais) {
+      console.log(`No se pudo procesar la ubicación "${original}" - guardando como ciudad por defecto`);
       resultado.ciudad = ubicacionLimpia;
     }
+  } catch (error) {
+    console.error(`Error procesando ubicación compleja "${ubicacion}":`, error);
+    // En caso de error, devolver un objeto simple con la ciudad como valor de respaldo
+    return { ciudad: ubicacion };
   }
   
   return resultado;

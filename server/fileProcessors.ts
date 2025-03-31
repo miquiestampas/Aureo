@@ -7,6 +7,7 @@ import { promisify } from 'util';
 import ExcelJS from 'exceljs';
 import { read as readXLSX, utils as xlsxUtils } from 'xlsx';
 import csvParser from 'csv-parser';
+import iconv from 'iconv-lite';
 
 // Import pdf-parse dynamically to avoid initialization errors
 // We'll only use it when we actually need to parse a PDF
@@ -407,7 +408,12 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
   const customerAddress = safeGetValue(offset + 5);
   
   // Columna G: Provincia/País del cliente (campo separado)
-  const customerLocation = safeGetValue(offset + 6);
+  let customerLocation = safeGetValue(offset + 6);
+  // Asegurarse de que está en mayúsculas como se almacena típicamente en la base de datos
+  if (customerLocation) {
+    customerLocation = customerLocation.toUpperCase();
+    console.log(`Ubicación del cliente normalizada: "${customerLocation}"`);
+  }
   
   // Columna H: Objeto (Detalles del artículo)
   const itemDetails = safeGetValue(offset + 7);
@@ -531,17 +537,94 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     if (fileExt === '.csv') {
       // Procesar archivo CSV para obtener código de tienda con soporte de caracteres especiales
       const rows: any[] = [];
-      await new Promise<void>((resolve, reject) => {
-        // Leer el contenido completo del archivo primero para determinar su estructura
-        const fileContent = fs.readFileSync(filePath, { encoding: 'utf8' });
+      
+      try {
+        // Detectar la codificación de archivo y manejar caracteres especiales españoles
+        console.log("Procesando archivo CSV con mejor soporte para caracteres españoles");
         
-        // Log para depuración
-        console.log(`Contenido del CSV (primeras 200 caracteres): ${fileContent.substring(0, 200)}...`);
+        // Leer el archivo como buffer para analizar y detectar su codificación
+        const fileBuffer = fs.readFileSync(filePath);
+        let fileContent = '';
+        let fileEncoding = 'utf8';
+
+        // Detectar BOM para UTF-8 (EF BB BF) - muchos archivos Excel lo tienen
+        if (fileBuffer.length >= 3 && 
+            fileBuffer[0] === 0xEF && 
+            fileBuffer[1] === 0xBB && 
+            fileBuffer[2] === 0xBF) {
+          console.log("Detectado BOM UTF-8, usando codificación UTF-8");
+          fileEncoding = 'utf8';
+          // Eliminar el BOM al leer el contenido
+          fileContent = fileBuffer.slice(3).toString('utf8');
+        } 
+        // Detectar señales de codificación UTF-16 
+        else if (fileBuffer.length >= 2 && 
+                ((fileBuffer[0] === 0xFF && fileBuffer[1] === 0xFE) || 
+                 (fileBuffer[0] === 0xFE && fileBuffer[1] === 0xFF))) {
+          console.log("Detectado BOM UTF-16, utilizando codificación UTF-16");
+          fileEncoding = 'utf16le';
+          fileContent = fileBuffer.toString('utf16le');
+        } 
+        // Detectar si es probable que sea latin1/ISO-8859-1 o Windows-1252 (común en Excel español)
+        else if (fileBuffer.some(byte => byte > 127 && byte < 256)) {
+          // Intentar primero con Latin-1
+          console.log("Detectados bytes característicos de codificación no-UTF8, intentando diferentes codificaciones");
+          fileEncoding = 'latin1';
+          fileContent = fileBuffer.toString('latin1');
+          
+          // Verificar si hay caracteres mal formados (cuadrados o interrogantes)
+          if (fileContent.includes('�')) {
+            console.log("Detectados caracteres corruptos con latin1, intentando con Windows-1252");
+            
+            // Usar iconv-lite para Windows-1252 (muy común en aplicaciones españolas)
+            try {
+              fileContent = iconv.decode(fileBuffer, 'win1252');
+              fileEncoding = 'win1252';
+              console.log("Aplicada decodificación Windows-1252 con iconv-lite");
+              
+              // Verificar si aún hay caracteres problemáticos
+              if (fileContent.includes('�')) {
+                // Intentar con codificaciones adicionales comunes en español
+                for (const encoding of ['iso-8859-15', 'cp850', 'mac-roman']) {
+                  console.log(`Intentando con codificación: ${encoding}`);
+                  const tempContent = iconv.decode(fileBuffer, encoding);
+                  
+                  // Si tiene menos caracteres de reemplazo, usamos esta codificación
+                  if ((tempContent.match(/�/g) || []).length < (fileContent.match(/�/g) || []).length) {
+                    fileContent = tempContent;
+                    fileEncoding = encoding;
+                    console.log(`Mejor resultado encontrado con: ${encoding}`);
+                    
+                    // Si no quedan caracteres problemáticos, terminamos la búsqueda
+                    if (!fileContent.includes('�')) {
+                      break;
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn("Error al decodificar con iconv-lite:", e);
+              // Volver a latin1 como respaldo
+              fileContent = fileBuffer.toString('latin1');
+            }
+          }
+        } else {
+          // Por defecto, usar UTF-8
+          fileContent = fileBuffer.toString('utf8');
+          console.log("No se detectaron indicadores especiales de codificación, usando UTF-8 por defecto");
+        }
         
-        // Detectar el tipo de separador (puede ser que usen punto y coma en lugar de coma)
+        // Log para depuración - mostrar primeros caracteres
+        console.log(`Contenido del CSV con codificación ${fileEncoding} (primeros 100 caracteres): ${fileContent.substring(0, 100)}...`);
+        
+        // Detectar automáticamente el tipo de separador (coma o punto y coma)
+        let separator = ',';
         const commaCount = (fileContent.match(/,/g) || []).length;
         const semicolonCount = (fileContent.match(/;/g) || []).length;
-        const separator = semicolonCount > commaCount ? ';' : ',';
+        
+        if (semicolonCount > commaCount) {
+          separator = ';';
+        }
         
         console.log(`Usando separador: "${separator}" (comas: ${commaCount}, punto y coma: ${semicolonCount})`);
         
@@ -556,76 +639,104 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         // Crear headers predeterminados si son necesarios
         const defaultHeaders = Array.from({ length: estimatedColumnCount }, (_, i) => `column${i}`);
         
-        // Usar utf8 para asegurar que se leen correctamente los caracteres especiales
-        fs.createReadStream(filePath, { encoding: 'utf8' })
-          .pipe(csvParser({
-            // Opciones para mejorar compatibilidad con caracteres especiales
-            separator: separator,    // Usar el separador detectado
-            escape: '"',             // Carácter de escape
-            quote: '"',              // Carácter de comillas
-            strict: false,           // Desactivar modo estricto para ser más tolerante
-            skipComments: true,      // Saltar líneas de comentarios
-            headers: defaultHeaders, // Usar headers predeterminados si son necesarios
-            skipLines: 0             // No saltar líneas al inicio
-          }))
-          .on('data', (row) => {
-            // Procesar los valores que llegan para asegurar que se manejan correctamente
-            const processedRow: any = {};
-            for (const key in row) {
-              const value = row[key];
-              // Convertir a string y preservar caracteres especiales
-              processedRow[key] = value !== undefined && value !== null ? value.toString() : '';
-            }
-            rows.push(processedRow);
-          })
-          .on('end', () => {
-            resolve();
-          })
-          .on('error', (error) => {
-            console.error("Error al procesar CSV:", error);
-            reject(error);
-          });
-      });
-      
-      if (rows.length > 1) {
-        // Extraer código de tienda de la segunda fila (índice 1)
-        const secondRow = rows[1];
-        const values = Object.values(secondRow);
-        if (values.length > 0) {
-          excelStoreCode = values[0]?.toString() || '';
-        }
-      }
-      
-      // Continuar con el procesamiento normal
-      // Saltar la primera fila (encabezado) e indexar los valores por posición
-      rows.forEach((row, index) => {
-        if (index === 0) return; // Saltar encabezado
-        
-        // Extraer valores de las columnas en orden, asegurando que los caracteres especiales se preserven
-        const values = Object.values(row);
-        
-        // Convertir explícitamente cada valor a string para manejar caracteres especiales
-        const processedValues = values.map(val => {
-          if (val === null || val === undefined) return '';
+        // Procesar el contenido ya decodificado como stream para CSV parsing
+        await new Promise<void>((resolve, reject) => {
+          const streamContent = Buffer.from(fileContent);
           
-          // Asegurar que el valor es una cadena y preservar caracteres especiales
-          const strVal = val.toString();
-          
-          // Debug para detectar problemas con caracteres especiales
-          if (strVal.includes('�')) {
-            console.warn(`Detectado carácter de reemplazo en valor "${strVal}"`);
-          }
-          
-          return strVal;
+          require('stream').Readable.from(streamContent)
+            .pipe(csvParser({
+              separator: separator,    // Usar el separador detectado
+              escape: '"',             // Carácter de escape
+              quote: '"',              // Carácter de comillas
+              strict: false,           // Desactivar modo estricto para ser más tolerante
+              skipComments: true,      // Saltar líneas de comentarios
+              headers: defaultHeaders, // Usar headers predeterminados 
+              skipLines: 0             // No saltar líneas al inicio
+            }))
+            .on('data', (row) => {
+              // Procesar los valores que llegan para asegurar que se manejan correctamente
+              const processedRow: any = {};
+              for (const key in row) {
+                const value = row[key];
+                // Convertir a string y preservar caracteres especiales
+                let processedValue = value !== undefined && value !== null ? value.toString() : '';
+                
+                // Eliminar caracteres invisibles o corruptos
+                processedValue = processedValue
+                  .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '') // Eliminar caracteres de control
+                  .trim(); // Eliminar espacios al inicio/final
+                
+                processedRow[key] = processedValue;
+                
+                // Log de valores problemáticos para diagnóstico
+                if (processedValue.includes('�')) {
+                  console.warn(`Detectado carácter de reemplazo en campo ${key}: "${processedValue}"`);
+                }
+              }
+              
+              rows.push(processedRow);
+            })
+            .on('end', () => {
+              console.log(`Procesamiento CSV finalizado, ${rows.length} filas leídas`);
+              resolve();
+            })
+            .on('error', (error) => {
+              console.error("Error al procesar CSV:", error);
+              reject(error);
+            });
         });
         
-        console.log("CSV row values (processed):", processedValues);
-        
-        const excelData = createExcelDataFromValues(processedValues, storeCode, activityId);
-        if (excelData) {
-          processedRows.push(excelData);
+        if (rows.length > 1) {
+          // Extraer código de tienda de la segunda fila (índice 1)
+          const secondRow = rows[1];
+          const values = Object.values(secondRow);
+          if (values.length > 0) {
+            excelStoreCode = values[0]?.toString() || '';
+            console.log(`Código de tienda extraído: "${excelStoreCode}"`);
+          }
         }
-      });
+        
+        // Continuar con el procesamiento normal
+        // Saltar la primera fila (encabezado) e indexar los valores por posición
+        rows.forEach((row, index) => {
+          if (index === 0) return; // Saltar encabezado
+          
+          // Extraer valores de las columnas en orden
+          const values = Object.values(row);
+          
+          // Limpieza final de los valores para asegurar consistencia
+          const processedValues = values.map(val => {
+            if (val === null || val === undefined) return '';
+            
+            // Asegurar que el valor es una cadena y realizar limpieza final
+            let strVal = val.toString().trim();
+            
+            // Eliminar caracteres invisibles y normalizar espacios
+            strVal = strVal.replace(/\s+/g, ' ');
+            
+            // Debug para detectar problemas finales con caracteres especiales
+            if (strVal.includes('�')) {
+              console.warn(`Valor final con problemas de codificación: "${strVal}"`);
+            }
+            
+            return strVal;
+          });
+          
+          // Mostrar solo primeras filas para evitar sobrecargar los logs
+          if (index < 5 || index % 50 === 0) {
+            console.log(`Fila ${index} procesada: ${JSON.stringify(processedValues.slice(0, 5))}...`);
+          }
+          
+          const excelData = createExcelDataFromValues(processedValues, storeCode, activityId);
+          if (excelData) {
+            processedRows.push(excelData);
+          }
+        });
+        
+      } catch (error) {
+        console.error("Error en el procesamiento avanzado de CSV:", error);
+        throw new Error(`Error procesando archivo CSV: ${error.message || 'Error desconocido'}`);
+      }
     } 
     else if (fileExt === '.xls') {
       // Procesar archivo XLS (formato antiguo) usando la biblioteca XLSX
