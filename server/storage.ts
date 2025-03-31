@@ -95,7 +95,8 @@ export interface IStorage {
   // PdfDocument methods
   createPdfDocument(doc: InsertPdfDocument): Promise<PdfDocument>;
   getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]>;
-  searchPdfDocuments(params: { storeCodes: string[], dateFrom?: string, dateTo?: string }): Promise<PdfDocument[]>;
+  searchPdfDocuments(params: { storeCodes: string[], dateFrom?: string, dateTo?: string, limit?: number }): Promise<PdfDocument[]>;
+  getRecentPdfDocuments(limit: number): Promise<PdfDocument[]>;
   getPdfDocument(id: number): Promise<PdfDocument | undefined>;
   getPdfDocumentByActivityId(activityId: number): Promise<PdfDocument | undefined>;
   updatePdfDocumentPath(fileActivityId: number, newPath: string): Promise<boolean>;
@@ -472,7 +473,8 @@ export class MemStorage implements IStorage {
   async searchPdfDocuments(params: { 
     storeCodes: string[], 
     dateFrom?: string, 
-    dateTo?: string 
+    dateTo?: string,
+    limit?: number
   }): Promise<PdfDocument[]> {
     let results = Array.from(this.pdfDocuments.values())
       .filter(doc => params.storeCodes.includes(doc.storeCode));
@@ -481,13 +483,15 @@ export class MemStorage implements IStorage {
     if (params.dateFrom || params.dateTo) {
       results = results.filter(doc => {
         const uploadDate = new Date(doc.uploadDate);
+        const dateFrom = params.dateFrom ? new Date(params.dateFrom) : null;
+        const dateTo = params.dateTo ? new Date(params.dateTo) : null;
         
-        if (params.dateFrom && params.dateTo) {
-          return uploadDate >= params.dateFrom && uploadDate <= params.dateTo;
-        } else if (params.dateFrom) {
-          return uploadDate >= params.dateFrom;
-        } else if (params.dateTo) {
-          return uploadDate <= params.dateTo;
+        if (dateFrom && dateTo) {
+          return uploadDate >= dateFrom && uploadDate <= dateTo;
+        } else if (dateFrom) {
+          return uploadDate >= dateFrom;
+        } else if (dateTo) {
+          return uploadDate <= dateTo;
         }
         
         return true;
@@ -495,11 +499,31 @@ export class MemStorage implements IStorage {
     }
     
     // Ordenar por fecha (más reciente primero)
-    return results.sort((a, b) => {
+    results.sort((a, b) => {
       const dateA = new Date(a.uploadDate).getTime();
       const dateB = new Date(b.uploadDate).getTime();
       return dateB - dateA;
     });
+
+    // Aplicar límite si se especifica
+    if (params.limit && params.limit > 0) {
+      results = results.slice(0, params.limit);
+    }
+    
+    return results;
+  }
+  
+  async getRecentPdfDocuments(limit: number): Promise<PdfDocument[]> {
+    // Obtener todos los documentos, ordenarlos por fecha y limitar el resultado
+    const results = Array.from(this.pdfDocuments.values())
+      .sort((a, b) => {
+        const dateA = new Date(a.uploadDate).getTime();
+        const dateB = new Date(b.uploadDate).getTime();
+        return dateB - dateA; // Ordenar por fecha descendente (más reciente primero)
+      })
+      .slice(0, limit);
+    
+    return results;
   }
   
   async getPdfDocument(id: number): Promise<PdfDocument | undefined> {
@@ -1318,7 +1342,8 @@ export class DatabaseStorage implements IStorage {
   async searchPdfDocuments(params: { 
     storeCodes: string[], 
     dateFrom?: string, 
-    dateTo?: string 
+    dateTo?: string,
+    limit?: number
   }): Promise<PdfDocument[]> {
     let query = db
       .select()
@@ -1341,6 +1366,23 @@ export class DatabaseStorage implements IStorage {
     
     // Ordenar por fecha (más reciente primero)
     query = query.orderBy(desc(pdfDocuments.uploadDate));
+    
+    // Aplicar límite si se proporciona
+    if (params.limit && params.limit > 0) {
+      query = query.limit(params.limit);
+    }
+    
+    const results = await query;
+    return results;
+  }
+  
+  async getRecentPdfDocuments(limit: number): Promise<PdfDocument[]> {
+    // Obtener los documentos PDF más recientes ordenados por fecha de carga
+    const query = db
+      .select()
+      .from(pdfDocuments)
+      .orderBy(desc(pdfDocuments.uploadDate))
+      .limit(limit);
     
     const results = await query;
     return results;

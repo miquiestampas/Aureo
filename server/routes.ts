@@ -1222,6 +1222,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PDF document routes
   app.get("/api/pdf-documents", async (req, res, next) => {
     try {
+      if (req.query.recent === "true") {
+        // Si se solicitan los documentos más recientes
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : 10; // Por defecto 10 documentos
+        const documents = await storage.getRecentPdfDocuments(limit);
+        
+        // Enriquecer con información de la tienda
+        const stores = await storage.getStores();
+        const enrichedDocuments = documents.map(doc => {
+          const store = stores.find(s => s.code === doc.storeCode);
+          return {
+            ...doc,
+            storeName: store?.name || 'Desconocida',
+            storeDistrict: store?.district || null,
+            storeLocality: store?.locality || null
+          };
+        });
+        
+        return res.json(enrichedDocuments);
+      }
+      
+      // Comportamiento original - documentos por tienda
       if (!req.query.storeCode) {
         return res.status(400).json({ message: "storeCode query parameter is required" });
       }
@@ -1229,6 +1250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const documents = await storage.getPdfDocumentsByStore(req.query.storeCode as string);
       res.json(documents);
     } catch (err) {
+      console.error("Error obteniendo documentos PDF:", err);
       next(err);
     }
   });
