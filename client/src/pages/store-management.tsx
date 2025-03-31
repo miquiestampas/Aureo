@@ -7,6 +7,7 @@ import { useLocation } from "wouter";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { StoreSelector } from "@/components/StoreSelector";
 
 // Lista de localidades de Madrid
 const MADRID_LOCALITIES = [
@@ -218,12 +219,30 @@ export default function StoreManagementPage() {
   const [isImporting, setIsImporting] = useState(false);
 
   // Filtros
+  const [selectedStoreId, setSelectedStoreId] = useState("");
   const [codeFilter, setCodeFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
   const [localityFilter, setLocalityFilter] = useState("_empty");
   const [districtFilter, setDistrictFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  
+  // Función para manejar la selección de tiendas desde el selector
+  const handleStoreChange = (storeId: string) => {
+    setSelectedStoreId(storeId);
+    
+    if (storeId && stores) {
+      const selectedStore = stores.find(store => store.id.toString() === storeId);
+      if (selectedStore) {
+        setCodeFilter(selectedStore.code);
+        setNameFilter(selectedStore.name);
+      }
+    } else {
+      // Limpiar filtros si no se selecciona ninguna tienda
+      setCodeFilter("");
+      setNameFilter("");
+    }
+  };
 
   // Referencias para exportación
   const tableRef = useRef(null);
@@ -1505,6 +1524,7 @@ export default function StoreManagementPage() {
                   <Button 
                     variant="outline" 
                     onClick={() => {
+                      setSelectedStoreId("");
                       setCodeFilter("");
                       setNameFilter("");
                       setLocalityFilter("_empty");
@@ -1573,11 +1593,22 @@ export default function StoreManagementPage() {
           </CardHeader>
           <CardContent className="p-0" ref={tableRef}>
             {filteredStores.length ? (
-              <DataTable
-                columns={columns}
-                data={filteredStores}
-                searchKey="name"
-              />
+              <div>
+                <div className="mb-4 p-4 border-b">
+                  <div className="flex flex-col space-y-2">
+                    <label className="text-sm font-medium">Buscar tienda</label>
+                    <StoreSelector 
+                      value={selectedStoreId}
+                      onChange={handleStoreChange}
+                      placeholder="Seleccione o busque una tienda"
+                    />
+                  </div>
+                </div>
+                <DataTable
+                  columns={columns}
+                  data={filteredStores}
+                />
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12">
                 <Store className="h-12 w-12 text-muted-foreground mb-4" />
