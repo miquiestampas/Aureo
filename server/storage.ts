@@ -2316,8 +2316,23 @@ export class DatabaseStorage implements IStorage {
           
           // Preparar los términos de búsqueda y eliminar espacios en blanco adicionales
           const searchTerm = filters.customerLocation.trim();
-          const upperSearchTerm = searchTerm.toUpperCase(); // Los países están en mayúsculas
+          const lowerSearchTerm = searchTerm.toLowerCase();
           
+          // Solución simplificada para buscar por país
+          if (lowerSearchTerm === 'perú' || lowerSearchTerm === 'peru') {
+            console.log("Búsqueda especial para Perú");
+            conditions.push(sql`(LOWER(${excelData.customerLocation}) LIKE '%peru%' OR LOWER(${excelData.customerLocation}) LIKE '%perú%')`);
+          }
+          else if (lowerSearchTerm === 'rumania' || lowerSearchTerm === 'rumanía' || lowerSearchTerm === 'romania') {
+            console.log("Búsqueda especial para Rumanía");
+            conditions.push(sql`(LOWER(${excelData.customerLocation}) LIKE '%rumania%' OR LOWER(${excelData.customerLocation}) LIKE '%rumanía%' OR LOWER(${excelData.customerLocation}) LIKE '%romania%')`);
+          }
+          else {
+            // Para otros términos, usar búsqueda genérica
+            conditions.push(sql`LOWER(${excelData.customerLocation}) LIKE '%${lowerSearchTerm}%'`);
+          }
+          
+          const upperSearchTerm = searchTerm.toUpperCase(); // Los países están en mayúsculas
           console.log(`Búsqueda de país/provincia: "${searchTerm}" en mayúsculas: "${upperSearchTerm}"`);
           
           // Buscar variantes del país/ciudad usando nuestra función mejorada
@@ -2327,12 +2342,6 @@ export class DatabaseStorage implements IStorage {
           const codigoPostal = extraerCodigoPostal(searchTerm);
           if (codigoPostal) {
             console.log(`Código postal detectado: ${codigoPostal}`);
-          }
-          
-          // Procesar ubicación compleja (Ej: "Madrid, España")
-          const ubicacionProcesada = procesarUbicacionCompleja(searchTerm);
-          if (ubicacionProcesada.ciudad || ubicacionProcesada.pais) {
-            console.log(`Ubicación procesada: Ciudad - ${ubicacionProcesada.ciudad || 'N/A'}, País - ${ubicacionProcesada.pais || 'N/A'}`);
           }
           
           // Construir condición SQL usando la función mejorada para países y ciudades

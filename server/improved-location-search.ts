@@ -2,16 +2,39 @@
 export function normalizeText(text: string): string {
   if (!text) return '';
   
-  // Reemplazos específicos para caracteres problemáticos
-  let normalized = text;
-  
   // Preservar el texto original para diagnóstico
   const original = text;
+  console.log(`Normalizando texto: "${original}"`);
   
   try {
     // Eliminar comillas que pueden estar en los datos como "Madrid, España"
-    normalized = normalized.replace(/"/g, '');
-    normalized = normalized.replace(/'/g, '');
+    let normalized = text.replace(/"/g, '').replace(/'/g, '');
+    
+    // Realizar primero normalizaciones especiales más específicas
+    // Como la 'ú' en Perú, que a veces se pierde
+    normalized = normalized.replace(/\bperu\b/gi, 'peru');
+    normalized = normalized.replace(/\bperú\b/gi, 'peru');
+    
+    // Más países sudamericanos
+    normalized = normalized.replace(/\bchile\b/gi, 'chile');
+    normalized = normalized.replace(/\bargentina\b/gi, 'argentina');
+    normalized = normalized.replace(/\bmexico\b/gi, 'mexico');
+    normalized = normalized.replace(/\bméxico\b/gi, 'mexico');
+    normalized = normalized.replace(/\bcolombia\b/gi, 'colombia');
+    normalized = normalized.replace(/\becuador\b/gi, 'ecuador');
+    normalized = normalized.replace(/\bvenezuela\b/gi, 'venezuela');
+    normalized = normalized.replace(/\bparaguay\b/gi, 'paraguay');
+    normalized = normalized.replace(/\buruguay\b/gi, 'uruguay');
+    normalized = normalized.replace(/\bbolivia\b/gi, 'bolivia');
+    
+    // Países europeos con caracteres especiales
+    normalized = normalized.replace(/\brumani?a\b/gi, 'rumania');
+    normalized = normalized.replace(/\bromani?a\b/gi, 'rumania');
+    normalized = normalized.replace(/\bespa[ñn]a\b/gi, 'espana');
+    normalized = normalized.replace(/\balemani?a\b/gi, 'alemania');
+    normalized = normalized.replace(/\bitalía\b/gi, 'italia');
+    normalized = normalized.replace(/\bitalia\b/gi, 'italia');
+    normalized = normalized.replace(/\bfrancia\b/gi, 'francia');
     
     // Reemplazos específicos para manejo adecuado de caracteres españoles
     // El orden es importante: primero reemplazar caracteres compuestos, luego individuales
@@ -49,16 +72,19 @@ export function normalizeText(text: string): string {
     normalized = normalized.replace(/\s+/g, ' ').trim();
     
     // Log detallado para análisis
-    if (normalized !== original.toLowerCase()) {
-      console.log(`Normalización mejorada: "${original}" → "${normalized}"`);
+    console.log(`Normalización mejorada: "${original}" → "${normalized}"`);
+    
+    // Detección especial para búsqueda de país individual
+    if (['peru', 'rumani', 'rumania', 'espana'].includes(normalized)) {
+      console.log(`¡Detección especial de país! "${normalized}"`);
     }
+    
+    return normalized;
   } catch (error) {
     console.error(`Error normalizando texto "${original}":`, error);
     // En caso de error, devolver una versión simple del texto
     return text.toLowerCase().trim();
   }
-  
-  return normalized;
 }
 
 // Diccionario mejorado de variantes de países y ciudades
