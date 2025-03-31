@@ -495,18 +495,34 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     
     // First extract the store code from cell A2 based on the file type
     if (fileExt === '.csv') {
-      // Procesar archivo CSV para obtener código de tienda
+      // Procesar archivo CSV para obtener código de tienda con soporte de caracteres especiales
       const rows: any[] = [];
       await new Promise<void>((resolve, reject) => {
-        fs.createReadStream(filePath)
-          .pipe(csvParser())
+        // Usar utf8 para asegurar que se leen correctamente los caracteres especiales
+        fs.createReadStream(filePath, { encoding: 'utf8' })
+          .pipe(csvParser({
+            // Opciones para mejorar compatibilidad con caracteres especiales
+            separator: ',',        // Separador de columnas
+            escape: '"',           // Carácter de escape
+            quote: '"',            // Carácter de comillas
+            strict: true,          // Modo estricto para mejor detección de formatos
+            skipComments: true     // Saltar líneas de comentarios
+          }))
           .on('data', (row) => {
-            rows.push(row);
+            // Procesar los valores que llegan para asegurar que se manejan correctamente
+            const processedRow: any = {};
+            for (const key in row) {
+              const value = row[key];
+              // Convertir a string y preservar caracteres especiales
+              processedRow[key] = value !== undefined && value !== null ? value.toString() : '';
+            }
+            rows.push(processedRow);
           })
           .on('end', () => {
             resolve();
           })
           .on('error', (error) => {
+            console.error("Error al procesar CSV:", error);
             reject(error);
           });
       });
@@ -525,10 +541,27 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       rows.forEach((row, index) => {
         if (index === 0) return; // Saltar encabezado
         
-        // Extraer valores de las columnas en orden
+        // Extraer valores de las columnas en orden, asegurando que los caracteres especiales se preserven
         const values = Object.values(row);
-        console.log("CSV row values:", values);
-        const excelData = createExcelDataFromValues(values, storeCode, activityId);
+        
+        // Convertir explícitamente cada valor a string para manejar caracteres especiales
+        const processedValues = values.map(val => {
+          if (val === null || val === undefined) return '';
+          
+          // Asegurar que el valor es una cadena y preservar caracteres especiales
+          const strVal = val.toString();
+          
+          // Debug para detectar problemas con caracteres especiales
+          if (strVal.includes('�')) {
+            console.warn(`Detectado carácter de reemplazo en valor "${strVal}"`);
+          }
+          
+          return strVal;
+        });
+        
+        console.log("CSV row values (processed):", processedValues);
+        
+        const excelData = createExcelDataFromValues(processedValues, storeCode, activityId);
         if (excelData) {
           processedRows.push(excelData);
         }
