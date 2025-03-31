@@ -121,7 +121,10 @@ export const excelData = sqliteTable("excel_data", {
   orderDate: text("order_date").notNull(), // ISO date string
   customerName: text("customer_name"),
   customerContact: text("customer_contact"),
+  customerAddress: text("customer_address"), // Nuevo: Dirección del cliente (columna F)
+  customerLocation: text("customer_location"), // Nuevo: Provincia o País del cliente (columna G)
   itemDetails: text("item_details"),
+  itemWeight: text("item_weight"), // Nuevo: Peso del artículo (columna I)
   metals: text("metals"),
   engravings: text("engravings"),
   stones: text("stones"),
@@ -138,7 +141,10 @@ export const insertExcelDataSchema = createInsertSchema(excelData).pick({
   orderDate: true,
   customerName: true,
   customerContact: true,
+  customerAddress: true, // Incluir el nuevo campo en el schema
+  customerLocation: true, // Incluir el nuevo campo en el schema
   itemDetails: true,
+  itemWeight: true, // Incluir el nuevo campo en el schema
   metals: true,
   engravings: true,
   stones: true,

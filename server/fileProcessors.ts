@@ -403,17 +403,17 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
   // Columna E: Contacto del cliente (DNI/Pasaporte)
   const customerContact = safeGetValue(offset + 4);
   
-  // Columna F y G: Dirección y Provincia (guardamos información combinada en un campo)
-  const addressInfo = [
-    safeGetValue(offset + 5), // Dirección
-    safeGetValue(offset + 6)  // Provincia/país
-  ].filter(Boolean).join(', ');
+  // Columna F: Dirección del cliente (campo separado)
+  const customerAddress = safeGetValue(offset + 5);
+  
+  // Columna G: Provincia/País del cliente (campo separado)
+  const customerLocation = safeGetValue(offset + 6);
   
   // Columna H: Objeto (Detalles del artículo)
   const itemDetails = safeGetValue(offset + 7);
   
   // Columna I: Peso
-  const weight = safeGetValue(offset + 8);
+  const itemWeight = safeGetValue(offset + 8);
   
   // Columna J: Clase de metal
   const metals = safeGetValue(offset + 9);
@@ -477,7 +477,10 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
     orderDate: orderDate.toISOString(), // Convertimos Date a string para SQLite
     customerName: customerName,
     customerContact: customerContact,
+    customerAddress: customerAddress, // Nuevo campo separado
+    customerLocation: customerLocation, // Nuevo campo separado
     itemDetails: itemDetails,
+    itemWeight: itemWeight, // Nuevo campo separado
     metals: metals,
     engravings: engravings,
     stones: stones,
