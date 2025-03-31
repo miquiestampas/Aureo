@@ -1,0 +1,6 @@
+CODIGO;PEDIDO;FECHA;CLIENTE;DNI;DIRECCION;PROVINCIA;OBJETO;PESO;METAL;GRABADO;PIEDRAS;PRECIO;PAPELETA;VENTA
+J28366AAKA5;12345;25/03/2025;MARTÍNEZ GARCÍA, JOSÉ MARÍA;12345678A;Calle Mayor 123;Madrid;Anillo oro 18K con diamante;5.2g;Oro 18K;Iniciales JM;Diamante 0.5K;1250€;;
+J28366AAKA5;12346;25/03/2025;GONZALEZ PÉREZ, MARÍA DOLORES;87654321B;Avenida Principal 45;Sevilla;Pulsera de plata;15.8g;Plata 925;Sin grabado;Sin piedras;350€;;
+J28366AAKA5;12347;26/03/2025;FERNÁNDEZ LÓPEZ, ANTONIO;24681357C;Plaza Central 8, 3ºB;Barcelona;Reloj de oro;85.5g;Oro 14K y acero;Nº serie: 789123456;Sin piedras;3800€;;
+J28366AAKA5;12348;26/03/2025;SÁNCHEZ RUIZ, CARMEN;13579246D;Calle Estrecha 2;Valencia;Pendientes oro blanco con zafiros;3.6g;Oro blanco 18K;Sin grabado;Zafiros;950€;;
+J28366AAKA5;12349;27/03/2025;LÓPEZ GÓMEZ, FRANCISCO;97531642E;Avenida del Parque 78;Málaga;Cadena de oro;12.7g;Oro 18K;Sin grabado;Sin piedras;1450€;;
