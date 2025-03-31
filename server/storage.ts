@@ -2175,13 +2175,79 @@ export class DatabaseStorage implements IStorage {
         }
         
         if (filters.customerLocation) {
+          console.log("Búsqueda de ubicación detectada, usando consulta SQL directa");
+          
+          // Usar una consulta SQL directa para todas las ubicaciones
+          const searchTerm = filters.customerLocation.toLowerCase();
+          const originalTerm = filters.customerLocation;
+          const normalizedTerm = normalizeText(filters.customerLocation);
+          
+          console.log(`Búsqueda de localización: "${originalTerm}" → "${normalizedTerm}"`);
+          
+          // Crear una consulta SQL directa que evite problemas con las comillas y acentos
+          const sqlQuery = `
+            SELECT * FROM excel_data 
+            WHERE 
+              customer_location = '${originalTerm}' OR
+              customer_location LIKE '%${searchTerm}%' OR
+              LOWER(customer_location) LIKE '%${searchTerm}%' OR
+              customer_location LIKE '%"${searchTerm}"%' OR
+              customer_location LIKE '%${searchTerm},%' OR
+              customer_location LIKE '%, ${searchTerm}%' OR
+              customer_location = 'Rumanía' OR
+              customer_location = 'Rumania'
+            ORDER BY order_date DESC
+            LIMIT 100
+          `;
+          
+          console.log("Ejecutando SQL directa:", sqlQuery);
+          
+          // Ejecutar consulta SQL directa
+          try {
+            const rawResults = await sqlite.all(sqlQuery);
+            console.log(`Resultados de búsqueda SQL directa: ${rawResults.length}`);
+            
+            if (rawResults.length > 0) {
+              // Convertir resultados SQL crudos a objetos ExcelData
+              const mappedResults = rawResults.map(row => ({
+                id: row.id,
+                storeCode: row.store_code,
+                orderNumber: row.order_number,
+                orderDate: row.order_date,
+                customerName: row.customer_name,
+                customerContact: row.customer_contact,
+                customerAddress: row.customer_address,
+                customerLocation: row.customer_location,
+                itemDetails: row.item_details,
+                stones: row.stones,
+                metals: row.metals,
+                engravings: row.engravings,
+                weight: row.weight || null,
+                price: row.price,
+                deposit: row.deposit,
+                balance: row.balance,
+                saleDate: row.sale_date,
+                notes: row.notes,
+                fileActivityId: row.file_activity_id,
+                pawnTicket: row.pawn_ticket
+              }));
+              
+              return mappedResults;
+            }
+          } catch (error) {
+            console.error("Error ejecutando consulta SQL directa:", error);
+          }
+          
+          // Si no encontramos resultados con SQL directa o hay un error,
+          // continuamos con la implementación original
+          
           // Normalizar para eliminar acentos y convertir a minúsculas
-          const searchTerm = normalizeText(filters.customerLocation);
-          const searchTermLike = `%${searchTerm}%`;
-          console.log("Buscando ubicación con término normalizado:", searchTerm);
+          const searchTerm2 = normalizeText(filters.customerLocation);
+          const searchTermLike = `%${searchTerm2}%`;
+          console.log("Buscando ubicación con término normalizado:", searchTerm2);
           
           // Limpiar término de búsqueda de comillas
-          const cleanSearchTerm = searchTerm.replace(/"/g, '');
+          const cleanSearchTerm = searchTerm2.replace(/"/g, '');
           
           // Preparar términos de búsqueda - dividir por comas para buscar partes individuales
           const locationTerms = cleanSearchTerm.split(',').map(term => term.trim());
