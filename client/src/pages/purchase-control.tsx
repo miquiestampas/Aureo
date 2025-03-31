@@ -132,6 +132,7 @@ interface SearchParams {
   price?: string;
   priceOperator?: string;
   onlyAlerts?: boolean;
+  customerLocation?: string; // Added customer location
 }
 
 export default function PurchaseControlPage() {
@@ -147,6 +148,7 @@ export default function PurchaseControlPage() {
     metals: "",
     engravings: "",
     stones: "",
+    customerLocation: "", // Added customer location
   });
   const [advancedSearch, setAdvancedSearch] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
@@ -235,7 +237,8 @@ export default function PurchaseControlPage() {
         stones: searchParams.stones || undefined,
         price: searchParams.price || undefined,
         priceOperator: searchParams.priceOperator || undefined,
-        onlyAlerts: searchParams.onlyAlerts || undefined
+        onlyAlerts: searchParams.onlyAlerts || undefined,
+        customerLocation: searchParams.customerLocation || undefined, // Added customer location
       };
     } else {
       // Parámetros para búsqueda simple - solo la consulta
@@ -491,6 +494,20 @@ export default function PurchaseControlPage() {
                   </div>
 
                   <div>
+                    <Label htmlFor="customer-location">Provincia/País</Label>
+                    <Input
+                      id="customer-location"
+                      placeholder="Provincia o país"
+                      value={searchParams.customerLocation || ""}
+                      onChange={(e) =>
+                        setSearchParams({
+                          ...searchParams,
+                          customerLocation: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
                     <Label htmlFor="order-number">Número de Orden</Label>
                     <Input
                       id="order-number"
@@ -651,6 +668,7 @@ export default function PurchaseControlPage() {
                         customerContact: "",
                         itemDetails: "",
                         metals: "",
+                        customerLocation: "", // Added customer location
                       });
                       setDateFrom(undefined);
                       setDateTo(undefined);
@@ -967,7 +985,7 @@ export default function PurchaseControlPage() {
                       Imprimir
                     </Button>
                     <Button variant="outline" size="sm">
-                      <Download className="h-4 w-4 mr-2" />
+                      <Download className="h-4 w-4 mr2" />
                       Exportar
                     </Button>
                   </div>
