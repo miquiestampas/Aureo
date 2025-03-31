@@ -8,6 +8,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import XLSX from "xlsx";
+import * as ExcelJS from 'exceljs';
 import { processExcelFile, processPdfFile } from "./fileProcessors";
 import { 
   InsertSearchHistory, User, 
@@ -1178,7 +1179,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Crear un nuevo libro de Excel
-      const ExcelJS = require('exceljs');
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Resultados de Búsqueda');
 
