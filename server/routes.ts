@@ -942,80 +942,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Excel advanced search route for Purchase Control
   app.post("/api/search/excel-data/advanced", async (req, res, next) => {
     try {
-      console.log("Búsqueda recibida:", req.body);
+      console.log("Búsqueda recibida:", JSON.stringify(req.body, null, 2));
       
-      // Extract all filters from the body
-      const {
-        query = "",
-        storeCode,
-        dateFrom,
-        dateTo,
-        orderNumber,
-        customerName,
-        customerContact,
-        customerLocation, // Añadido: provincia/país
-        itemDetails,
-        metals,
-        engravings,
-        stones,
-        price,
-        priceOperator = "=",
-        onlyAlerts = false
-      } = req.body;
+      // Determinar el formato de la solicitud
+      let query = "";
+      let filters: any = {};
       
-      // Verificamos si es búsqueda simple (solo tiene la propiedad query)
-      const isSimpleSearch = Object.keys(req.body).length === 1 && query;
-      
-      // Preparar filtros
-      const filters: any = {};
-      
-      // Agregar filtros solo si no es una búsqueda simple
-      if (!isSimpleSearch) {
-        // Agregar filtros de búsqueda avanzada
-        if (storeCode && storeCode !== "all") filters.storeCode = storeCode;
+      // Extraer directamente los filtros del body
+      if (req.body.filters && typeof req.body.filters === 'object') {
+        console.log("Formato con filters explícito detectado");
         
-        // Filtros de fecha
-        if (dateFrom) filters.fromDate = new Date(dateFrom).toISOString();
-        if (dateTo) filters.toDate = new Date(dateTo).toISOString();
+        // Si hay un campo query, extraerlo
+        if (req.body.query) {
+          query = req.body.query;
+        }
         
-        // Filtros específicos por campo
-        if (orderNumber) filters.orderNumber = orderNumber;
-        if (customerName) filters.customerName = customerName;
-        if (customerContact) filters.customerContact = customerContact;
-        if (customerLocation) filters.customerLocation = customerLocation; // Añadido: filtro de provincia/país
-        if (itemDetails) filters.itemDetails = itemDetails;
-        if (metals) filters.metals = metals;
-        if (engravings) filters.engravings = engravings;
-        if (stones) filters.stones = stones;
+        // Aplicar filtros directamente desde req.body.filters
+        filters = req.body.filters;
         
-        // Manejar filtrado de precios con operadores
-        if (price && !isNaN(parseFloat(price))) {
-          const numericPrice = parseFloat(price);
-          switch (priceOperator) {
-            case ">":
-              filters.priceMin = numericPrice;
-              break;
-            case "<":
-              filters.priceMax = numericPrice;
-              break;
-            case ">=":
-              filters.priceMin = numericPrice;
-              filters.priceIncludeEqual = true;
-              break;
-            case "<=":
-              filters.priceMax = numericPrice;
-              filters.priceIncludeEqual = true;
-              break;
-            case "=":
-            default:
-              filters.priceExact = numericPrice;
-              break;
+        // Log para depuración
+        console.log("Filtros aplicados:", JSON.stringify(filters, null, 2));
+      } else {
+        console.log("Usando formato de body directo");
+        
+        // Extraer query y filtros directamente del body
+        const {
+          query: bodyQuery = "",
+          storeCode,
+          dateFrom,
+          dateTo,
+          orderNumber,
+          customerName,
+          customerContact,
+          customerLocation,
+          itemDetails,
+          metals,
+          engravings,
+          stones,
+          price,
+          priceOperator = "=",
+          onlyAlerts = false
+        } = req.body;
+        
+        query = bodyQuery;
+        
+        // Verificamos si es búsqueda simple (solo tiene la propiedad query)
+        const isSimpleSearch = Object.keys(req.body).length === 1 && query;
+        
+        // Agregar filtros solo si no es una búsqueda simple
+        if (!isSimpleSearch) {
+          if (storeCode && storeCode !== "all") filters.storeCode = storeCode;
+          if (dateFrom) filters.fromDate = new Date(dateFrom).toISOString();
+          if (dateTo) filters.toDate = new Date(dateTo).toISOString();
+          if (orderNumber) filters.orderNumber = orderNumber;
+          if (customerName) filters.customerName = customerName;
+          if (customerContact) filters.customerContact = customerContact;
+          if (customerLocation) {
+            filters.customerLocation = customerLocation;
+            console.log("Filtro de ubicación aplicado:", customerLocation);
+          }
+          if (itemDetails) filters.itemDetails = itemDetails;
+          if (metals) filters.metals = metals;
+          if (engravings) filters.engravings = engravings;
+          if (stones) filters.stones = stones;
+          
+          // Procesar filtro de precio si existe
+          if (price && !isNaN(parseFloat(price))) {
+            const numericPrice = parseFloat(price);
+            switch (priceOperator) {
+              case ">": filters.priceMin = numericPrice; break;
+              case "<": filters.priceMax = numericPrice; break;
+              case ">=": 
+                filters.priceMin = numericPrice; 
+                filters.priceIncludeEqual = true; 
+                break;
+              case "<=": 
+                filters.priceMax = numericPrice; 
+                filters.priceIncludeEqual = true; 
+                break;
+              case "=":
+              default: filters.priceExact = numericPrice; break;
+            }
           }
         }
       }
       
-      // Ejecutar la búsqueda con los filtros configurados
+      // Verificar si hay filtros aplicados
+      const isSimpleSearch = Object.keys(filters).length === 0 && query;
+      
+      // Log de depuración
       console.log(`Realizando búsqueda ${isSimpleSearch ? 'simple' : 'avanzada'} con:`, { query, filters });
+      
+      // Ejecutar la búsqueda
       let results = await storage.searchExcelData(query, filters);
       
       console.log(`Búsqueda completada. Encontrados ${results.length} resultados`);

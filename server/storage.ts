@@ -2203,6 +2203,11 @@ export class DatabaseStorage implements IStorage {
               
               -- Búsqueda en minúsculas
               OR LOWER(customer_location) LIKE '%${searchTerm.toLowerCase()}%'
+              
+              -- Búsqueda específica para ubicaciones con comillas
+              OR customer_location LIKE '%"${searchTerm}%'
+              OR customer_location LIKE '%"${searchTerm},%'
+              OR customer_location LIKE '%, ${searchTerm}"%'
             )
           `;
           
@@ -2266,7 +2271,9 @@ export class DatabaseStorage implements IStorage {
           like(sql`LOWER(${excelData.metals})`, `%${searchTerm.toLowerCase()}%`),
           like(sql`LOWER(${excelData.engravings})`, `%${searchTerm.toLowerCase()}%`),
           like(sql`LOWER(${excelData.stones})`, `%${searchTerm.toLowerCase()}%`),
-          like(sql`LOWER(${excelData.pawnTicket})`, `%${searchTerm.toLowerCase()}%`)
+          like(sql`LOWER(${excelData.pawnTicket})`, `%${searchTerm.toLowerCase()}%`),
+          // Agregar condiciones para manejar valores con comillas dobles
+          like(sql`LOWER(REPLACE(${excelData.customerLocation}, '"', ''))`, `%${searchTerm.toLowerCase()}%`)
         );
         
         conditions.push(textCondition);
@@ -2356,6 +2363,14 @@ export class DatabaseStorage implements IStorage {
               OR UPPER(customer_location) LIKE '%, ${safeUpperTerm}%'
               OR customer_location LIKE '%${safeLowerTerm},%' 
               OR customer_location LIKE '%, ${safeLowerTerm}%'
+              
+              -- Búsqueda específica para valores con comillas dobles
+              OR customer_location LIKE '%"${safeUpperTerm}%'
+              OR customer_location LIKE '%"${safeUpperTerm},%'
+              OR customer_location LIKE '%, ${safeUpperTerm}"%'
+              OR customer_location LIKE '%"${safeLowerTerm}%'
+              OR customer_location LIKE '%"${safeLowerTerm},%'
+              OR customer_location LIKE '%, ${safeLowerTerm}"%'
               
               -- Búsqueda en minúsculas y con TRIM para eliminar espacios
               OR LOWER(customer_location) LIKE '%${safeLowerTerm}%'

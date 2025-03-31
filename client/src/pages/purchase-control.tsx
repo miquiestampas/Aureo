@@ -209,10 +209,33 @@ export default function PurchaseControlPage() {
   // Search mutation
   const searchMutation = useMutation({
     mutationFn: async (params: SearchParams) => {
+      // Format request to separate filters for a more consistent API
+      const requestBody = {
+        query: params.query || "",
+        filters: {
+          storeCode: params.storeCode,
+          dateFrom: params.dateFrom,
+          dateTo: params.dateTo,
+          orderNumber: params.orderNumber,
+          customerName: params.customerName,
+          customerContact: params.customerContact,
+          customerLocation: params.customerLocation,
+          itemDetails: params.itemDetails,
+          metals: params.metals,
+          engravings: params.engravings,
+          stones: params.stones,
+          price: params.price,
+          priceOperator: params.priceOperator,
+          onlyAlerts: params.onlyAlerts
+        }
+      };
+      
+      console.log("Enviando búsqueda:", JSON.stringify(requestBody, null, 2));
+      
       const response = await apiRequest(
         "POST", 
         "/api/search/excel-data/advanced", 
-        params
+        requestBody
       );
       return await response.json();
     },
