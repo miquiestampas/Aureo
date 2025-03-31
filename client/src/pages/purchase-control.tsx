@@ -4,6 +4,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
+import { Store as StoreType, ExcelData } from "../shared/types";
+import StoreInfoDialog from "../components/StoreInfoDialog";
 
 // Components
 import {
@@ -60,7 +62,7 @@ import {
   Phone,
   MapPin,
   FileSpreadsheet,
-  Store,
+  Store as StoreIcon,
   Package,
   Info,
   ArrowUpDown,
@@ -75,38 +77,6 @@ import {
 } from "lucide-react";
 
 // Types
-interface Store {
-  id: number;
-  code: string;
-  name: string;
-  type: string;
-  location: string;
-  district?: string;
-  locality?: string;
-  active: boolean;
-}
-
-interface ExcelData {
-  id: number;
-  storeCode: string;
-  orderNumber: string;
-  orderDate: string;
-  customerName: string;
-  customerContact: string;
-  customerAddress?: string; // Añadido: dirección del cliente
-  customerLocation?: string; // Añadido: provincia/país del cliente
-  itemDetails: string;
-  metals: string;
-  engravings: string;
-  stones: string;
-  carats: string;
-  price: string;
-  pawnTicket: string;
-  saleDate: string | null;
-  fileActivityId: number;
-  itemWeight?: string; // Añadido: peso del artículo
-}
-
 interface Alert {
   id: number;
   excelDataId: number;
@@ -168,7 +138,7 @@ export default function PurchaseControlPage() {
   const today = new Date();
 
   // Fetch stores for filter
-  const { data: stores } = useQuery<Store[]>({
+  const { data: stores } = useQuery<StoreType[]>({
     queryKey: ['/api/stores'],
   });
 
@@ -853,7 +823,7 @@ export default function PurchaseControlPage() {
                   <div className="space-y-1">
                     <Label className="text-xs text-gray-500">Tienda</Label>
                     <div className="flex items-center">
-                      <Store className="h-4 w-4 mr-2 text-primary" />
+                      <StoreIcon className="h-4 w-4 mr-2 text-primary" />
                       <span className="font-medium">{selectedRecord.storeCode}</span>
                     </div>
                   </div>

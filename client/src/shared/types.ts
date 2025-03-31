@@ -16,6 +16,8 @@ export interface ExcelData {
   orderDate: string;
   customerName: string;
   customerContact: string;
+  customerAddress?: string; // Añadido: dirección del cliente
+  customerLocation?: string; // Añadido: provincia/país del cliente
   itemDetails: string;
   metals: string;
   engravings: string;
@@ -25,6 +27,7 @@ export interface ExcelData {
   pawnTicket: string;
   saleDate: string | null;
   fileActivityId: number;
+  itemWeight?: string; // Añadido: peso del artículo
 }
 
 export interface ExcelSearchResults {

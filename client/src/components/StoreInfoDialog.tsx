@@ -1,4 +1,4 @@
-import { Store } from "../shared/types";
+import { Store as StoreType } from "../shared/types";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface StoreInfoDialogProps {
-  store: Store | null;
+  store: StoreType | null;
   open: boolean;
   onClose: () => void;
 }
