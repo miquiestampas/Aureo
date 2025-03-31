@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart, PieChart, Users, TrendingUp, Star, Calendar } from "lucide-react";
+import { BarChart, MapPin, Users, TrendingUp, Star, Calendar } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 interface StoreAdvancedStatsProps {
@@ -34,7 +34,7 @@ export function StoreAdvancedStats({ storeCode }: StoreAdvancedStatsProps) {
     );
   }
 
-  if (!statsData || (statsData.ordersByMonth.length === 0 && statsData.topMetals.length === 0)) {
+  if (!statsData || (statsData.ordersByMonth.length === 0 && statsData.sellersByRegion.length === 0)) {
     return (
       <div className="text-center py-8 text-muted-foreground">
         No hay datos suficientes para mostrar estadísticas avanzadas.
@@ -48,7 +48,7 @@ export function StoreAdvancedStats({ storeCode }: StoreAdvancedStatsProps) {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="orders">Órdenes</TabsTrigger>
           <TabsTrigger value="price">Precios</TabsTrigger>
-          <TabsTrigger value="materials">Materiales</TabsTrigger>
+          <TabsTrigger value="regions">Provincias/Países</TabsTrigger>
           <TabsTrigger value="customers">Clientes</TabsTrigger>
         </TabsList>
         
@@ -67,7 +67,7 @@ export function StoreAdvancedStats({ storeCode }: StoreAdvancedStatsProps) {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {statsData.ordersByMonth.map((item) => (
+                  {statsData.ordersByMonth.map((item: any) => (
                     <div key={item.month} className="flex items-center">
                       <p className="w-36 text-sm">{item.month}</p>
                       <div className="w-full">
@@ -130,13 +130,13 @@ export function StoreAdvancedStats({ storeCode }: StoreAdvancedStatsProps) {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {statsData.priceDistribution.map((item) => (
+                  {statsData.priceDistribution.map((item: any) => (
                     <div key={item.range} className="flex items-center">
                       <p className="w-24 text-sm">{item.range}</p>
                       <div className="w-full">
                         <div className="flex items-center gap-2">
                           <Progress 
-                            value={item.count / Math.max(...statsData.priceDistribution.map(d => d.count)) * 100} 
+                            value={item.count / Math.max(...statsData.priceDistribution.map((d: any) => d.count)) * 100} 
                             className="h-2" 
                           />
                           <span className="text-sm">{item.count}</span>
@@ -150,65 +150,70 @@ export function StoreAdvancedStats({ storeCode }: StoreAdvancedStatsProps) {
           </Card>
         </TabsContent>
         
-        <TabsContent value="materials" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Metales más Comunes</CardTitle>
-                <CardDescription>
-                  Distribución de metales en las órdenes
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pl-2">
-                {statsData.topMetals.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No hay datos de metales disponibles
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {statsData.topMetals.map((item) => (
-                      <div key={item.metal} className="flex items-center">
-                        <p className="w-28 text-sm">{item.metal}</p>
-                        <div className="w-full">
-                          <div className="flex items-center gap-2">
-                            <Progress value={item.percentage} className="h-2" />
-                            <span className="text-sm">{item.count} ({item.percentage}%)</span>
-                          </div>
+        <TabsContent value="regions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Distribución por Provincias/Países</CardTitle>
+              <CardDescription>
+                Análisis de ventas por regiones geográficas
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pl-2">
+              {statsData.sellersByRegion?.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No hay datos de regiones disponibles
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {statsData.sellersByRegion?.map((item: any) => (
+                    <div key={item.region} className="flex items-center">
+                      <p className="w-28 text-sm truncate" title={item.region}>
+                        {item.region}
+                      </p>
+                      <div className="w-full">
+                        <div className="flex items-center gap-2">
+                          <Progress 
+                            value={item.percentage} 
+                            className="h-2" 
+                          />
+                          <span className="text-sm">{item.count} ({item.percentage}%)</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total de Regiones</CardTitle>
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {statsData.sellersByRegion?.length || 0}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  provincias/países con actividad
+                </p>
               </CardContent>
             </Card>
             
             <Card>
-              <CardHeader>
-                <CardTitle>Piedras más Comunes</CardTitle>
-                <CardDescription>
-                  Distribución de piedras en las órdenes
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Región Principal</CardTitle>
+                <Star className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent className="pl-2">
-                {statsData.topStones.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No hay datos de piedras disponibles
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {statsData.topStones.map((item) => (
-                      <div key={item.stone} className="flex items-center">
-                        <p className="w-28 text-sm">{item.stone}</p>
-                        <div className="w-full">
-                          <div className="flex items-center gap-2">
-                            <Progress value={item.percentage} className="h-2" />
-                            <span className="text-sm">{item.count} ({item.percentage}%)</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <CardContent>
+                <div className="text-2xl font-bold truncate" title={statsData.sellersByRegion?.[0]?.region || "N/A"}>
+                  {statsData.sellersByRegion?.[0]?.region || "N/A"}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {statsData.sellersByRegion?.[0]?.count || 0} órdenes ({statsData.sellersByRegion?.[0]?.percentage || 0}%)
+                </p>
               </CardContent>
             </Card>
           </div>

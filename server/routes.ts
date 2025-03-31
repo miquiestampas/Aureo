@@ -339,8 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({
           ordersByMonth: [],
           priceDistribution: [],
-          topMetals: [],
-          topStones: [],
+          sellersByRegion: [],
           customerMetrics: {
             totalCustomers: 0,
             returningCustomers: 0,
@@ -372,9 +371,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uniqueCustomers = new Set<string>();
       const customerOrders: Record<string, number> = {};
       
-      // Contador para metales y piedras
-      const metalCounts: Record<string, number> = {};
-      const stoneCounts: Record<string, number> = {};
+      // Vendedores por región (provincia/país)
+      const sellersByRegionMap: Record<string, number> = {};
       
       // Procesar cada orden
       orders.forEach(order => {
@@ -401,24 +399,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerOrders[customerKey] = (customerOrders[customerKey] || 0) + 1;
         }
         
-        // Metales
-        if (order.metals) {
-          const metals = order.metals.split(',').map(m => m.trim().toUpperCase());
-          metals.forEach(metal => {
-            if (metal && metal.length > 0) {
-              metalCounts[metal] = (metalCounts[metal] || 0) + 1;
-            }
-          });
-        }
-        
-        // Piedras
-        if (order.stones) {
-          const stones = order.stones.split(',').map(s => s.trim().toUpperCase());
-          stones.forEach(stone => {
-            if (stone && stone.length > 0) {
-              stoneCounts[stone] = (stoneCounts[stone] || 0) + 1;
-            }
-          });
+        // Vendedores por región
+        if (order.customerLocation) {
+          // Extraer provincia/país de customerLocation
+          let region = order.customerLocation;
+          
+          // Intentar extraer país de la ubicación (patrón común: "Ciudad, País")
+          const locationParts = order.customerLocation.split(',');
+          if (locationParts.length > 1) {
+            // El último elemento es probablemente el país
+            region = locationParts[locationParts.length - 1].trim();
+          } else {
+            // Si no hay coma, usar toda la ubicación
+            region = order.customerLocation.trim();
+          }
+          
+          // Normalizar la región
+          region = region.toUpperCase();
+          
+          // Incrementar contador para esta región
+          sellersByRegionMap[region] = (sellersByRegionMap[region] || 0) + 1;
         }
       });
       
@@ -441,20 +441,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return { range, count };
       });
       
-      // Top metales
-      const topMetals = Object.entries(metalCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([metal, count]) => {
-          return { metal, count, percentage: Math.round((count / orders.length) * 100) };
-        });
-      
-      // Top piedras
-      const topStones = Object.entries(stoneCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([stone, count]) => {
-          return { stone, count, percentage: Math.round((count / orders.length) * 100) };
+      // Convertir vendedores por región a array ordenado
+      const sellersByRegion = Object.entries(sellersByRegionMap)
+        .sort((a, b) => b[1] - a[1])  // Ordenar por cantidad (descendente)
+        .map(([region, count]) => {
+          return { 
+            region, 
+            count, 
+            percentage: Math.round((count / orders.length) * 100) 
+          };
         });
       
       // Métricas de clientes
@@ -487,8 +482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({
         ordersByMonth: ordersByMonthArray,
         priceDistribution,
-        topMetals,
-        topStones,
+        sellersByRegion,
         customerMetrics: {
           totalCustomers,
           returningCustomers,
