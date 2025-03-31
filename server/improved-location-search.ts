@@ -139,13 +139,44 @@ export const listaVariantesPaises = {
 export function buscarVariantesPais(busqueda: string): string[] {
   if (!busqueda || busqueda.trim() === '') return [];
   
-  const upperSearchTerm = busqueda.toUpperCase();
+  const upperSearchTerm = busqueda.toUpperCase().trim();
   
-  // Buscar en todas las variantes para encontrar coincidencias
+  // Para búsquedas cortas (1 o 2 caracteres), necesitamos coincidir exactamente 
+  // para evitar falsos positivos
+  if (upperSearchTerm.length <= 2) {
+    for (const [key, variants] of Object.entries(listaVariantesPaises)) {
+      // Para búsquedas cortas, solo comparamos contra países que son exactamente estos códigos
+      if (variants.some(v => v === upperSearchTerm)) {
+        console.log(`Coincidencia exacta para código corto ${key}: ${variants.join(', ')}`);
+        return variants;
+      }
+    }
+    return []; // No encontramos coincidencias para búsquedas cortas
+  }
+
+  // Buscar primero coincidencias exactas
+  for (const [key, variants] of Object.entries(listaVariantesPaises)) {
+    if (variants.some(v => v === upperSearchTerm)) {
+      console.log(`Coincidencia exacta detectada con ${key}: ${variants.join(', ')}`);
+      return variants;
+    }
+  }
+  
+  // Buscar en todas las variantes para encontrar coincidencias parciales
   for (const [key, variants] of Object.entries(listaVariantesPaises)) {
     // Si el término de búsqueda está incluido en alguna variante o viceversa
-    if (variants.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
-      console.log(`Coincidencia detectada con ${key}: ${variants.join(', ')}`);
+    // Preferimos que la variante incluya el término de búsqueda, no al revés
+    if (variants.some(v => v.includes(upperSearchTerm))) {
+      console.log(`Coincidencia parcial detectada con ${key}: ${variants.join(', ')}`);
+      return variants;
+    }
+  }
+  
+  // Otra pasada para verificar si el término de búsqueda incluye alguna variante
+  // (menos preciso, pero útil para búsquedas como "MADRID, ESPAÑA")
+  for (const [key, variants] of Object.entries(listaVariantesPaises)) {
+    if (variants.some(v => upperSearchTerm.includes(v))) {
+      console.log(`Coincidencia detectada (contiene) con ${key}: ${variants.join(', ')}`);
       return variants;
     }
   }
@@ -157,8 +188,15 @@ export function buscarVariantesPais(busqueda: string): string[] {
     // Normalizar también las variantes para comparar
     const normalizedVariants = variants.map(v => normalizeText(v));
     
+    // Intentar primero coincidencias exactas normalizadas
+    if (normalizedVariants.some(v => v === normalizedSearch)) {
+      console.log(`Coincidencia exacta normalizada para ${key}: ${variants.join(', ')}`);
+      return variants;
+    }
+    
+    // Luego buscar coincidencias parciales normalizadas
     if (normalizedVariants.some(v => v.includes(normalizedSearch) || normalizedSearch.includes(v))) {
-      console.log(`Coincidencia detectada con normalización para ${key}: ${variants.join(', ')}`);
+      console.log(`Coincidencia parcial normalizada para ${key}: ${variants.join(', ')}`);
       return variants;
     }
   }
@@ -179,9 +217,19 @@ export function construirCondicionesUbicacion(columna: string, termino: string):
   // Condición básica: coincidencia exacta o contiene el término
   let sqlCondition = `${columna} = '${safeUpperTerm}' OR ${columna} LIKE '%${safeUpperTerm}%'`;
   
+  // También buscar con TRIM para manejar espacios adicionales
+  sqlCondition += ` OR TRIM(${columna}) = '${safeUpperTerm}' OR TRIM(${columna}) LIKE '%${safeUpperTerm}%'`;
+  
   // Agregar también búsqueda en minúsculas
   const lowerSearchTerm = termino.toLowerCase().replace(/'/g, "''");
   sqlCondition += ` OR LOWER(${columna}) LIKE '%${lowerSearchTerm}%'`;
+  sqlCondition += ` OR LOWER(TRIM(${columna})) LIKE '%${lowerSearchTerm}%'`;
+  
+  // Buscar sin comillas
+  const cleanTerm = termino.replace(/"/g, '').replace(/'/g, '').trim();
+  const safeCleanTerm = cleanTerm.replace(/'/g, "''");
+  sqlCondition += ` OR ${columna} LIKE '%${safeCleanTerm}%'`;
+  sqlCondition += ` OR LOWER(${columna}) LIKE '%${safeCleanTerm.toLowerCase()}%'`;
   
   // Agregar variantes si existen
   if (variantes.length > 0) {
@@ -204,20 +252,59 @@ export function construirCondicionesUbicacion(columna: string, termino: string):
     sqlCondition += ` OR LOWER(${columna}) LIKE '%${safeNormalizedTerm}%'`;
     
     // Estas condiciones son aproximaciones ya que SQLite no tiene una función directa para eliminar acentos
-    sqlCondition += ` OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+    sqlCondition += ` OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
       ${columna},
       'á', 'a'),
       'é', 'e'),
       'í', 'i'),
       'ó', 'o'),
-      'ú', 'u')
+      'ú', 'u'),
+      'ñ', 'n'),
+      'Á', 'a'),
+      'É', 'e')
     ) LIKE '%${safeNormalizedTerm}%'`;
+    
+    sqlCondition += ` OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+      ${columna},
+      'Í', 'i'),
+      'Ó', 'o'),
+      'Ú', 'u'),
+      'Ñ', 'n'),
+      '"', '')
+    ) LIKE '%${safeNormalizedTerm}%'`;
+  }
+  
+  // Procesar para casos con estructura "Ciudad, País"
+  const ubicacionProcesada = procesarUbicacionCompleja(termino);
+  if (ubicacionProcesada.ciudad) {
+    const safeCiudad = ubicacionProcesada.ciudad.replace(/'/g, "''");
+    sqlCondition += ` OR ${columna} LIKE '%${safeCiudad}%'`;
+    sqlCondition += ` OR LOWER(${columna}) LIKE '%${safeCiudad.toLowerCase()}%'`;
+  }
+  
+  if (ubicacionProcesada.pais) {
+    const safePais = ubicacionProcesada.pais.replace(/'/g, "''");
+    sqlCondition += ` OR ${columna} LIKE '%${safePais}%'`;
+    sqlCondition += ` OR LOWER(${columna}) LIKE '%${safePais.toLowerCase()}%'`;
+  }
+  
+  // Buscar coincidencias parciales para ubicaciones compuestas
+  if (termino.includes(',')) {
+    const partes = termino.split(',').map(p => p.trim());
+    partes.forEach(parte => {
+      if (parte.length > 0) {
+        const safeParte = parte.replace(/'/g, "''");
+        sqlCondition += ` OR ${columna} LIKE '%${safeParte}%'`;
+        sqlCondition += ` OR LOWER(${columna}) LIKE '%${safeParte.toLowerCase()}%'`;
+      }
+    });
   }
   
   // Manejar casos especiales como espacios al final/inicio o comillas
   sqlCondition += ` OR TRIM(${columna}) = '${safeUpperTerm.trim()}' OR TRIM(${columna}) LIKE '%${safeUpperTerm.trim()}%'`;
   
   // Asegurarse de que la condición está bien formada
+  console.log(`Condición SQL generada para búsqueda de ubicación: ${sqlCondition}`);
   return `(${sqlCondition})`;
 }
 

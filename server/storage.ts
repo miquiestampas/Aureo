@@ -2307,7 +2307,7 @@ export class DatabaseStorage implements IStorage {
         if (filters.customerLocation) {
           console.log("Búsqueda de ubicación detectada, usando búsqueda mejorada de ubicaciones");
           
-          // Preparar los términos de búsqueda
+          // Preparar los términos de búsqueda y eliminar espacios en blanco adicionales
           const searchTerm = filters.customerLocation.trim();
           const upperSearchTerm = searchTerm.toUpperCase(); // Los países están en mayúsculas
           
@@ -2331,26 +2331,48 @@ export class DatabaseStorage implements IStorage {
           // Construir condición SQL usando la función mejorada para países y ciudades
           const condicionSQL = construirCondicionesUbicacion('customer_location', searchTerm);
           
+          // Escapar comillas y caracteres especiales para evitar inyección SQL
+          const safeUpperTerm = searchTerm.toUpperCase().replace(/'/g, "''");
+          const safeLowerTerm = searchTerm.toLowerCase().replace(/'/g, "''");
+          
           // Crear una consulta SQL directa que combine todas las condiciones necesarias
           let sqlQuery = `
             SELECT * FROM excel_data 
             WHERE 
             (
               -- Búsqueda por coincidencia exacta 
-              UPPER(customer_location) = '${searchTerm.toUpperCase()}'
+              UPPER(customer_location) = '${safeUpperTerm}'
               
-              -- Búsqueda por coincidencia parcial
-              OR UPPER(customer_location) LIKE '%${searchTerm.toUpperCase()}%'
+              -- Búsqueda por coincidencia parcial (con y sin espacios alrededor)
+              OR UPPER(customer_location) LIKE '%${safeUpperTerm}%'
+              OR UPPER(TRIM(customer_location)) = '${safeUpperTerm}'
+              OR UPPER(TRIM(customer_location)) LIKE '%${safeUpperTerm}%'
               
               -- Búsqueda por variantes (a través de condición personalizada)
               OR ${condicionSQL}
               
               -- Búsqueda con formato "Ciudad, País" donde coincida cualquier parte
-              OR customer_location LIKE '%${searchTerm},%' 
-              OR customer_location LIKE '%, ${searchTerm}%'
+              OR UPPER(customer_location) LIKE '%${safeUpperTerm},%' 
+              OR UPPER(customer_location) LIKE '%, ${safeUpperTerm}%'
+              OR customer_location LIKE '%${safeLowerTerm},%' 
+              OR customer_location LIKE '%, ${safeLowerTerm}%'
               
-              -- Búsqueda en minúsculas
-              OR LOWER(customer_location) LIKE '%${searchTerm.toLowerCase()}%'
+              -- Búsqueda en minúsculas y con TRIM para eliminar espacios
+              OR LOWER(customer_location) LIKE '%${safeLowerTerm}%'
+              OR LOWER(TRIM(customer_location)) LIKE '%${safeLowerTerm}%'
+              
+              -- Búsqueda por variantes normalizadas (sin acentos)
+              OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                customer_location,
+                'á', 'a'),
+                'é', 'e'),
+                'í', 'i'),
+                'ó', 'o'),
+                'ú', 'u')
+              ) LIKE '%${safeLowerTerm}%'
+              
+              -- Búsqueda removiendo comillas
+              OR LOWER(REPLACE(customer_location, '"', '')) LIKE '%${safeLowerTerm}%'
             )
           `;
           
