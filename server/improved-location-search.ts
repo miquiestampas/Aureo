@@ -168,16 +168,29 @@ export function buscarVariantesPais(busqueda: string): string[] {
 
 // Función para construir condiciones SQL para búsqueda de ubicación
 export function construirCondicionesUbicacion(columna: string, termino: string): string {
+  if (!termino || termino.trim() === '') return `${columna} IS NOT NULL`;
+  
   const upperSearchTerm = termino.toUpperCase();
   const variantes = buscarVariantesPais(termino);
   
-  let sqlCondition = `${columna} = '${upperSearchTerm}' OR
-    ${columna} LIKE '%${upperSearchTerm}%'`;
+  // Escapar comillas simples en el término de búsqueda para evitar inyección SQL
+  const safeUpperTerm = upperSearchTerm.replace(/'/g, "''");
+  
+  // Condición básica: coincidencia exacta o contiene el término
+  let sqlCondition = `${columna} = '${safeUpperTerm}' OR ${columna} LIKE '%${safeUpperTerm}%'`;
+  
+  // Agregar también búsqueda en minúsculas
+  const lowerSearchTerm = termino.toLowerCase().replace(/'/g, "''");
+  sqlCondition += ` OR LOWER(${columna}) LIKE '%${lowerSearchTerm}%'`;
   
   // Agregar variantes si existen
   if (variantes.length > 0) {
-    const variantesCondition = variantes.map(v => `${columna} = '${v}' OR ${columna} LIKE '%${v}%'`).join(' OR ');
-    sqlCondition += ` OR ${variantesCondition}`;
+    const variantesCondition = variantes.map(v => {
+      const safeVariant = v.replace(/'/g, "''");
+      return `${columna} = '${safeVariant}' OR ${columna} LIKE '%${safeVariant}%' OR LOWER(${columna}) LIKE '%${safeVariant.toLowerCase()}%'`;
+    }).join(' OR ');
+    
+    sqlCondition += ` OR (${variantesCondition})`;
   }
   
   // Buscar por términos normalizados (sin acentos)
@@ -185,20 +198,27 @@ export function construirCondicionesUbicacion(columna: string, termino: string):
   
   // Si el término normalizado es diferente del original, añadir condiciones para buscar sin acentos
   if (normalizedTerm !== termino.toLowerCase()) {
+    // Búsqueda de términos normalizados con seguridad para SQL
+    const safeNormalizedTerm = normalizedTerm.replace(/'/g, "''");
+    
+    sqlCondition += ` OR LOWER(${columna}) LIKE '%${safeNormalizedTerm}%'`;
+    
     // Estas condiciones son aproximaciones ya que SQLite no tiene una función directa para eliminar acentos
-    // pero ayudan a encontrar coincidencias con caracteres normalizados
-    sqlCondition += ` OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+    sqlCondition += ` OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
       ${columna},
       'á', 'a'),
       'é', 'e'),
       'í', 'i'),
       'ó', 'o'),
-      'ú', 'u'),
-      'ñ', 'n')
-    ) LIKE '%${normalizedTerm}%'`;
+      'ú', 'u')
+    ) LIKE '%${safeNormalizedTerm}%'`;
   }
   
-  return sqlCondition;
+  // Manejar casos especiales como espacios al final/inicio o comillas
+  sqlCondition += ` OR TRIM(${columna}) = '${safeUpperTerm.trim()}' OR TRIM(${columna}) LIKE '%${safeUpperTerm.trim()}%'`;
+  
+  // Asegurarse de que la condición está bien formada
+  return `(${sqlCondition})`;
 }
 
 // Función para extraer códigos postales de un texto para búsqueda mejorada

@@ -2183,11 +2183,27 @@ export class DatabaseStorage implements IStorage {
           // Construir condición SQL usando la función mejorada
           const condicionSQL = construirCondicionesUbicacion('customer_location', searchTerm);
           
-          // Crear una consulta SQL directa con todas las mejoras
+          // Crear una consulta SQL directa que combine todas las condiciones necesarias
           let sqlQuery = `
             SELECT * FROM excel_data 
             WHERE 
-              ${condicionSQL}
+            (
+              -- Búsqueda por coincidencia exacta 
+              UPPER(customer_location) = '${searchTerm.toUpperCase()}'
+              
+              -- Búsqueda por coincidencia parcial
+              OR UPPER(customer_location) LIKE '%${searchTerm.toUpperCase()}%'
+              
+              -- Búsqueda por variantes (a través de condición personalizada)
+              OR ${condicionSQL}
+              
+              -- Búsqueda con formato "Ciudad, País" donde coincida cualquier parte
+              OR customer_location LIKE '%${searchTerm},%' 
+              OR customer_location LIKE '%, ${searchTerm}%'
+              
+              -- Búsqueda en minúsculas
+              OR LOWER(customer_location) LIKE '%${searchTerm.toLowerCase()}%'
+            )
           `;
           
           // Finalizar la consulta
@@ -2196,7 +2212,7 @@ export class DatabaseStorage implements IStorage {
             LIMIT 100
           `;
           
-          console.log("Ejecutando SQL directa para búsqueda simple de ubicación:", sqlQuery);
+          console.log("Ejecutando SQL directa mejorada para búsqueda simple de ubicación:", sqlQuery);
           
           try {
             // Ejecutar consulta SQL directa
@@ -2218,14 +2234,15 @@ export class DatabaseStorage implements IStorage {
                 stones: row.stones,
                 metals: row.metals,
                 engravings: row.engravings,
-                weight: row.item_weight || null,
+                itemWeight: row.item_weight || null,
                 price: row.price,
                 deposit: row.deposit || null,
                 balance: row.balance || null,
                 saleDate: row.sale_date,
                 notes: row.notes || null,
                 fileActivityId: row.file_activity_id,
-                pawnTicket: row.pawn_ticket
+                pawnTicket: row.pawn_ticket,
+                carats: row.carats || null
               }));
             }
           } catch (error) {
@@ -2311,14 +2328,30 @@ export class DatabaseStorage implements IStorage {
             console.log(`Ubicación procesada: Ciudad - ${ubicacionProcesada.ciudad || 'N/A'}, País - ${ubicacionProcesada.pais || 'N/A'}`);
           }
           
-          // Construir condición SQL usando la función mejorada
+          // Construir condición SQL usando la función mejorada para países y ciudades
           const condicionSQL = construirCondicionesUbicacion('customer_location', searchTerm);
           
-          // Crear una consulta SQL directa con todas las mejoras
+          // Crear una consulta SQL directa que combine todas las condiciones necesarias
           let sqlQuery = `
             SELECT * FROM excel_data 
             WHERE 
-              ${condicionSQL}
+            (
+              -- Búsqueda por coincidencia exacta 
+              UPPER(customer_location) = '${searchTerm.toUpperCase()}'
+              
+              -- Búsqueda por coincidencia parcial
+              OR UPPER(customer_location) LIKE '%${searchTerm.toUpperCase()}%'
+              
+              -- Búsqueda por variantes (a través de condición personalizada)
+              OR ${condicionSQL}
+              
+              -- Búsqueda con formato "Ciudad, País" donde coincida cualquier parte
+              OR customer_location LIKE '%${searchTerm},%' 
+              OR customer_location LIKE '%, ${searchTerm}%'
+              
+              -- Búsqueda en minúsculas
+              OR LOWER(customer_location) LIKE '%${searchTerm.toLowerCase()}%'
+            )
           `;
           
           // Finalizar la consulta
@@ -2327,7 +2360,7 @@ export class DatabaseStorage implements IStorage {
             LIMIT 100
           `;
           
-          console.log("Ejecutando SQL directa:", sqlQuery);
+          console.log("Ejecutando SQL directa mejorada:", sqlQuery);
           
           // Ejecutar consulta SQL directa
           try {
@@ -2350,14 +2383,15 @@ export class DatabaseStorage implements IStorage {
                 stones: row.stones,
                 metals: row.metals,
                 engravings: row.engravings,
-                weight: row.item_weight || null, // Corregido: weight → item_weight
+                itemWeight: row.item_weight || null, // Corregido: weight → item_weight
                 price: row.price,
                 deposit: row.deposit || null,
                 balance: row.balance || null,
                 saleDate: row.sale_date,
                 notes: row.notes || null,
                 fileActivityId: row.file_activity_id,
-                pawnTicket: row.pawn_ticket
+                pawnTicket: row.pawn_ticket,
+                carats: row.carats || null
               }));
               
               return mappedResults;
