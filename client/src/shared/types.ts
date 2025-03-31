@@ -7,6 +7,9 @@ export interface Store {
   type: string;
   location: string;
   active: boolean;
+  phone?: string;
+  email?: string;
+  details?: string;
 }
 
 export interface ExcelData {

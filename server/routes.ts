@@ -239,6 +239,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
+  // Endpoint para obtener estadísticas de una tienda
+  app.get("/api/stores/:storeCode/stats", async (req, res, next) => {
+    try {
+      const storeCode = req.params.storeCode.trim();
+      
+      // Obtener total de órdenes para la tienda
+      const orders = await storage.getExcelDataByStore(storeCode);
+      
+      // Si no hay órdenes, devolver estadísticas vacías
+      if (!orders || orders.length === 0) {
+        return res.status(200).json({
+          totalOrders: 0,
+          averagePrice: "0",
+          lastActivity: "Sin actividad",
+          mostCommonMetal: "Sin datos"
+        });
+      }
+      
+      // Calcular estadísticas
+      const totalOrders = orders.length;
+      
+      // Calcular precio promedio de las órdenes
+      let totalPrice = 0;
+      let validPrices = 0;
+      
+      orders.forEach(order => {
+        const price = parseFloat(order.price.replace(/[^\d.-]/g, ''));
+        if (!isNaN(price)) {
+          totalPrice += price;
+          validPrices++;
+        }
+      });
+      
+      const averagePrice = validPrices > 0 
+        ? `${Math.round(totalPrice / validPrices).toLocaleString('es-ES')} €` 
+        : "No disponible";
+      
+      // Obtener fecha de última actividad
+      const lastOrder = orders.sort((a, b) => 
+        new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()
+      )[0];
+      
+      const lastActivity = lastOrder 
+        ? new Date(lastOrder.orderDate).toLocaleDateString('es-ES', {
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric'
+          })
+        : "Sin actividad reciente";
+      
+      // Contar metales más comunes
+      const metalCounts: Record<string, number> = {};
+      
+      orders.forEach(order => {
+        if (!order.metals) return;
+        
+        const metals = order.metals.split(',').map(m => m.trim().toUpperCase());
+        metals.forEach(metal => {
+          if (metal && metal.length > 0) {
+            metalCounts[metal] = (metalCounts[metal] || 0) + 1;
+          }
+        });
+      });
+      
+      let mostCommonMetal = "Sin datos";
+      let maxCount = 0;
+      
+      for (const [metal, count] of Object.entries(metalCounts)) {
+        if (count > maxCount) {
+          mostCommonMetal = metal;
+          maxCount = count;
+        }
+      }
+      
+      res.status(200).json({
+        totalOrders,
+        averagePrice,
+        lastActivity,
+        mostCommonMetal
+      });
+      
+    } catch (err) {
+      console.error("Error al obtener estadísticas de tienda:", err);
+      next(err);
+    }
+  });
+  
   // Importación de tiendas desde Excel
   app.post("/api/import-stores", (req, res, next) => {
     req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
