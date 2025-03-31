@@ -2131,6 +2131,8 @@ export class DatabaseStorage implements IStorage {
         const textCondition = or(
           like(sql`LOWER(${excelData.customerName})`, `%${searchTerm.toLowerCase()}%`),
           like(sql`LOWER(${excelData.customerContact})`, `%${searchTerm.toLowerCase()}%`),
+          like(sql`LOWER(${excelData.customerAddress})`, `%${searchTerm.toLowerCase()}%`),
+          like(sql`LOWER(${excelData.customerLocation})`, `%${searchTerm.toLowerCase()}%`),
           like(sql`LOWER(${excelData.orderNumber})`, `%${searchTerm.toLowerCase()}%`),
           like(sql`LOWER(${excelData.itemDetails})`, `%${searchTerm.toLowerCase()}%`),
           like(sql`LOWER(${excelData.metals})`, `%${searchTerm.toLowerCase()}%`),
