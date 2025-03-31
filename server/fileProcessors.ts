@@ -867,21 +867,23 @@ export async function processPdfFile(filePath: string, activityId: number, store
     console.log(`Attempting to extract store code from PDF filename: ${filename}`);
     
     // 1. Buscar por patrón J12345ABCDE (formato común que comienza con J seguido de números y letras)
+    // La bandera 'i' al final de la expresión regular hace que la búsqueda sea insensible a mayúsculas/minúsculas
     const j_pattern = /\b(J\d{5}[A-Z0-9]{4,5})\b/i;
     const j_match = originalFilename.match(j_pattern);
       
     if (j_match && j_match[1]) {
-      pdfStoreCode = j_match[1];
-      console.log(`Pattern 1 matched: ${pdfStoreCode}`);
+      pdfStoreCode = j_match[1]; // Mantener el formato original encontrado para preservar mayúsculas/minúsculas
+      console.log(`Pattern 1 matched (case insensitive): ${pdfStoreCode}`);
     }
     // 2. Intentar formato general de códigos: LETRA+NÚMEROS o NÚMEROS+LETRA
+    // La bandera 'i' al final de la expresión regular hace que la búsqueda sea insensible a mayúsculas/minúsculas
     else {
       const general_pattern = /\b([A-Z]\d{1,6}|J\d{2,6}[a-z]{1,3})\b/i;
       const general_match = originalFilename.match(general_pattern);
         
       if (general_match && general_match[1]) {
-        pdfStoreCode = general_match[1];
-        console.log(`Pattern 2 matched: ${pdfStoreCode}`);
+        pdfStoreCode = general_match[1]; // Mantener el formato original encontrado para preservar mayúsculas/minúsculas
+        console.log(`Pattern 2 matched (case insensitive): ${pdfStoreCode}`);
       }
       // 3. Intentar patrones específicos para las tiendas en el sistema
       else {
@@ -889,11 +891,12 @@ export async function processPdfFile(filePath: string, activityId: number, store
         const allStores = await storage.getStores();
         const storesCodes = allStores.map(store => store.code);
         
-        // Buscar si algún código de tienda aparece en el nombre del archivo
+        // Buscar si algún código de tienda aparece en el nombre del archivo, ignorando diferencias entre mayúsculas y minúsculas
+        const originalFilenameLower = originalFilename.toLowerCase();
         for (const code of storesCodes) {
-          if (originalFilename.includes(code)) {
-            pdfStoreCode = code;
-            console.log(`Found exact store code in filename: ${pdfStoreCode}`);
+          if (originalFilenameLower.includes(code.toLowerCase())) {
+            pdfStoreCode = code; // Mantenemos el código original para preservar el formato de la base de datos
+            console.log(`Found store code in filename (case insensitive): ${pdfStoreCode}`);
             break;
           }
         }
@@ -928,10 +931,11 @@ export async function processPdfFile(filePath: string, activityId: number, store
         // Obtener todas las tiendas y buscar una coincidencia ignorando espacios
         const allStores = await storage.getStores();
         
-        // Buscar tienda cuyo código sin espacios coincida con el código detectado sin espacios
+        // Buscar tienda cuyo código sin espacios coincida con el código detectado sin espacios,
+        // ignorando diferencias entre mayúsculas y minúsculas
         const storeMatch = allStores.find(store => {
-          const storeCodeNoSpaces = store.code.replace(/\s+/g, '');
-          const detectedCodeNoSpaces = normalizedPdfStoreCode.replace(/\s+/g, '');
+          const storeCodeNoSpaces = store.code.replace(/\s+/g, '').toLowerCase();
+          const detectedCodeNoSpaces = normalizedPdfStoreCode.replace(/\s+/g, '').toLowerCase();
           return storeCodeNoSpaces === detectedCodeNoSpaces;
         });
         
