@@ -953,7 +953,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderNumber,
         customerName,
         customerContact,
-        country,
         itemDetails,
         metals,
         engravings,
@@ -982,7 +981,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (orderNumber) filters.orderNumber = orderNumber;
         if (customerName) filters.customerName = customerName;
         if (customerContact) filters.customerContact = customerContact;
-        if (country) filters.country = country;
         if (itemDetails) filters.itemDetails = itemDetails;
         if (metals) filters.metals = metals;
         if (engravings) filters.engravings = engravings;
@@ -1015,7 +1013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Ejecutar la búsqueda con los filtros configurados
-      console.log(`Realizando búsqueda ${isSimpleSearch ? 'simple' : 'avanzada'} con:`, { query, filters: JSON.stringify(filters) });
+      console.log(`Realizando búsqueda ${isSimpleSearch ? 'simple' : 'avanzada'} con:`, { query, filters });
       let results = await storage.searchExcelData(query, filters);
       
       console.log(`Búsqueda completada. Encontrados ${results.length} resultados`);
