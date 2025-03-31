@@ -2177,25 +2177,49 @@ export class DatabaseStorage implements IStorage {
         if (filters.customerLocation) {
           console.log("Búsqueda de ubicación detectada, usando consulta SQL directa");
           
-          // Usar una consulta SQL directa para todas las ubicaciones
-          const searchTerm = filters.customerLocation.toLowerCase();
-          const originalTerm = filters.customerLocation;
-          const normalizedTerm = normalizeText(filters.customerLocation);
+          // Preparar los términos de búsqueda
+          const searchTerm = filters.customerLocation.trim();
+          const upperSearchTerm = searchTerm.toUpperCase(); // Los países están en mayúsculas
+          const lowerSearchTerm = searchTerm.toLowerCase();
           
-          console.log(`Búsqueda de localización: "${originalTerm}" → "${normalizedTerm}"`);
+          console.log(`Búsqueda de país/provincia: "${searchTerm}" en mayúsculas: "${upperSearchTerm}"`);
           
-          // Crear una consulta SQL directa que evite problemas con las comillas y acentos
-          const sqlQuery = `
+          // Lista de países comunes con variaciones ortográficas
+          const variantesRumania = ['RUMANIA', 'RUMANÍA', 'ROMANIA', 'RUMANÌA'];
+          const variantesPeru = ['PERU', 'PERÚ', 'PERÙ'];
+          const variantesEspana = ['ESPANA', 'ESPAÑA', 'ESPANHA'];
+          
+          // Determinar si estamos buscando por algunos países específicos con variantes
+          let paisesAlternativos = [];
+          
+          if (variantesRumania.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
+            paisesAlternativos = variantesRumania;
+          } else if (variantesPeru.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
+            paisesAlternativos = variantesPeru;
+          } else if (variantesEspana.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
+            paisesAlternativos = variantesEspana;
+          }
+          
+          // Crear condiciones OR para cada variante
+          const variantesCondition = paisesAlternativos.length > 0 
+            ? paisesAlternativos.map(v => `customer_location = '${v}'`).join(' OR ') 
+            : '';
+            
+          // Crear una consulta SQL directa que busque exactamente en el formato que tiene la base de datos
+          let sqlQuery = `
             SELECT * FROM excel_data 
             WHERE 
-              customer_location = '${originalTerm}' OR
-              customer_location LIKE '%${searchTerm}%' OR
-              LOWER(customer_location) LIKE '%${searchTerm}%' OR
-              customer_location LIKE '%"${searchTerm}"%' OR
-              customer_location LIKE '%${searchTerm},%' OR
-              customer_location LIKE '%, ${searchTerm}%' OR
-              customer_location = 'Rumanía' OR
-              customer_location = 'Rumania'
+              customer_location = '${upperSearchTerm}' OR
+              customer_location LIKE '%${upperSearchTerm}%'
+          `;
+          
+          // Agregar variantes de países si existen
+          if (variantesCondition) {
+            sqlQuery += ` OR ${variantesCondition}`;
+          }
+          
+          // Finalizar la consulta
+          sqlQuery += `
             ORDER BY order_date DESC
             LIMIT 100
           `;
@@ -2204,7 +2228,8 @@ export class DatabaseStorage implements IStorage {
           
           // Ejecutar consulta SQL directa
           try {
-            const rawResults = await sqlite.all(sqlQuery);
+            // En better-sqlite3, las consultas se ejecutan directamente con el método
+            const rawResults = sqlite.prepare(sqlQuery).all();
             console.log(`Resultados de búsqueda SQL directa: ${rawResults.length}`);
             
             if (rawResults.length > 0) {
@@ -2222,12 +2247,12 @@ export class DatabaseStorage implements IStorage {
                 stones: row.stones,
                 metals: row.metals,
                 engravings: row.engravings,
-                weight: row.weight || null,
+                weight: row.item_weight || null, // Corregido: weight → item_weight
                 price: row.price,
-                deposit: row.deposit,
-                balance: row.balance,
+                deposit: row.deposit || null,
+                balance: row.balance || null,
                 saleDate: row.sale_date,
-                notes: row.notes,
+                notes: row.notes || null,
                 fileActivityId: row.file_activity_id,
                 pawnTicket: row.pawn_ticket
               }));
