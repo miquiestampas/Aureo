@@ -118,6 +118,10 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
   const [searchResults, setSearchResults] = useState<ExcelData[]>([]);
   const [totalResults, setTotalResults] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<string>("search");
+  const [storeInfoDialog, setStoreInfoDialog] = useState<{ open: boolean, store: Store | null }>({
+    open: false,
+    store: null
+  });
   
   // Inicializar el formulario
   const form = useForm<SearchValues>({
@@ -229,7 +233,15 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       cell: ({ row }) => {
         const storeCode = row.original.storeCode;
         const store = stores.find(s => s.code === storeCode);
-        return store ? `${store.name} (${storeCode})` : storeCode;
+        return (
+          <Button 
+            variant="link" 
+            className="p-0 h-auto font-normal text-left"
+            onClick={() => onShowStoreInfo(store || { code: storeCode, name: storeCode, location: "", type: "", active: true, id: 0 })}
+          >
+            {store ? `${store.name} (${storeCode})` : storeCode}
+          </Button>
+        );
       }
     },
     {
@@ -286,6 +298,14 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
     setSearchResults([]);
     setTotalResults(0);
     setActiveTab("search");
+  };
+  
+  // Función para mostrar el diálogo de información de tienda
+  const onShowStoreInfo = (store: Store) => {
+    setStoreInfoDialog({
+      open: true,
+      store
+    });
   };
   
   return (
@@ -743,6 +763,58 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
             </DialogFooter>
           </TabsContent>
         </Tabs>
+      </DialogContent>
+    </Dialog>
+    
+    {/* Diálogo de información de tienda */}
+    <Dialog open={storeInfoDialog.open} onOpenChange={(open) => !open && setStoreInfoDialog({ ...storeInfoDialog, open: false })}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Información de tienda</DialogTitle>
+          <DialogDescription>
+            Detalles completos de la tienda seleccionada
+          </DialogDescription>
+        </DialogHeader>
+        
+        {storeInfoDialog.store && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground">Código</h4>
+                <p className="text-base">{storeInfoDialog.store.code}</p>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground">Estado</h4>
+                <p className="text-base">
+                  <Badge variant={storeInfoDialog.store.active ? "default" : "outline"}>
+                    {storeInfoDialog.store.active ? "Activa" : "Inactiva"}
+                  </Badge>
+                </p>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground">Nombre</h4>
+              <p className="text-base">{storeInfoDialog.store.name}</p>
+            </div>
+            
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground">Tipo</h4>
+              <p className="text-base">{storeInfoDialog.store.type || "No especificado"}</p>
+            </div>
+            
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground">Ubicación</h4>
+              <p className="text-base">{storeInfoDialog.store.location || "No especificada"}</p>
+            </div>
+          </div>
+        )}
+        
+        <DialogFooter>
+          <Button onClick={() => setStoreInfoDialog({ ...storeInfoDialog, open: false })}>
+            Cerrar
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
