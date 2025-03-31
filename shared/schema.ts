@@ -121,8 +121,6 @@ export const excelData = sqliteTable("excel_data", {
   orderDate: text("order_date").notNull(), // ISO date string
   customerName: text("customer_name"),
   customerContact: text("customer_contact"),
-  // customerAddress: text("customer_address"), // Estas columnas no existen en la base de datos SQLite
-  // customerLocation: text("customer_location"), // Estas columnas no existen en la base de datos SQLite
   itemDetails: text("item_details"),
   metals: text("metals"),
   engravings: text("engravings"),
@@ -140,7 +138,6 @@ export const insertExcelDataSchema = createInsertSchema(excelData).pick({
   orderDate: true,
   customerName: true,
   customerContact: true,
-  // Eliminadas las columnas customerAddress y customerLocation que no existen en la DB
   itemDetails: true,
   metals: true,
   engravings: true,

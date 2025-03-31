@@ -2075,87 +2075,6 @@ export class DatabaseStorage implements IStorage {
     return document;
   }
   
-  // Método simplificado para búsqueda simple
-  async simpleSearchExcelData(query: string, storeCode?: string): Promise<ExcelData[]> {
-    console.log("DatabaseStorage.simpleSearchExcelData - Parámetros:", { query, storeCode });
-    
-    try {
-      // Si no hay términos de búsqueda, devolver los 100 registros más recientes
-      if (!query || query.trim() === '') {
-        let queryBuilder = db
-          .select()
-          .from(excelData)
-          .orderBy(desc(excelData.orderDate))
-          .limit(100);
-          
-        // Aplicar filtro por tienda si se especifica
-        if (storeCode && storeCode !== "all") {
-          queryBuilder = queryBuilder.where(eq(excelData.storeCode, storeCode));
-        }
-        
-        console.log("Búsqueda simple: retornando los registros más recientes");
-        const results = await queryBuilder;
-        return results;
-      }
-      
-      // Para búsqueda con términos
-      const searchTerm = query.trim();
-      const isNumericQuery = !isNaN(Number(searchTerm));
-      
-      // Condiciones para la búsqueda
-      const conditions: SQL<unknown>[] = [];
-      
-      // Condiciones de texto para la búsqueda - Solo usamos las columnas que existen en la base de datos
-      const textCondition = or(
-        like(excelData.customerName, `%${searchTerm}%`),
-        like(excelData.customerContact, `%${searchTerm}%`),
-        like(excelData.orderNumber, `%${searchTerm}%`),
-        like(excelData.itemDetails, `%${searchTerm}%`),
-        like(excelData.metals, `%${searchTerm}%`),
-        like(excelData.engravings, `%${searchTerm}%`),
-        like(excelData.stones, `%${searchTerm}%`),
-        like(excelData.pawnTicket, `%${searchTerm}%`)
-      );
-      
-      conditions.push(textCondition);
-      
-      // Si es numérico, agregar condiciones adicionales para comparaciones exactas
-      if (isNumericQuery) {
-        const numericValue = Number(searchTerm);
-        
-        // Solo agregar condición de precio si el valor es mayor que cero
-        if (numericValue > 0) {
-          conditions.push(
-            sql`(${excelData.price} IS NOT NULL AND TRIM(${excelData.price}) != '' AND CAST(${excelData.price} AS REAL) = ${numericValue})`
-          );
-        }
-        
-        // Condiciones exactas para campos numéricos
-        conditions.push(eq(excelData.orderNumber, searchTerm));
-        conditions.push(eq(excelData.customerContact, searchTerm));
-      }
-      
-      // Aplicar filtro por tienda si se especifica
-      if (storeCode && storeCode !== "all") {
-        conditions.push(eq(excelData.storeCode, storeCode));
-      }
-      
-      // Ejecutar la consulta
-      const results = await db
-        .select()
-        .from(excelData)
-        .where(or(...conditions))
-        .orderBy(desc(excelData.orderDate))
-        .limit(100);
-        
-      console.log(`Búsqueda simple con término "${searchTerm}": encontrados ${results.length} resultados`);
-      return results;
-    } catch (error) {
-      console.error("Error en búsqueda simple de datos Excel:", error);
-      throw error;
-    }
-  }
-
   // Métodos de ExcelData para búsqueda
   async searchExcelData(query: string, filters?: any): Promise<ExcelData[]> {
     console.log("DatabaseStorage.searchExcelData - Parámetros:", { query, filters });
@@ -2184,7 +2103,7 @@ export class DatabaseStorage implements IStorage {
         const searchTerm = query.trim();
         const isNumericQuery = !isNaN(Number(searchTerm));
         
-        // Condiciones de texto para la búsqueda - Solo usamos las columnas que existen en la base de datos
+        // Condiciones de texto para la búsqueda
         const textCondition = or(
           like(excelData.customerName, `%${searchTerm}%`),
           like(excelData.customerContact, `%${searchTerm}%`),
