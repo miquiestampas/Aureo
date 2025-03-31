@@ -1093,6 +1093,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Ruta para búsqueda simple con método POST
+  app.post("/api/search/excel-data/simple", async (req, res, next) => {
+    try {
+      console.log("Búsqueda simple recibida:", req.body);
+      
+      // Extraer parámetros de la solicitud
+      const { query = "", storeCode } = req.body;
+      
+      // Realizar la búsqueda simple utilizando la nueva función
+      const results = await storage.simpleSearchExcelData(query, storeCode);
+      
+      console.log(`Búsqueda simple completada. Encontrados ${results.length} resultados.`);
+      
+      // Para cada resultado, verificar si tiene alertas
+      let resultsWithAlertFlags = results;
+      
+      try {
+        const allAlerts = await storage.getAlerts();
+        resultsWithAlertFlags = results.map(record => {
+          const recordAlerts = allAlerts.filter(alert => alert.excelDataId === record.id);
+          return {
+            ...record,
+            hasAlerts: recordAlerts.length > 0
+          };
+        });
+      } catch (alertError) {
+        console.error("Error al obtener alertas para los resultados:", alertError);
+        // En caso de error, continuamos con los resultados originales
+        resultsWithAlertFlags = results.map(record => ({
+          ...record,
+          hasAlerts: false
+        }));
+      }
+      
+      // Registrar la búsqueda si hay un usuario autenticado
+      if (req.session.user) {
+        try {
+          await storage.logSearchActivity({
+            userId: req.session.user.id,
+            searchType: "Simple",
+            searchTerms: query || "",
+            resultCount: results.length
+          });
+        } catch (logError) {
+          console.error("Error al registrar la actividad de búsqueda:", logError);
+          // No afecta el resultado principal, así que continuamos
+        }
+      }
+      
+      res.json({
+        success: true,
+        results: resultsWithAlertFlags,
+        count: resultsWithAlertFlags.length
+      });
+    } catch (err) {
+      console.error("Error en la búsqueda simple:", err);
+      res.status(500).json({ 
+        success: false, 
+        error: "Error al realizar la búsqueda simple", 
+        message: err instanceof Error ? err.message : "Error desconocido" 
+      });
+    }
+  });
+
   // Original Excel search route
   app.get("/api/search/excel-data", async (req, res, next) => {
     try {
