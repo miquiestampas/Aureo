@@ -1159,7 +1159,6 @@ export default function StoreManagementPage() {
                               <SelectContent>
                                 <SelectItem value="_empty">Sin especificar</SelectItem>
                                 <SelectItem value="Arganzuela">Arganzuela</SelectItem>
-                                <SelectItem value="Barajas">Barajas</SelectItem>
                                 <SelectItem value="Carabanchel">Carabanchel</SelectItem>
                                 <SelectItem value="Centro">Centro</SelectItem>
                                 <SelectItem value="Chamartín">Chamartín</SelectItem>
@@ -1739,7 +1738,6 @@ export default function StoreManagementPage() {
                             <SelectContent>
                               <SelectItem value="_empty">Sin especificar</SelectItem>
                               <SelectItem value="Arganzuela">Arganzuela</SelectItem>
-                              <SelectItem value="Barajas">Barajas</SelectItem>
                               <SelectItem value="Carabanchel">Carabanchel</SelectItem>
                               <SelectItem value="Centro">Centro</SelectItem>
                               <SelectItem value="Chamartín">Chamartín</SelectItem>
