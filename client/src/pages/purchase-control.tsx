@@ -58,6 +58,7 @@ import {
   Calendar as CalendarIcon,
   User,
   Phone,
+  MapPin,
   FileSpreadsheet,
   Store,
   Package,
@@ -92,6 +93,8 @@ interface ExcelData {
   orderDate: string;
   customerName: string;
   customerContact: string;
+  customerAddress?: string; // Añadido: dirección del cliente
+  customerLocation?: string; // Añadido: provincia/país del cliente
   itemDetails: string;
   metals: string;
   engravings: string;
@@ -101,6 +104,7 @@ interface ExcelData {
   pawnTicket: string;
   saleDate: string | null;
   fileActivityId: number;
+  itemWeight?: string; // Añadido: peso del artículo
 }
 
 interface Alert {
@@ -125,6 +129,8 @@ interface SearchParams {
   orderNumber?: string;
   customerName?: string;
   customerContact?: string;
+  customerAddress?: string; // Añadido: dirección del cliente
+  customerLocation?: string; // Añadido: provincia/país del cliente
   itemDetails?: string;
   metals?: string;
   engravings?: string; // Agregamos campo para grabaciones
@@ -143,6 +149,7 @@ export default function PurchaseControlPage() {
     storeCode: "",
     customerName: "",
     customerContact: "",
+    customerLocation: "", // Añadido: provincia/país del cliente
     itemDetails: "",
     metals: "",
     engravings: "",
@@ -229,6 +236,7 @@ export default function PurchaseControlPage() {
         orderNumber: searchParams.orderNumber || undefined,
         customerName: searchParams.customerName || undefined,
         customerContact: searchParams.customerContact || undefined,
+        customerLocation: searchParams.customerLocation || undefined, // Añadido: provincia/país del cliente
         itemDetails: searchParams.itemDetails || undefined,
         metals: searchParams.metals || undefined,
         engravings: searchParams.engravings || undefined,
@@ -491,6 +499,21 @@ export default function PurchaseControlPage() {
                   </div>
 
                   <div>
+                    <Label htmlFor="customer-location">Provincia/País</Label>
+                    <Input
+                      id="customer-location"
+                      placeholder="Madrid, Barcelona, etc."
+                      value={searchParams.customerLocation || ""}
+                      onChange={(e) =>
+                        setSearchParams({
+                          ...searchParams,
+                          customerLocation: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div>
                     <Label htmlFor="order-number">Número de Orden</Label>
                     <Input
                       id="order-number"
@@ -649,8 +672,11 @@ export default function PurchaseControlPage() {
                         storeCode: "all",
                         customerName: "",
                         customerContact: "",
+                        customerLocation: "", // Añadido: provincia/país del cliente
                         itemDetails: "",
                         metals: "",
+                        engravings: "",
+                        stones: "",
                       });
                       setDateFrom(undefined);
                       setDateTo(undefined);
@@ -854,6 +880,12 @@ export default function PurchaseControlPage() {
                       <Phone className="h-4 w-4 mr-2 text-gray-400" />
                       <span>{selectedRecord.customerContact}</span>
                     </div>
+                    {selectedRecord.customerLocation && (
+                      <div className="flex items-center ml-6">
+                        <MapPin className="h-4 w-4 mr-2 text-gray-400" />
+                        <span>{selectedRecord.customerLocation}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

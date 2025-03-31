@@ -2150,6 +2150,10 @@ export class DatabaseStorage implements IStorage {
           conditions.push(like(excelData.customerContact, `%${filters.customerContact}%`));
         }
         
+        if (filters.customerLocation) {
+          conditions.push(like(excelData.customerLocation, `%${filters.customerLocation}%`));
+        }
+        
         if (filters.orderNumber) {
           conditions.push(like(excelData.orderNumber, `%${filters.orderNumber}%`));
         }
