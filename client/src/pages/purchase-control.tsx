@@ -7,13 +7,6 @@ import { es } from "date-fns/locale";
 
 // Components
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Card,
   CardContent,
   CardDescription,
@@ -79,7 +72,6 @@ import {
   AlertTriangle,
   Quote,
   Gem,
-  FileDown as FileDownIcon,
 } from "lucide-react";
 
 // Types
@@ -145,14 +137,12 @@ interface SearchParams {
   stones?: string; // Agregamos campo para piedras
   price?: string;
   priceOperator?: string;
-  // onlyAlerts eliminado para evitar errores
+  onlyAlerts?: boolean;
 }
 
 export default function PurchaseControlPage() {
   const { toast } = useToast();
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isStoreDetailDialogOpen, setIsStoreDetailDialogOpen] = useState(false);
-  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchParams, setSearchParams] = useState<SearchParams>({
     query: "",
@@ -185,57 +175,13 @@ export default function PurchaseControlPage() {
   // Excel stores (type: Excel) for the filter
   const excelStores = stores?.filter(store => store.type === "Excel" && store.active) || [];
 
-  // Función para obtener el nombre de la tienda a partir del código
-  const getStoreName = (storeCode: string): string => {
-    const store = stores?.find(s => s.code === storeCode);
-    return store?.name || '';
-  };
-  
-  // Función para manejar el clic en el código de tienda y mostrar detalles
-  const handleViewStoreDetails = (storeCode: string) => {
-    const store = stores?.find(s => s.code === storeCode);
-    if (store) {
-      setSelectedStore(store);
-      setIsStoreDetailDialogOpen(true);
-    } else {
-      toast({
-        title: "Tienda no encontrada",
-        description: `No se encontró información de la tienda con código ${storeCode}`,
-        variant: "destructive",
-      });
-    }
-  };
-
   // Search mutation
   const searchMutation = useMutation({
     mutationFn: async (params: SearchParams) => {
-      // Format request to separate filters for a more consistent API
-      const requestBody = {
-        query: params.query || "",
-        filters: {
-          storeCode: params.storeCode,
-          dateFrom: params.dateFrom,
-          dateTo: params.dateTo,
-          orderNumber: params.orderNumber,
-          customerName: params.customerName,
-          customerContact: params.customerContact,
-          customerLocation: params.customerLocation,
-          itemDetails: params.itemDetails,
-          metals: params.metals,
-          engravings: params.engravings,
-          stones: params.stones,
-          price: params.price,
-          priceOperator: params.priceOperator
-          // Eliminado: onlyAlerts para evitar errores
-        }
-      };
-      
-      console.log("Enviando búsqueda:", JSON.stringify(requestBody, null, 2));
-      
       const response = await apiRequest(
         "POST", 
         "/api/search/excel-data/advanced", 
-        requestBody
+        params
       );
       return await response.json();
     },
@@ -296,8 +242,8 @@ export default function PurchaseControlPage() {
         engravings: searchParams.engravings || undefined,
         stones: searchParams.stones || undefined,
         price: searchParams.price || undefined,
-        priceOperator: searchParams.priceOperator || undefined
-        // Eliminado: onlyAlerts para evitar errores
+        priceOperator: searchParams.priceOperator || undefined,
+        onlyAlerts: searchParams.onlyAlerts || undefined
       };
     } else {
       // Parámetros para búsqueda simple - solo la consulta
@@ -858,24 +804,7 @@ export default function PurchaseControlPage() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="font-medium">
-                          <div>
-                            <button 
-                              onClick={() => handleViewStoreDetails(record.storeCode)}
-                              className="text-primary hover:underline cursor-pointer"
-                            >
-                              {record.storeCode}
-                            </button>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            <button 
-                              onClick={() => handleViewStoreDetails(record.storeCode)}
-                              className="hover:underline cursor-pointer"
-                            >
-                              {getStoreName(record.storeCode)}
-                            </button>
-                          </div>
-                        </TableCell>
+                        <TableCell className="font-medium">{record.storeCode}</TableCell>
                         <TableCell>{formatDate(record.orderDate)}</TableCell>
                         <TableCell>{record.orderNumber}</TableCell>
                         <TableCell>{record.customerName}</TableCell>
@@ -890,26 +819,14 @@ export default function PurchaseControlPage() {
                         </TableCell>
                         <TableCell>{record.price} €</TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => window.open(`/api/file-activities/${record.fileActivityId}/download`, '_blank')}
-                              title="Descargar archivo Excel"
-                              aria-label="Descargar archivo Excel original"
-                            >
-                              <FileDownIcon className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleViewDetails(record)}
-                              title="Ver detalles"
-                              aria-label="Ver detalles de la compra"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewDetails(record)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver Detalles
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -937,22 +854,7 @@ export default function PurchaseControlPage() {
                     <Label className="text-xs text-gray-500">Tienda</Label>
                     <div className="flex items-center">
                       <Store className="h-4 w-4 mr-2 text-primary" />
-                      <div>
-                        <button 
-                          onClick={() => handleViewStoreDetails(selectedRecord.storeCode)}
-                          className="font-medium text-primary hover:underline cursor-pointer"
-                        >
-                          {selectedRecord.storeCode}
-                        </button>
-                        <div className="text-xs text-muted-foreground">
-                          <button 
-                            onClick={() => handleViewStoreDetails(selectedRecord.storeCode)}
-                            className="hover:underline cursor-pointer"
-                          >
-                            {getStoreName(selectedRecord.storeCode)}
-                          </button>
-                        </div>
-                      </div>
+                      <span className="font-medium">{selectedRecord.storeCode}</span>
                     </div>
                   </div>
 
@@ -1096,13 +998,9 @@ export default function PurchaseControlPage() {
                       <Printer className="h-4 w-4 mr-2" />
                       Imprimir
                     </Button>
-                    <Button
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => window.open(`/api/file-activities/${selectedRecord.fileActivityId}/download`, '_blank')}
-                    >
-                      <FileDownIcon className="h-4 w-4 mr-2" />
-                      Descargar Excel
+                    <Button variant="outline" size="sm">
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
                     </Button>
                   </div>
                 </div>
@@ -1111,166 +1009,6 @@ export default function PurchaseControlPage() {
           </Sheet>
         )}
       </div>
-
-      {/* Diálogo de detalles de la tienda */}
-      <Dialog open={isStoreDetailDialogOpen} onOpenChange={setIsStoreDetailDialogOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold">Detalles de la Tienda</DialogTitle>
-            <DialogDescription>
-              Información completa sobre la tienda seleccionada.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedStore && (
-            <div className="space-y-4 py-2">
-              <div className="grid grid-cols-[140px_1fr] gap-2">
-                {/* Información básica */}
-                <div className="col-span-2 bg-muted/50 px-2 py-1 rounded-md mb-2">
-                  <h3 className="font-semibold">Información básica</h3>
-                </div>
-                
-                <span className="font-medium text-gray-500">Código:</span>
-                <span>{selectedStore.code}</span>
-                
-                <span className="font-medium text-gray-500">Nombre:</span>
-                <span>{selectedStore.name}</span>
-                
-                <span className="font-medium text-gray-500">Tipo:</span>
-                <span>{selectedStore.type}</span>
-                
-                <span className="font-medium text-gray-500">Estado:</span>
-                <span>
-                  {selectedStore.active ? (
-                    <Badge variant="outline" className="bg-green-100 text-green-800">
-                      Activa
-                    </Badge>
-                  ) : (
-                    <Badge variant="destructive" className="bg-red-100 text-red-800">
-                      Inactiva
-                    </Badge>
-                  )}
-                </span>
-                
-                {/* Ubicación */}
-                <div className="col-span-2 bg-muted/50 px-2 py-1 rounded-md mb-2 mt-3">
-                  <h3 className="font-semibold">Ubicación</h3>
-                </div>
-                
-                {selectedStore.address && (
-                  <>
-                    <span className="font-medium text-gray-500">Dirección:</span>
-                    <span>{selectedStore.address}</span>
-                  </>
-                )}
-                
-                {selectedStore.district && (
-                  <>
-                    <span className="font-medium text-gray-500">Distrito:</span>
-                    <span>{selectedStore.district}</span>
-                  </>
-                )}
-                
-                {selectedStore.locality && (
-                  <>
-                    <span className="font-medium text-gray-500">Localidad:</span>
-                    <span>{selectedStore.locality}</span>
-                  </>
-                )}
-                
-                {/* Contacto */}
-                <div className="col-span-2 bg-muted/50 px-2 py-1 rounded-md mb-2 mt-3">
-                  <h3 className="font-semibold">Información de contacto</h3>
-                </div>
-                
-                {selectedStore.phone && (
-                  <>
-                    <span className="font-medium text-gray-500">Teléfono:</span>
-                    <span>{selectedStore.phone}</span>
-                  </>
-                )}
-                
-                {selectedStore.email && (
-                  <>
-                    <span className="font-medium text-gray-500">Email:</span>
-                    <span>{selectedStore.email}</span>
-                  </>
-                )}
-                
-                {/* Información empresarial */}
-                <div className="col-span-2 bg-muted/50 px-2 py-1 rounded-md mb-2 mt-3">
-                  <h3 className="font-semibold">Información empresarial</h3>
-                </div>
-                
-                {selectedStore.cif && (
-                  <>
-                    <span className="font-medium text-gray-500">CIF:</span>
-                    <span>{selectedStore.cif}</span>
-                  </>
-                )}
-                
-                {selectedStore.businessName && (
-                  <>
-                    <span className="font-medium text-gray-500">Razón social:</span>
-                    <span>{selectedStore.businessName}</span>
-                  </>
-                )}
-                
-                {selectedStore.ownerName && (
-                  <>
-                    <span className="font-medium text-gray-500">Propietario:</span>
-                    <span>{selectedStore.ownerName}</span>
-                  </>
-                )}
-                
-                {selectedStore.ownerIdNumber && (
-                  <>
-                    <span className="font-medium text-gray-500">DNI propietario:</span>
-                    <span>{selectedStore.ownerIdNumber}</span>
-                  </>
-                )}
-                
-                {/* Fechas */}
-                <div className="col-span-2 bg-muted/50 px-2 py-1 rounded-md mb-2 mt-3">
-                  <h3 className="font-semibold">Fechas</h3>
-                </div>
-                
-                {selectedStore.startDate && (
-                  <>
-                    <span className="font-medium text-gray-500">Inicio actividad:</span>
-                    <span>{selectedStore.startDate}</span>
-                  </>
-                )}
-                
-                {selectedStore.endDate && (
-                  <>
-                    <span className="font-medium text-gray-500">Cese actividad:</span>
-                    <span>{selectedStore.endDate}</span>
-                  </>
-                )}
-                
-                {selectedStore.createdAt && (
-                  <>
-                    <span className="font-medium text-gray-500">Registro sistema:</span>
-                    <span>{new Date(selectedStore.createdAt).toLocaleDateString()}</span>
-                  </>
-                )}
-                
-                {/* Notas */}
-                {selectedStore.notes && (
-                  <>
-                    <div className="col-span-2 bg-muted/50 px-2 py-1 rounded-md mb-2 mt-3">
-                      <h3 className="font-semibold">Notas adicionales</h3>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-sm whitespace-pre-wrap">{selectedStore.notes}</p>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

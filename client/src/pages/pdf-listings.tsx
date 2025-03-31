@@ -1,9 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { 
-  AlertCircle,
   Calendar, 
   CalendarIcon, 
   FileText, 
@@ -65,28 +64,11 @@ export default function PdfListingsPage() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [isSearching, setIsSearching] = useState(false);
-  const [recentDocs, setRecentDocs] = useState<PdfDocument[]>([]);
   const { toast } = useToast();
   
   // Obtener información de la tienda seleccionada
   const { data: stores } = useQuery<any[]>({
     queryKey: ['/api/stores'],
-  });
-  
-  // Consulta para obtener los 10 últimos documentos PDF por defecto
-  const {
-    data: recentPdfDocuments,
-    isLoading: isLoadingRecent,
-    error: recentError
-  } = useQuery<PdfDocument[]>({
-    queryKey: ["/api/pdf-documents/recent"],
-    queryFn: async () => {
-      const response = await fetch("/api/pdf-documents?recent=true&limit=10");
-      if (!response.ok) {
-        throw new Error("Error al cargar documentos PDF recientes");
-      }
-      return response.json();
-    },
   });
   
   // Manejar cambio de tienda seleccionada
@@ -459,88 +441,11 @@ export default function PdfListingsPage() {
                 <p>No se encontraron documentos con los criterios seleccionados</p>
               </div>
             )
-          ) : isLoadingRecent ? (
-            // Estado cargando documentos recientes
-            <div className="space-y-4">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-20 w-full" />
-            </div>
-          ) : recentError ? (
-            // Error al cargar documentos recientes
-            <div className="text-center py-8 text-muted-foreground">
-              <AlertCircle className="mx-auto h-12 w-12 mb-4 opacity-50" />
-              <p>Error al cargar documentos recientes</p>
-              <p className="text-sm text-muted-foreground mt-2">{(recentError as Error).message}</p>
-            </div>
-          ) : recentPdfDocuments && recentPdfDocuments.length > 0 ? (
-            // Mostrar documentos recientes
-            <div>
-              <div className="mb-4">
-                <h3 className="text-lg font-medium">Últimos 10 documentos procesados</h3>
-                <p className="text-sm text-muted-foreground">Mostrando los documentos más recientes en el sistema</p>
-              </div>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tienda</TableHead>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Ubicación</TableHead>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Tamaño</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentPdfDocuments.map((doc) => (
-                      <TableRow key={doc.id}>
-                        <TableCell>
-                          <div className="font-medium">{doc.storeCode}</div>
-                          <div className="text-sm text-muted-foreground">{doc.storeName || '-'}</div>
-                        </TableCell>
-                        <TableCell>{doc.title || "Sin título"}</TableCell>
-                        <TableCell>
-                          <div>{doc.storeLocation || '-'}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {[doc.storeDistrict, doc.storeLocality].filter(Boolean).join(', ') || '-'}
-                          </div>
-                        </TableCell>
-                        <TableCell>{formatDate(doc.uploadDate)}</TableCell>
-                        <TableCell>{formatFileSize(doc.fileSize)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => viewPdf(doc.fileActivityId)}
-                              title="Ver documento"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => downloadPdf(doc.fileActivityId, doc.title || "documento.pdf")}
-                              title="Descargar documento"
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
           ) : (
-            // Sin documentos recientes
+            // Estado inicial (sin búsqueda)
             <div className="text-center py-16 text-muted-foreground">
               <Calendar className="mx-auto h-12 w-12 mb-4 opacity-20" />
-              <p>No se encontraron documentos recientes</p>
-              <p className="text-sm mt-2">Use los filtros de búsqueda para encontrar documentos PDF</p>
+              <p>Use los filtros de búsqueda para encontrar documentos PDF</p>
             </div>
           )}
         </CardContent>

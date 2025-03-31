@@ -19,14 +19,27 @@ import createMemoryStore from "memorystore";
 // No necesitamos connectPg para SQLite
 import { db, sqlite } from "./db";
 
-// Importar las funciones mejoradas para la búsqueda de ubicaciones
-import { 
-  normalizeText, 
-  buscarVariantesPais, 
-  construirCondicionesUbicacion, 
-  extraerCodigoPostal, 
-  procesarUbicacionCompleja 
-} from './improved-location-search';
+// Función para normalizar texto: eliminar acentos y convertir a minúsculas
+function normalizeText(text: string): string {
+  if (!text) return '';
+  
+  // Reemplazos específicos para caracteres problemáticos
+  let normalized = text;
+  
+  // Eliminar comillas que pueden estar en los datos como "Madrid, España"
+  normalized = normalized.replace(/"/g, '');
+  
+  // Reemplazar 'ñ' por 'n' antes de la normalización Unicode
+  normalized = normalized.replace(/ñ/g, 'n').replace(/Ñ/g, 'n');
+  
+  // Aplicar normalización Unicode para eliminar acentos
+  normalized = normalized.normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Eliminar acentos
+    .toLowerCase(); // Convertir a minúsculas
+    
+  console.log(`Normalización: "${text}" → "${normalized}"`);
+  return normalized;
+}
 import { eq, desc, like, or, and, gte, lte, inArray, sql, count } from "drizzle-orm";
 // SQLite no necesita pool
 
@@ -82,8 +95,7 @@ export interface IStorage {
   // PdfDocument methods
   createPdfDocument(doc: InsertPdfDocument): Promise<PdfDocument>;
   getPdfDocumentsByStore(storeCode: string): Promise<PdfDocument[]>;
-  searchPdfDocuments(params: { storeCodes: string[], dateFrom?: string, dateTo?: string, limit?: number }): Promise<PdfDocument[]>;
-  getRecentPdfDocuments(limit: number): Promise<PdfDocument[]>;
+  searchPdfDocuments(params: { storeCodes: string[], dateFrom?: string, dateTo?: string }): Promise<PdfDocument[]>;
   getPdfDocument(id: number): Promise<PdfDocument | undefined>;
   getPdfDocumentByActivityId(activityId: number): Promise<PdfDocument | undefined>;
   updatePdfDocumentPath(fileActivityId: number, newPath: string): Promise<boolean>;
@@ -460,8 +472,7 @@ export class MemStorage implements IStorage {
   async searchPdfDocuments(params: { 
     storeCodes: string[], 
     dateFrom?: string, 
-    dateTo?: string,
-    limit?: number
+    dateTo?: string 
   }): Promise<PdfDocument[]> {
     let results = Array.from(this.pdfDocuments.values())
       .filter(doc => params.storeCodes.includes(doc.storeCode));
@@ -470,15 +481,13 @@ export class MemStorage implements IStorage {
     if (params.dateFrom || params.dateTo) {
       results = results.filter(doc => {
         const uploadDate = new Date(doc.uploadDate);
-        const dateFrom = params.dateFrom ? new Date(params.dateFrom) : null;
-        const dateTo = params.dateTo ? new Date(params.dateTo) : null;
         
-        if (dateFrom && dateTo) {
-          return uploadDate >= dateFrom && uploadDate <= dateTo;
-        } else if (dateFrom) {
-          return uploadDate >= dateFrom;
-        } else if (dateTo) {
-          return uploadDate <= dateTo;
+        if (params.dateFrom && params.dateTo) {
+          return uploadDate >= params.dateFrom && uploadDate <= params.dateTo;
+        } else if (params.dateFrom) {
+          return uploadDate >= params.dateFrom;
+        } else if (params.dateTo) {
+          return uploadDate <= params.dateTo;
         }
         
         return true;
@@ -486,31 +495,11 @@ export class MemStorage implements IStorage {
     }
     
     // Ordenar por fecha (más reciente primero)
-    results.sort((a, b) => {
+    return results.sort((a, b) => {
       const dateA = new Date(a.uploadDate).getTime();
       const dateB = new Date(b.uploadDate).getTime();
       return dateB - dateA;
     });
-
-    // Aplicar límite si se especifica
-    if (params.limit && params.limit > 0) {
-      results = results.slice(0, params.limit);
-    }
-    
-    return results;
-  }
-  
-  async getRecentPdfDocuments(limit: number): Promise<PdfDocument[]> {
-    // Obtener todos los documentos, ordenarlos por fecha y limitar el resultado
-    const results = Array.from(this.pdfDocuments.values())
-      .sort((a, b) => {
-        const dateA = new Date(a.uploadDate).getTime();
-        const dateB = new Date(b.uploadDate).getTime();
-        return dateB - dateA; // Ordenar por fecha descendente (más reciente primero)
-      })
-      .slice(0, limit);
-    
-    return results;
   }
   
   async getPdfDocument(id: number): Promise<PdfDocument | undefined> {
@@ -1329,8 +1318,7 @@ export class DatabaseStorage implements IStorage {
   async searchPdfDocuments(params: { 
     storeCodes: string[], 
     dateFrom?: string, 
-    dateTo?: string,
-    limit?: number
+    dateTo?: string 
   }): Promise<PdfDocument[]> {
     let query = db
       .select()
@@ -1353,23 +1341,6 @@ export class DatabaseStorage implements IStorage {
     
     // Ordenar por fecha (más reciente primero)
     query = query.orderBy(desc(pdfDocuments.uploadDate));
-    
-    // Aplicar límite si se proporciona
-    if (params.limit && params.limit > 0) {
-      query = query.limit(params.limit);
-    }
-    
-    const results = await query;
-    return results;
-  }
-  
-  async getRecentPdfDocuments(limit: number): Promise<PdfDocument[]> {
-    // Obtener los documentos PDF más recientes ordenados por fecha de carga
-    const query = db
-      .select()
-      .from(pdfDocuments)
-      .orderBy(desc(pdfDocuments.uploadDate))
-      .limit(limit);
     
     const results = await query;
     return results;
@@ -2165,51 +2136,36 @@ export class DatabaseStorage implements IStorage {
           // Preparar variantes para búsqueda directa
           const upperSearchTerm = searchTerm.toUpperCase();
           
-          // Usar la función mejorada para buscar variantes de países y ciudades
-          const paisesAlternativos = buscarVariantesPais(searchTerm);
+          // Lista de países comunes con variaciones ortográficas
+          const variantesRumania = ['RUMANIA', 'RUMANÍA', 'ROMANIA', 'RUMANÌA'];
+          const variantesPeru = ['PERU', 'PERÚ', 'PERÙ'];
+          const variantesEspana = ['ESPANA', 'ESPAÑA', 'ESPANHA'];
           
-          // Extraer posible código postal para mejor búsqueda
-          const codigoPostal = extraerCodigoPostal(searchTerm);
-          if (codigoPostal) {
-            console.log(`Código postal detectado: ${codigoPostal}`);
+          // Determinar si estamos buscando por algunos países específicos con variantes
+          let paisesAlternativos = [];
+          
+          if (variantesRumania.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
+            paisesAlternativos = variantesRumania;
+          } else if (variantesPeru.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
+            paisesAlternativos = variantesPeru;
+          } else if (variantesEspana.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
+            paisesAlternativos = variantesEspana;
           }
           
-          // Procesar ubicación compleja (Ej: "Madrid, España")
-          const ubicacionProcesada = procesarUbicacionCompleja(searchTerm);
-          if (ubicacionProcesada.ciudad || ubicacionProcesada.pais) {
-            console.log(`Ubicación procesada: Ciudad - ${ubicacionProcesada.ciudad || 'N/A'}, País - ${ubicacionProcesada.pais || 'N/A'}`);
-          }
-          
-          // Construir condición SQL usando la función mejorada
-          const condicionSQL = construirCondicionesUbicacion('customer_location', searchTerm);
-          
-          // Crear una consulta SQL directa que combine todas las condiciones necesarias
+          // Usar el mismo método que en la búsqueda avanzada para países
+          // Crear consulta SQL directa para búsqueda de países en mayúsculas
           let sqlQuery = `
             SELECT * FROM excel_data 
             WHERE 
-            (
-              -- Búsqueda por coincidencia exacta 
-              UPPER(customer_location) = '${searchTerm.toUpperCase()}'
-              
-              -- Búsqueda por coincidencia parcial
-              OR UPPER(customer_location) LIKE '%${searchTerm.toUpperCase()}%'
-              
-              -- Búsqueda por variantes (a través de condición personalizada)
-              OR ${condicionSQL}
-              
-              -- Búsqueda con formato "Ciudad, País" donde coincida cualquier parte
-              OR customer_location LIKE '%${searchTerm},%' 
-              OR customer_location LIKE '%, ${searchTerm}%'
-              
-              -- Búsqueda en minúsculas
-              OR LOWER(customer_location) LIKE '%${searchTerm.toLowerCase()}%'
-              
-              -- Búsqueda específica para ubicaciones con comillas
-              OR customer_location LIKE '%"${searchTerm}%'
-              OR customer_location LIKE '%"${searchTerm},%'
-              OR customer_location LIKE '%, ${searchTerm}"%'
-            )
+              customer_location = '${upperSearchTerm}' OR
+              customer_location LIKE '%${upperSearchTerm}%'
           `;
+          
+          // Agregar variantes de países si existen
+          if (paisesAlternativos.length > 0) {
+            const variantesCondition = paisesAlternativos.map(v => `customer_location = '${v}' OR customer_location LIKE '%${v}%'`).join(' OR ');
+            sqlQuery += ` OR ${variantesCondition}`;
+          }
           
           // Finalizar la consulta
           sqlQuery += `
@@ -2217,7 +2173,7 @@ export class DatabaseStorage implements IStorage {
             LIMIT 100
           `;
           
-          console.log("Ejecutando SQL directa mejorada para búsqueda simple de ubicación:", sqlQuery);
+          console.log("Ejecutando SQL directa para búsqueda simple de ubicación:", sqlQuery);
           
           try {
             // Ejecutar consulta SQL directa
@@ -2239,15 +2195,14 @@ export class DatabaseStorage implements IStorage {
                 stones: row.stones,
                 metals: row.metals,
                 engravings: row.engravings,
-                itemWeight: row.item_weight || null,
+                weight: row.item_weight || null,
                 price: row.price,
                 deposit: row.deposit || null,
                 balance: row.balance || null,
                 saleDate: row.sale_date,
                 notes: row.notes || null,
                 fileActivityId: row.file_activity_id,
-                pawnTicket: row.pawn_ticket,
-                carats: row.carats || null
+                pawnTicket: row.pawn_ticket
               }));
             }
           } catch (error) {
@@ -2271,9 +2226,7 @@ export class DatabaseStorage implements IStorage {
           like(sql`LOWER(${excelData.metals})`, `%${searchTerm.toLowerCase()}%`),
           like(sql`LOWER(${excelData.engravings})`, `%${searchTerm.toLowerCase()}%`),
           like(sql`LOWER(${excelData.stones})`, `%${searchTerm.toLowerCase()}%`),
-          like(sql`LOWER(${excelData.pawnTicket})`, `%${searchTerm.toLowerCase()}%`),
-          // Agregar condiciones para manejar valores con comillas dobles
-          like(sql`LOWER(REPLACE(${excelData.customerLocation}, '"', ''))`, `%${searchTerm.toLowerCase()}%`)
+          like(sql`LOWER(${excelData.pawnTicket})`, `%${searchTerm.toLowerCase()}%`)
         );
         
         conditions.push(textCondition);
@@ -2312,93 +2265,48 @@ export class DatabaseStorage implements IStorage {
         }
         
         if (filters.customerLocation) {
-          console.log("Búsqueda de ubicación detectada, usando búsqueda mejorada de ubicaciones");
+          console.log("Búsqueda de ubicación detectada, usando consulta SQL directa");
           
-          // Preparar los términos de búsqueda y eliminar espacios en blanco adicionales
+          // Preparar los términos de búsqueda
           const searchTerm = filters.customerLocation.trim();
+          const upperSearchTerm = searchTerm.toUpperCase(); // Los países están en mayúsculas
           const lowerSearchTerm = searchTerm.toLowerCase();
           
-          // Solución simplificada para buscar por país
-          if (lowerSearchTerm === 'perú' || lowerSearchTerm === 'peru') {
-            console.log("Búsqueda especial para Perú");
-            conditions.push(sql`(LOWER(${excelData.customerLocation}) LIKE '%peru%' OR LOWER(${excelData.customerLocation}) LIKE '%perú%')`);
-          }
-          else if (lowerSearchTerm === 'rumania' || lowerSearchTerm === 'rumanía' || lowerSearchTerm === 'romania') {
-            console.log("Búsqueda especial para Rumanía");
-            conditions.push(sql`(LOWER(${excelData.customerLocation}) LIKE '%rumania%' OR LOWER(${excelData.customerLocation}) LIKE '%rumanía%' OR LOWER(${excelData.customerLocation}) LIKE '%romania%')`);
-          }
-          else {
-            // Para otros términos, usar búsqueda genérica
-            conditions.push(sql`LOWER(${excelData.customerLocation}) LIKE '%${lowerSearchTerm}%'`);
-          }
-          
-          const upperSearchTerm = searchTerm.toUpperCase(); // Los países están en mayúsculas
           console.log(`Búsqueda de país/provincia: "${searchTerm}" en mayúsculas: "${upperSearchTerm}"`);
           
-          // Buscar variantes del país/ciudad usando nuestra función mejorada
-          const paisesAlternativos = buscarVariantesPais(searchTerm);
+          // Lista de países comunes con variaciones ortográficas
+          const variantesRumania = ['RUMANIA', 'RUMANÍA', 'ROMANIA', 'RUMANÌA'];
+          const variantesPeru = ['PERU', 'PERÚ', 'PERÙ'];
+          const variantesEspana = ['ESPANA', 'ESPAÑA', 'ESPANHA'];
           
-          // Extraer posible código postal para mejor búsqueda
-          const codigoPostal = extraerCodigoPostal(searchTerm);
-          if (codigoPostal) {
-            console.log(`Código postal detectado: ${codigoPostal}`);
+          // Determinar si estamos buscando por algunos países específicos con variantes
+          let paisesAlternativos = [];
+          
+          if (variantesRumania.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
+            paisesAlternativos = variantesRumania;
+          } else if (variantesPeru.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
+            paisesAlternativos = variantesPeru;
+          } else if (variantesEspana.some(v => v.includes(upperSearchTerm) || upperSearchTerm.includes(v))) {
+            paisesAlternativos = variantesEspana;
           }
           
-          // Construir condición SQL usando la función mejorada para países y ciudades
-          const condicionSQL = construirCondicionesUbicacion('customer_location', searchTerm);
-          
-          // Escapar comillas y caracteres especiales para evitar inyección SQL
-          const safeUpperTerm = searchTerm.toUpperCase().replace(/'/g, "''");
-          const safeLowerTerm = searchTerm.toLowerCase().replace(/'/g, "''");
-          
-          // Crear una consulta SQL directa que combine todas las condiciones necesarias
+          // Crear condiciones OR para cada variante
+          const variantesCondition = paisesAlternativos.length > 0 
+            ? paisesAlternativos.map(v => `customer_location = '${v}'`).join(' OR ') 
+            : '';
+            
+          // Crear una consulta SQL directa que busque exactamente en el formato que tiene la base de datos
           let sqlQuery = `
             SELECT * FROM excel_data 
             WHERE 
-            (
-              -- Búsqueda por coincidencia exacta 
-              UPPER(customer_location) = '${safeUpperTerm}'
-              
-              -- Búsqueda por coincidencia parcial (con y sin espacios alrededor)
-              OR UPPER(customer_location) LIKE '%${safeUpperTerm}%'
-              OR UPPER(TRIM(customer_location)) = '${safeUpperTerm}'
-              OR UPPER(TRIM(customer_location)) LIKE '%${safeUpperTerm}%'
-              
-              -- Búsqueda por variantes (a través de condición personalizada)
-              OR ${condicionSQL}
-              
-              -- Búsqueda con formato "Ciudad, País" donde coincida cualquier parte
-              OR UPPER(customer_location) LIKE '%${safeUpperTerm},%' 
-              OR UPPER(customer_location) LIKE '%, ${safeUpperTerm}%'
-              OR customer_location LIKE '%${safeLowerTerm},%' 
-              OR customer_location LIKE '%, ${safeLowerTerm}%'
-              
-              -- Búsqueda específica para valores con comillas dobles
-              OR customer_location LIKE '%"${safeUpperTerm}%'
-              OR customer_location LIKE '%"${safeUpperTerm},%'
-              OR customer_location LIKE '%, ${safeUpperTerm}"%'
-              OR customer_location LIKE '%"${safeLowerTerm}%'
-              OR customer_location LIKE '%"${safeLowerTerm},%'
-              OR customer_location LIKE '%, ${safeLowerTerm}"%'
-              
-              -- Búsqueda en minúsculas y con TRIM para eliminar espacios
-              OR LOWER(customer_location) LIKE '%${safeLowerTerm}%'
-              OR LOWER(TRIM(customer_location)) LIKE '%${safeLowerTerm}%'
-              
-              -- Búsqueda por variantes normalizadas (sin acentos)
-              OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                customer_location,
-                'á', 'a'),
-                'é', 'e'),
-                'í', 'i'),
-                'ó', 'o'),
-                'ú', 'u')
-              ) LIKE '%${safeLowerTerm}%'
-              
-              -- Búsqueda removiendo comillas
-              OR LOWER(REPLACE(customer_location, '"', '')) LIKE '%${safeLowerTerm}%'
-            )
+              customer_location = '${upperSearchTerm}' OR
+              customer_location LIKE '%${upperSearchTerm}%'
           `;
+          
+          // Agregar variantes de países si existen
+          if (variantesCondition) {
+            sqlQuery += ` OR ${variantesCondition}`;
+          }
           
           // Finalizar la consulta
           sqlQuery += `
@@ -2406,7 +2314,7 @@ export class DatabaseStorage implements IStorage {
             LIMIT 100
           `;
           
-          console.log("Ejecutando SQL directa mejorada:", sqlQuery);
+          console.log("Ejecutando SQL directa:", sqlQuery);
           
           // Ejecutar consulta SQL directa
           try {
@@ -2429,15 +2337,14 @@ export class DatabaseStorage implements IStorage {
                 stones: row.stones,
                 metals: row.metals,
                 engravings: row.engravings,
-                itemWeight: row.item_weight || null, // Corregido: weight → item_weight
+                weight: row.item_weight || null, // Corregido: weight → item_weight
                 price: row.price,
                 deposit: row.deposit || null,
                 balance: row.balance || null,
                 saleDate: row.sale_date,
                 notes: row.notes || null,
                 fileActivityId: row.file_activity_id,
-                pawnTicket: row.pawn_ticket,
-                carats: row.carats || null
+                pawnTicket: row.pawn_ticket
               }));
               
               return mappedResults;
@@ -2519,17 +2426,64 @@ export class DatabaseStorage implements IStorage {
               )`
             );
           } else {
-            // Búsqueda simplificada para ubicaciones
-            // Usamos una única condición que busca el texto normalizado en minúsculas
-            console.log(`Búsqueda simplificada para el término: "${cleanSearchTerm}" en ubicaciones`);
+            // También buscamos por términos independientes en ubicaciones compuestas
+            // Por ejemplo, si busca "madrid", debe encontrar "Madrid, España"
+            const searchTermLikeClean = `%${cleanSearchTerm}%`;
             
-            // Versión extremadamente simplificada para evitar exceder el límite de parámetros
-            const simplifiedCondition = sql`LOWER(${excelData.customerLocation}) LIKE ${'%' + cleanSearchTerm.toLowerCase() + '%'}`;
+            // Mejorar la búsqueda para manejar mejor acentos y casos específicos, incluyendo comillas
+            const singleTermCondition = sql`(
+              ${excelData.customerLocation} LIKE ${searchTermLikeClean}
+              OR ${excelData.customerLocation} LIKE ${`"%${cleanSearchTerm}%"`}
+              OR ${excelData.customerLocation} LIKE ${`"${cleanSearchTerm}%"`}
+              OR LOWER(${excelData.customerLocation}) LIKE ${searchTermLikeClean}
+              OR LOWER(${excelData.customerLocation}) LIKE ${`"%${cleanSearchTerm}%"`}
+              OR LOWER(${excelData.customerLocation}) LIKE ${`"${cleanSearchTerm}%"`}
+              OR LOWER(REPLACE(${excelData.customerLocation}, '"', '')) LIKE ${searchTermLikeClean}
+              OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                ${excelData.customerLocation},
+                '"', ''),
+                'á', 'a'),
+                'é', 'e'),
+                'í', 'i'),
+                'ó', 'o'),
+                'ú', 'u'),
+                'ñ', 'n'),
+                'Ñ', 'n')
+              ) LIKE ${searchTermLikeClean}
+              OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                ${excelData.customerLocation},
+                '"', ''),
+                'Á', 'a'),
+                'É', 'e'),
+                'Í', 'i'),
+                'Ó', 'o'),
+                'Ú', 'u'),
+                'ñ', 'n'),
+                'Ñ', 'n')
+              ) LIKE ${searchTermLikeClean}
+            )`;
             
-            conditions.push(simplifiedCondition);
+            console.log(`Buscando termino único "${cleanSearchTerm}" en ubicaciones`);
+            conditions.push(singleTermCondition);
             
-            // Solo para depuración
-            console.log(`Se ha generado una condición simple para la búsqueda de ubicación: ${cleanSearchTerm}`);
+            // También hacemos una consulta especial para términos únicos en valores con formato "Ciudad, País"
+            if (cleanSearchTerm.length > 1) {
+              console.log(`Intentando emparejamiento como parte de ubicación compuesta para: ${cleanSearchTerm}`);
+              
+              // Para el caso específico de "Madrid, España" u otros formatos similares
+              // Busca el término en cualquier parte del campo location
+              // Incluyendo todas las variaciones posibles con y sin comillas
+              const cityPartCondition = sql`(
+                ${excelData.customerLocation} LIKE ${`%${cleanSearchTerm},%`} OR
+                ${excelData.customerLocation} LIKE ${`%, ${cleanSearchTerm}%`} OR
+                ${excelData.customerLocation} LIKE ${`"${cleanSearchTerm},%`} OR
+                ${excelData.customerLocation} LIKE ${`%, ${cleanSearchTerm}"`} OR
+                ${excelData.customerLocation} LIKE ${`"%${cleanSearchTerm},%`} OR
+                ${excelData.customerLocation} LIKE ${`%, ${cleanSearchTerm}%"`}
+              )`;
+              
+              conditions.push(cityPartCondition);
+            }
           }
           
           // Realizar un log adicional para depuración
