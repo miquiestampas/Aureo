@@ -18,6 +18,28 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 // No necesitamos connectPg para SQLite
 import { db, sqlite } from "./db";
+
+// Función para normalizar texto: eliminar acentos y convertir a minúsculas
+function normalizeText(text: string): string {
+  if (!text) return '';
+  
+  // Reemplazos específicos para caracteres problemáticos
+  let normalized = text;
+  
+  // Eliminar comillas que pueden estar en los datos como "Madrid, España"
+  normalized = normalized.replace(/"/g, '');
+  
+  // Reemplazar 'ñ' por 'n' antes de la normalización Unicode
+  normalized = normalized.replace(/ñ/g, 'n').replace(/Ñ/g, 'n');
+  
+  // Aplicar normalización Unicode para eliminar acentos
+  normalized = normalized.normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Eliminar acentos
+    .toLowerCase(); // Convertir a minúsculas
+    
+  console.log(`Normalización: "${text}" → "${normalized}"`);
+  return normalized;
+}
 import { eq, desc, like, or, and, gte, lte, inArray, sql, count } from "drizzle-orm";
 // SQLite no necesita pool
 
@@ -2153,7 +2175,138 @@ export class DatabaseStorage implements IStorage {
         }
         
         if (filters.customerLocation) {
-          conditions.push(like(sql`LOWER(${excelData.customerLocation})`, `%${filters.customerLocation.toLowerCase()}%`));
+          // Normalizar para eliminar acentos y convertir a minúsculas
+          const searchTerm = normalizeText(filters.customerLocation);
+          const searchTermLike = `%${searchTerm}%`;
+          console.log("Buscando ubicación con término normalizado:", searchTerm);
+          
+          // Limpiar término de búsqueda de comillas
+          const cleanSearchTerm = searchTerm.replace(/"/g, '');
+          
+          // Preparar términos de búsqueda - dividir por comas para buscar partes individuales
+          const locationTerms = cleanSearchTerm.split(',').map(term => term.trim());
+          console.log("Términos de búsqueda limpios:", cleanSearchTerm);
+          console.log("Términos de búsqueda divididos:", locationTerms);
+          
+          // Si hay más de un término (ciudad, país), crear condiciones para ambos por separado y juntos
+          if (locationTerms.length > 1) {
+            // Caso 1: Buscar el término completo
+            const fullTermLike = `%${cleanSearchTerm}%`;
+            
+            // Caso 2: Buscar solo el primer término (ciudad)
+            const cityTermLike = `%${locationTerms[0]}%`;
+            
+            // Caso 3: Buscar solo el segundo término (país)
+            const countryTermLike = `%${locationTerms[1]}%`;
+            
+            // Mejorar la búsqueda para manejar mejor acentos y casos específicos
+            conditions.push(
+              sql`(
+                LOWER(REPLACE(${excelData.customerLocation}, '"', '')) LIKE ${fullTermLike}
+                OR (
+                  LOWER(REPLACE(${excelData.customerLocation}, '"', '')) LIKE ${cityTermLike}
+                  AND LOWER(REPLACE(${excelData.customerLocation}, '"', '')) LIKE ${countryTermLike}
+                )
+                OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                  ${excelData.customerLocation},
+                  '"', ''),
+                  'á', 'a'),
+                  'é', 'e'),
+                  'í', 'i'),
+                  'ó', 'o'),
+                  'ú', 'u'),
+                  'ñ', 'n'),
+                  'Ñ', 'n')
+                ) LIKE ${fullTermLike}
+                OR (
+                  LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                    ${excelData.customerLocation},
+                    '"', ''),
+                    'á', 'a'),
+                    'é', 'e'),
+                    'í', 'i'),
+                    'ó', 'o'),
+                    'ú', 'u'),
+                    'ñ', 'n'),
+                    'Ñ', 'n')
+                  ) LIKE ${cityTermLike}
+                  AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                    ${excelData.customerLocation},
+                    '"', ''),
+                    'á', 'a'),
+                    'é', 'e'),
+                    'í', 'i'),
+                    'ó', 'o'),
+                    'ú', 'u'),
+                    'ñ', 'n'),
+                    'Ñ', 'n')
+                  ) LIKE ${countryTermLike}
+                )
+              )`
+            );
+          } else {
+            // También buscamos por términos independientes en ubicaciones compuestas
+            // Por ejemplo, si busca "madrid", debe encontrar "Madrid, España"
+            const searchTermLikeClean = `%${cleanSearchTerm}%`;
+            
+            // Mejorar la búsqueda para manejar mejor acentos y casos específicos, incluyendo comillas
+            const singleTermCondition = sql`(
+              ${excelData.customerLocation} LIKE ${searchTermLikeClean}
+              OR ${excelData.customerLocation} LIKE ${`"%${cleanSearchTerm}%"`}
+              OR ${excelData.customerLocation} LIKE ${`"${cleanSearchTerm}%"`}
+              OR LOWER(${excelData.customerLocation}) LIKE ${searchTermLikeClean}
+              OR LOWER(${excelData.customerLocation}) LIKE ${`"%${cleanSearchTerm}%"`}
+              OR LOWER(${excelData.customerLocation}) LIKE ${`"${cleanSearchTerm}%"`}
+              OR LOWER(REPLACE(${excelData.customerLocation}, '"', '')) LIKE ${searchTermLikeClean}
+              OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                ${excelData.customerLocation},
+                '"', ''),
+                'á', 'a'),
+                'é', 'e'),
+                'í', 'i'),
+                'ó', 'o'),
+                'ú', 'u'),
+                'ñ', 'n'),
+                'Ñ', 'n')
+              ) LIKE ${searchTermLikeClean}
+              OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                ${excelData.customerLocation},
+                '"', ''),
+                'Á', 'a'),
+                'É', 'e'),
+                'Í', 'i'),
+                'Ó', 'o'),
+                'Ú', 'u'),
+                'ñ', 'n'),
+                'Ñ', 'n')
+              ) LIKE ${searchTermLikeClean}
+            )`;
+            
+            console.log(`Buscando termino único "${cleanSearchTerm}" en ubicaciones`);
+            conditions.push(singleTermCondition);
+            
+            // También hacemos una consulta especial para términos únicos en valores con formato "Ciudad, País"
+            if (cleanSearchTerm.length > 1) {
+              console.log(`Intentando emparejamiento como parte de ubicación compuesta para: ${cleanSearchTerm}`);
+              
+              // Para el caso específico de "Madrid, España" u otros formatos similares
+              // Busca el término en cualquier parte del campo location
+              // Incluyendo todas las variaciones posibles con y sin comillas
+              const cityPartCondition = sql`(
+                ${excelData.customerLocation} LIKE ${`%${cleanSearchTerm},%`} OR
+                ${excelData.customerLocation} LIKE ${`%, ${cleanSearchTerm}%`} OR
+                ${excelData.customerLocation} LIKE ${`"${cleanSearchTerm},%`} OR
+                ${excelData.customerLocation} LIKE ${`%, ${cleanSearchTerm}"`} OR
+                ${excelData.customerLocation} LIKE ${`"%${cleanSearchTerm},%`} OR
+                ${excelData.customerLocation} LIKE ${`%, ${cleanSearchTerm}%"`}
+              )`;
+              
+              conditions.push(cityPartCondition);
+            }
+          }
+          
+          // Realizar un log adicional para depuración
+          console.log("SQL generado para búsqueda de ubicación:", conditions[conditions.length - 1]);
         }
         
         if (filters.orderNumber) {
