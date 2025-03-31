@@ -7,6 +7,8 @@ import { format } from "date-fns";
 import { Calendar as CalendarIcon, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { Store, ExcelData, ExcelSearchResults } from "../shared/types";
+import StoreInfoDialog from "./StoreInfoDialog";
 
 import {
   Dialog,
@@ -48,39 +50,6 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-
-interface ExcelData {
-  id: number;
-  storeCode: string;
-  orderNumber: string;
-  orderDate: string;
-  customerName: string;
-  customerContact: string;
-  itemDetails: string;
-  metals: string;
-  engravings: string;
-  stones: string;
-  carats: string;
-  price: string;
-  pawnTicket: string;
-  saleDate: string | null;
-  fileActivityId: number;
-}
-
-interface ExcelSearchResults {
-  results: ExcelData[];
-  count: number;
-  searchType: string;
-}
-
-interface Store {
-  id: number;
-  code: string;
-  name: string;
-  type: string;
-  location: string;
-  active: boolean;
-}
 
 interface ExcelDataSearchProps {
   isOpen: boolean;
@@ -221,6 +190,14 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
     searchMutation.mutate(values);
   };
   
+  // Función para mostrar el diálogo de información de tienda
+  const onShowStoreInfo = (store: Store) => {
+    setStoreInfoDialog({
+      open: true,
+      store
+    });
+  };
+  
   // Columnas para la tabla de resultados
   const columns: ColumnDef<ExcelData>[] = [
     {
@@ -298,14 +275,6 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
     setSearchResults([]);
     setTotalResults(0);
     setActiveTab("search");
-  };
-  
-  // Función para mostrar el diálogo de información de tienda
-  const onShowStoreInfo = (store: Store) => {
-    setStoreInfoDialog({
-      open: true,
-      store
-    });
   };
   
   return (
@@ -765,57 +734,14 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
         </Tabs>
       </DialogContent>
     </Dialog>
-    
+
     {/* Diálogo de información de tienda */}
-    <Dialog open={storeInfoDialog.open} onOpenChange={(open) => !open && setStoreInfoDialog({ ...storeInfoDialog, open: false })}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Información de tienda</DialogTitle>
-          <DialogDescription>
-            Detalles completos de la tienda seleccionada
-          </DialogDescription>
-        </DialogHeader>
-        
-        {storeInfoDialog.store && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground">Código</h4>
-                <p className="text-base">{storeInfoDialog.store.code}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground">Estado</h4>
-                <p className="text-base">
-                  <Badge variant={storeInfoDialog.store.active ? "default" : "outline"}>
-                    {storeInfoDialog.store.active ? "Activa" : "Inactiva"}
-                  </Badge>
-                </p>
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground">Nombre</h4>
-              <p className="text-base">{storeInfoDialog.store.name}</p>
-            </div>
-            
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground">Tipo</h4>
-              <p className="text-base">{storeInfoDialog.store.type || "No especificado"}</p>
-            </div>
-            
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground">Ubicación</h4>
-              <p className="text-base">{storeInfoDialog.store.location || "No especificada"}</p>
-            </div>
-          </div>
-        )}
-        
-        <DialogFooter>
-          <Button onClick={() => setStoreInfoDialog({ ...storeInfoDialog, open: false })}>
-            Cerrar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    {storeInfoDialog.store && (
+      <StoreInfoDialog 
+        store={storeInfoDialog.store} 
+        open={storeInfoDialog.open} 
+        onClose={() => setStoreInfoDialog({ open: false, store: null })} 
+      />
+    )}
   );
 }
