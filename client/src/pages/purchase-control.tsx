@@ -1074,7 +1074,7 @@ export default function PurchaseControlPage() {
 
       {/* Diálogo de detalles de la tienda */}
       <Dialog open={isStoreDetailDialogOpen} onOpenChange={setIsStoreDetailDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Detalles de la Tienda</DialogTitle>
             <DialogDescription>
@@ -1083,7 +1083,12 @@ export default function PurchaseControlPage() {
           </DialogHeader>
           {selectedStore && (
             <div className="space-y-4 py-2">
-              <div className="grid grid-cols-[120px_1fr] gap-2">
+              <div className="grid grid-cols-[140px_1fr] gap-2">
+                {/* Información básica */}
+                <div className="col-span-2 bg-muted/50 px-2 py-1 rounded-md mb-2">
+                  <h3 className="font-semibold">Información básica</h3>
+                </div>
+                
                 <span className="font-medium text-gray-500">Código:</span>
                 <span>{selectedStore.code}</span>
                 
@@ -1093,8 +1098,30 @@ export default function PurchaseControlPage() {
                 <span className="font-medium text-gray-500">Tipo:</span>
                 <span>{selectedStore.type}</span>
                 
-                <span className="font-medium text-gray-500">Ubicación:</span>
-                <span>{selectedStore.location}</span>
+                <span className="font-medium text-gray-500">Estado:</span>
+                <span>
+                  {selectedStore.active ? (
+                    <Badge variant="outline" className="bg-green-100 text-green-800">
+                      Activa
+                    </Badge>
+                  ) : (
+                    <Badge variant="destructive" className="bg-red-100 text-red-800">
+                      Inactiva
+                    </Badge>
+                  )}
+                </span>
+                
+                {/* Ubicación */}
+                <div className="col-span-2 bg-muted/50 px-2 py-1 rounded-md mb-2 mt-3">
+                  <h3 className="font-semibold">Ubicación</h3>
+                </div>
+                
+                {selectedStore.address && (
+                  <>
+                    <span className="font-medium text-gray-500">Dirección:</span>
+                    <span>{selectedStore.address}</span>
+                  </>
+                )}
                 
                 {selectedStore.district && (
                   <>
@@ -1110,18 +1137,95 @@ export default function PurchaseControlPage() {
                   </>
                 )}
                 
-                <span className="font-medium text-gray-500">Estado:</span>
-                <span>
-                  {selectedStore.active ? (
-                    <Badge variant="outline" className="bg-green-100 text-green-800">
-                      Activa
-                    </Badge>
-                  ) : (
-                    <Badge variant="destructive" className="bg-red-100 text-red-800">
-                      Inactiva
-                    </Badge>
-                  )}
-                </span>
+                {/* Contacto */}
+                <div className="col-span-2 bg-muted/50 px-2 py-1 rounded-md mb-2 mt-3">
+                  <h3 className="font-semibold">Información de contacto</h3>
+                </div>
+                
+                {selectedStore.phone && (
+                  <>
+                    <span className="font-medium text-gray-500">Teléfono:</span>
+                    <span>{selectedStore.phone}</span>
+                  </>
+                )}
+                
+                {selectedStore.email && (
+                  <>
+                    <span className="font-medium text-gray-500">Email:</span>
+                    <span>{selectedStore.email}</span>
+                  </>
+                )}
+                
+                {/* Información empresarial */}
+                <div className="col-span-2 bg-muted/50 px-2 py-1 rounded-md mb-2 mt-3">
+                  <h3 className="font-semibold">Información empresarial</h3>
+                </div>
+                
+                {selectedStore.cif && (
+                  <>
+                    <span className="font-medium text-gray-500">CIF:</span>
+                    <span>{selectedStore.cif}</span>
+                  </>
+                )}
+                
+                {selectedStore.businessName && (
+                  <>
+                    <span className="font-medium text-gray-500">Razón social:</span>
+                    <span>{selectedStore.businessName}</span>
+                  </>
+                )}
+                
+                {selectedStore.ownerName && (
+                  <>
+                    <span className="font-medium text-gray-500">Propietario:</span>
+                    <span>{selectedStore.ownerName}</span>
+                  </>
+                )}
+                
+                {selectedStore.ownerIdNumber && (
+                  <>
+                    <span className="font-medium text-gray-500">DNI propietario:</span>
+                    <span>{selectedStore.ownerIdNumber}</span>
+                  </>
+                )}
+                
+                {/* Fechas */}
+                <div className="col-span-2 bg-muted/50 px-2 py-1 rounded-md mb-2 mt-3">
+                  <h3 className="font-semibold">Fechas</h3>
+                </div>
+                
+                {selectedStore.startDate && (
+                  <>
+                    <span className="font-medium text-gray-500">Inicio actividad:</span>
+                    <span>{selectedStore.startDate}</span>
+                  </>
+                )}
+                
+                {selectedStore.endDate && (
+                  <>
+                    <span className="font-medium text-gray-500">Cese actividad:</span>
+                    <span>{selectedStore.endDate}</span>
+                  </>
+                )}
+                
+                {selectedStore.createdAt && (
+                  <>
+                    <span className="font-medium text-gray-500">Registro sistema:</span>
+                    <span>{new Date(selectedStore.createdAt).toLocaleDateString()}</span>
+                  </>
+                )}
+                
+                {/* Notas */}
+                {selectedStore.notes && (
+                  <>
+                    <div className="col-span-2 bg-muted/50 px-2 py-1 rounded-md mb-2 mt-3">
+                      <h3 className="font-semibold">Notas adicionales</h3>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-sm whitespace-pre-wrap">{selectedStore.notes}</p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
