@@ -892,11 +892,18 @@ export async function processPdfFile(filePath: string, activityId: number, store
         const storesCodes = allStores.map(store => store.code);
         
         // Buscar si algún código de tienda aparece en el nombre del archivo, ignorando diferencias entre mayúsculas y minúsculas
+        // y verificando también que el tipo de tienda coincida con el tipo de archivo
         const originalFilenameLower = originalFilename.toLowerCase();
-        for (const code of storesCodes) {
+        
+        // Primero filtrar las tiendas para obtener solo las de tipo PDF
+        const pdfStores = allStores.filter(store => store.type === 'PDF');
+        const pdfStoresCodes = pdfStores.map(store => store.code);
+        
+        // Buscar coincidencias SOLO con tiendas de tipo PDF
+        for (const code of pdfStoresCodes) {
           if (originalFilenameLower.includes(code.toLowerCase())) {
             pdfStoreCode = code; // Mantenemos el código original para preservar el formato de la base de datos
-            console.log(`Found store code in filename (case insensitive): ${pdfStoreCode}`);
+            console.log(`Found PDF store code in filename (case insensitive): ${pdfStoreCode}`);
             break;
           }
         }
