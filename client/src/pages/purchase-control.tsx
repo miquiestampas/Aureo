@@ -145,7 +145,7 @@ interface SearchParams {
   stones?: string; // Agregamos campo para piedras
   price?: string;
   priceOperator?: string;
-  onlyAlerts?: boolean;
+  // onlyAlerts eliminado para evitar errores
 }
 
 export default function PurchaseControlPage() {
@@ -225,8 +225,8 @@ export default function PurchaseControlPage() {
           engravings: params.engravings,
           stones: params.stones,
           price: params.price,
-          priceOperator: params.priceOperator,
-          onlyAlerts: params.onlyAlerts
+          priceOperator: params.priceOperator
+          // Eliminado: onlyAlerts para evitar errores
         }
       };
       
@@ -296,8 +296,8 @@ export default function PurchaseControlPage() {
         engravings: searchParams.engravings || undefined,
         stones: searchParams.stones || undefined,
         price: searchParams.price || undefined,
-        priceOperator: searchParams.priceOperator || undefined,
-        onlyAlerts: searchParams.onlyAlerts || undefined
+        priceOperator: searchParams.priceOperator || undefined
+        // Eliminado: onlyAlerts para evitar errores
       };
     } else {
       // Parámetros para búsqueda simple - solo la consulta

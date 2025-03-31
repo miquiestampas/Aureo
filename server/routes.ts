@@ -1039,7 +1039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Búsqueda completada. Encontrados ${results.length} resultados`);
       
       // Si necesitamos filtrar por alertas, obtener alertas para cada registro
-      if (onlyAlerts && !isSimpleSearch) {
+      if (req.body.filters?.onlyAlerts && !isSimpleSearch) {
         try {
           // Obtener todas las alertas
           const allAlerts = await storage.getAlerts();
