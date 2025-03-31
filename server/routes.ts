@@ -1015,7 +1015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Ejecutar la búsqueda con los filtros configurados
-      console.log(`Realizando búsqueda ${isSimpleSearch ? 'simple' : 'avanzada'} con:`, { query, filters });
+      console.log(`Realizando búsqueda ${isSimpleSearch ? 'simple' : 'avanzada'} con:`, { query, filters: JSON.stringify(filters) });
       let results = await storage.searchExcelData(query, filters);
       
       console.log(`Búsqueda completada. Encontrados ${results.length} resultados`);

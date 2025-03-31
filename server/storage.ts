@@ -925,6 +925,8 @@ export class MemStorage implements IStorage {
                 record.customerName.toLowerCase().includes(searchTerms)) ||
                 (filters.searchCustomerContact !== false && record.customerContact && 
                 record.customerContact.toLowerCase().includes(searchTerms)) ||
+                (filters.searchCountry !== false && record.country && 
+                record.country.toLowerCase().includes(searchTerms)) ||
                 (record.orderNumber && record.orderNumber.toLowerCase().includes(searchTerms)) ||
                 (filters.searchItemDetails !== false && record.itemDetails && 
                 record.itemDetails.toLowerCase().includes(searchTerms)) ||
