@@ -107,7 +107,6 @@ interface SearchParams {
   stones?: string; // Agregamos campo para piedras
   price?: string;
   priceOperator?: string;
-  onlyAlerts?: boolean;
 }
 
 export default function PurchaseControlPage() {
@@ -231,8 +230,7 @@ export default function PurchaseControlPage() {
         engravings: searchParams.engravings || undefined,
         stones: searchParams.stones || undefined,
         price: searchParams.price || undefined,
-        priceOperator: searchParams.priceOperator || undefined,
-        onlyAlerts: searchParams.onlyAlerts || undefined
+        priceOperator: searchParams.priceOperator || undefined
       };
     } else {
       // Parámetros para búsqueda simple - solo la consulta
@@ -632,25 +630,7 @@ export default function PurchaseControlPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2 mt-4">
-                  <Checkbox
-                    id="alerts-only"
-                    checked={searchParams.onlyAlerts || false}
-                    onCheckedChange={(checked) =>
-                      setSearchParams({
-                        ...searchParams,
-                        onlyAlerts: checked as boolean,
-                      })
-                    }
-                  />
-                  <label
-                    htmlFor="alerts-only"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center"
-                  >
-                    <AlertTriangle className="h-4 w-4 mr-1 text-orange-500" />
-                    Solo mostrar compras con alertas
-                  </label>
-                </div>
+
 
                 <div className="flex justify-end space-x-2 mt-4">
                   <Button 
