@@ -3016,33 +3016,34 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
-  async deleteCoincidenciasPorLote(ids: number[]): Promise<{borradas: number, total: number}> {
-    if (!ids || ids.length === 0) {
-      return { borradas: 0, total: 0 };
-    }
-    
-    try {
-      console.log(`Intentando eliminar ${ids.length} coincidencias en lote`);
-      
-      // Eliminar registros por ID en la lista
-      const result = await db
-        .delete(coincidencias)
-        .where(inArray(coincidencias.id, ids));
-      
-      console.log(`Resultado de eliminación por lote: ${JSON.stringify(result)}`);
-      
-      // En SQLite con better-sqlite3, result.changes contiene el número de filas afectadas
-      const borradas = result?.changes || 0;
-      
-      return { 
-        borradas, 
-        total: ids.length 
-      };
-    } catch (error) {
-      console.error(`Error al eliminar coincidencias en lote:`, error);
-      return { borradas: 0, total: ids.length };
-    }
-  }
+  // Esta es la implementación original usando Drizzle ORM, pero parece que no funciona correctamente
+  // async deleteCoincidenciasPorLote(ids: number[]): Promise<{borradas: number, total: number}> {
+  //   if (!ids || ids.length === 0) {
+  //     return { borradas: 0, total: 0 };
+  //   }
+  //   
+  //   try {
+  //     console.log(`Intentando eliminar ${ids.length} coincidencias en lote`);
+  //     
+  //     // Eliminar registros por ID en la lista
+  //     const result = await db
+  //       .delete(coincidencias)
+  //       .where(inArray(coincidencias.id, ids));
+  //     
+  //     console.log(`Resultado de eliminación por lote: ${JSON.stringify(result)}`);
+  //     
+  //     // En SQLite con better-sqlite3, result.changes contiene el número de filas afectadas
+  //     const borradas = result?.changes || 0;
+  //     
+  //     return { 
+  //       borradas, 
+  //       total: ids.length 
+  //     };
+  //   } catch (error) {
+  //     console.error(`Error al eliminar coincidencias en lote:`, error);
+  //     return { borradas: 0, total: ids.length };
+  //   }
+  // }
   
   async updateCoincidenciaEstado(
     id: number, 

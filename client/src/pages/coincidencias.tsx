@@ -207,6 +207,7 @@ export default function Coincidencias() {
   // Mutación para eliminar coincidencias en lote
   const batchDeleteMutation = useMutation({
     mutationFn: async (ids: number[]) => {
+      console.log('Enviando solicitud para eliminar coincidencias:', ids);
       const response = await fetch('/api/coincidencias/eliminar-lote', {
         method: 'POST',
         headers: {
@@ -219,12 +220,17 @@ export default function Coincidencias() {
         throw new Error('Error al eliminar coincidencias');
       }
       
-      return await response.json();
+      const data = await response.json();
+      console.log('Respuesta del servidor:', data);
+      return data;
     },
     onSuccess: (data) => {
+      // Aseguramos que data.borradas o data.deletedCount exista, sino usamos 0
+      const eliminadas = data.borradas || data.deletedCount || 0;
+      
       toast({
         title: 'Coincidencias eliminadas',
-        description: `Se han eliminado ${data.borradas} coincidencias correctamente`,
+        description: `Se han eliminado ${eliminadas} coincidencias correctamente`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/coincidencias'] });
       queryClient.invalidateQueries({ queryKey: ['/api/coincidencias/noleidas/count'] });
