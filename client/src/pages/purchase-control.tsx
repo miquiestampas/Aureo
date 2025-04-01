@@ -804,7 +804,31 @@ export default function PurchaseControlPage() {
                         </TableCell>
                         <TableCell>{formatDate(record.orderDate)}</TableCell>
                         <TableCell>{record.orderNumber}</TableCell>
-                        <TableCell>{record.customerName}</TableCell>
+                        <TableCell>
+                          {record.customerName ? (
+                            <Button 
+                              variant="link" 
+                              className="p-0 h-auto font-medium hover:text-primary text-left justify-start" 
+                              onClick={() => {
+                                setAdvancedSearch(true);
+                                setSearchParams({
+                                  ...searchParams,
+                                  customerName: record.customerName || "",
+                                  storeCode: "all"
+                                });
+                                searchMutation.mutate({
+                                  query: "",
+                                  customerName: record.customerName || "",
+                                  storeCode: "all"
+                                });
+                              }}
+                            >
+                              {record.customerName}
+                            </Button>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
                         <TableCell>{record.customerContact}</TableCell>
                         <TableCell>
                           {record.itemDetails.length > 30
