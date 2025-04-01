@@ -4,12 +4,11 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Download, Eye, FileSpreadsheet, Search, X } from "lucide-react";
+import { Calendar as CalendarIcon, Eye, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Store as StoreType, ExcelData, ExcelSearchResults } from "../shared/types";
 import StoreInfoDialog from "./StoreInfoDialog";
-import * as XLSX from 'xlsx';
 
 import {
   Dialog,
@@ -19,12 +18,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Form,
   FormControl,
@@ -252,25 +245,14 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       id: "actions",
       header: "Acciones",
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="px-2 py-1 h-8">
-                Acciones
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => onViewDetails(row.original)}>
-                <Eye className="h-4 w-4 mr-2" />
-                <span>Ver detalles</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.open(`/api/excel-data/${row.original.id}/download`, '_blank')}>
-                <Download className="h-4 w-4 mr-2" />
-                <span>Descargar Excel</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={() => onViewDetails(row.original)}
+          title="Ver detalles"
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
       ),
     },
   ];
@@ -294,67 +276,6 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
     setSearchResults([]);
     setTotalResults(0);
     setActiveTab("search");
-  };
-  
-  // Función para exportar resultados a Excel
-  const exportToExcel = () => {
-    if (searchResults.length === 0) {
-      toast({
-        title: "Sin datos para exportar",
-        description: "No hay resultados que exportar a Excel.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    try {
-      // Formatear los datos para Excel
-      const formattedData = searchResults.map(item => ({
-        'Número de Orden': item.orderNumber,
-        'Tienda': stores.find(s => s.code === item.storeCode)?.name || item.storeCode,
-        'Código Tienda': item.storeCode,
-        'Fecha': format(new Date(item.orderDate), "dd/MM/yyyy"),
-        'Cliente': item.customerName || '',
-        'Contacto': item.customerContact || '',
-        'Dirección': item.customerAddress || '',
-        'Ubicación': item.customerLocation || '',
-        'Detalles del Artículo': item.itemDetails || '',
-        'Metales': item.metals || '',
-        'Piedras': item.stones || '',
-        'Grabados': item.engravings || '',
-        'Precio': item.price || '',
-        'Quilates': item.carats || '',
-        'Peso': item.itemWeight || '',
-        'Ticket empeño': item.pawnTicket || '',
-        'Fecha venta': item.saleDate ? format(new Date(item.saleDate), "dd/MM/yyyy") : '',
-      }));
-      
-      // Crear una hoja de Excel
-      const worksheet = XLSX.utils.json_to_sheet(formattedData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Resultados");
-      
-      // Generar un nombre de archivo basado en la búsqueda
-      const searchType = form.getValues("searchType");
-      const searchTerms = form.getValues("searchTerms") || "todos";
-      const dateString = format(new Date(), "dd-MM-yyyy");
-      const fileName = `Búsqueda_${searchType}_${searchTerms}_${dateString}.xlsx`;
-      
-      // Descargar el archivo
-      XLSX.writeFile(workbook, fileName);
-      
-      toast({
-        title: "Exportación exitosa",
-        description: `Los resultados se han exportado a ${fileName}`,
-      });
-    } catch (error) {
-      console.error("Error al exportar a Excel:", error);
-      toast({
-        title: "Error en la exportación",
-        description: "Ocurrió un error al exportar los datos a Excel.",
-        variant: "destructive",
-      });
-    }
   };
   
   return (
@@ -777,22 +698,14 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
                 >
                   Modificar búsqueda
                 </Button>
-              </div>
-            </div>
-            
-            {searchResults.length > 0 && (
-              <div className="flex justify-end mb-4">
                 <Button 
-                  variant="default" 
+                  variant="outline" 
                   size="sm"
-                  onClick={exportToExcel}
-                  className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white"
                 >
-                  <FileSpreadsheet className="h-4 w-4" />
-                  Exportar resultados a Excel
+                  Exportar resultados
                 </Button>
               </div>
-            )}
+            </div>
             
             {searchResults.length > 0 ? (
               <DataTable
