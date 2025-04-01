@@ -538,9 +538,9 @@ export default function Coincidencias() {
                   </div>
                   <div className="mt-2">
                     <Button variant="outline" size="sm" className="mt-2" asChild>
-                      <a href={`/purchase-control?orderNumber=${viewingCoincidencia.ordenInfo.orderNumber}`} target="_blank">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Ver en Control de Compras
+                      <a href={`/api/excel-data/${viewingCoincidencia.idExcelData}/download`} download>
+                        <FileSpreadsheet className="h-4 w-4 mr-2" />
+                        Descargar archivo Excel
                       </a>
                     </Button>
                   </div>
