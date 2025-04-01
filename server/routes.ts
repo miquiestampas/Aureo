@@ -1828,6 +1828,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         activity.status === 'Failed'
       ).length;
       
+      console.log(`DEBUG: Conteo de archivos fallidos: ${failedFiles}`);
+      console.log(`DEBUG: Actividades con status 'Failed':`, 
+        recentActivities.filter(activity => activity.status === 'Failed')
+          .map(act => ({id: act.id, filename: act.filename}))
+      );
+      
       // Calcula tiendas críticas (sin actividad en el último mes)
       const oneMonthAgo = new Date();
       oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
