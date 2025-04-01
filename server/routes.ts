@@ -3251,6 +3251,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
+  // Endpoint para eliminar una coincidencia
+  app.delete("/api/coincidencias/:id", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ error: "ID inválido" });
+        }
+        
+        const result = await storage.deleteCoincidencia(id);
+        if (result) {
+          console.log(`Coincidencia ${id} eliminada correctamente`);
+          return res.json({ success: true, message: `Coincidencia ${id} eliminada correctamente` });
+        } else {
+          console.log(`No se encontró la coincidencia ${id} para eliminar`);
+          return res.status(404).json({ success: false, error: "No se encontró la coincidencia" });
+        }
+      } catch (error) {
+        console.error("Error al eliminar coincidencia:", error);
+        next(error);
+      }
+    });
+  });
+  
+  // Endpoint para eliminar múltiples coincidencias en un lote
+  app.post("/api/coincidencias/eliminar-lote", (req, res, next) => {
+    req.authorize(["SuperAdmin", "Admin"])(req, res, async () => {
+      try {
+        const { ids } = req.body;
+        
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+          return res.status(400).json({ 
+            success: false, 
+            error: "Se requiere un array de IDs válido" 
+          });
+        }
+        
+        console.log(`Solicitud para eliminar coincidencias en lote: [${ids.join(', ')}]`);
+        
+        const result = await storage.deleteCoincidenciasPorLote(ids);
+        
+        if (result.borradas > 0) {
+          console.log(`${result.borradas} de ${result.total} coincidencias eliminadas correctamente`);
+          return res.json({ 
+            success: true, 
+            message: `${result.borradas} de ${result.total} coincidencias eliminadas correctamente`,
+            eliminadas: result.borradas,
+            total: result.total
+          });
+        } else {
+          console.log(`No se pudo eliminar ninguna coincidencia del lote de ${result.total}`);
+          return res.status(404).json({ 
+            success: false, 
+            error: "No se pudo eliminar ninguna coincidencia",
+            eliminadas: 0,
+            total: result.total
+          });
+        }
+      } catch (error) {
+        console.error("Error al eliminar coincidencias en lote:", error);
+        next(error);
+      }
+    });
+  });
+  
   // 4. Endpoint para detectar coincidencias manualmente (para pruebas)
   app.post("/api/coincidencias/detectar/:excelDataId", (req, res, next) => {
     req.authorize(["SuperAdmin"])(req, res, async () => {

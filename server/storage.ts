@@ -153,6 +153,8 @@ export interface IStorage {
   getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]>;
   getNumeroCoincidenciasNoLeidas(): Promise<number>;
   detectarCoincidencias(excelDataId: number): Promise<{ nuevasCoincidencias: number }>;
+  deleteCoincidencia(id: number): Promise<boolean>;
+  deleteCoincidenciasPorLote(ids: number[]): Promise<{borradas: number, total: number}>;
 
   // Database cleaning methods
   purgeExcelStores(): Promise<{ count: number }>;
@@ -811,6 +813,26 @@ export class MemStorage implements IStorage {
     
     this.coincidencias.set(id, updatedCoincidencia);
     return updatedCoincidencia;
+  }
+  
+  async deleteCoincidencia(id: number): Promise<boolean> {
+    if (!this.coincidencias.has(id)) return false;
+    return this.coincidencias.delete(id);
+  }
+  
+  async deleteCoincidenciasPorLote(ids: number[]): Promise<{borradas: number, total: number}> {
+    if (!ids || ids.length === 0) {
+      return { borradas: 0, total: 0 };
+    }
+    
+    let borradas = 0;
+    for (const id of ids) {
+      if (this.coincidencias.delete(id)) {
+        borradas++;
+      }
+    }
+    
+    return { borradas, total: ids.length };
   }
   
   async getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]> {
@@ -2978,6 +3000,47 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
+  async deleteCoincidencia(id: number): Promise<boolean> {
+    try {
+      console.log(`Intentando eliminar coincidencia con ID ${id}`);
+      const result = await db
+        .delete(coincidencias)
+        .where(eq(coincidencias.id, id));
+      
+      console.log(`Resultado de eliminación: ${JSON.stringify(result)}`);
+      // Verificamos si se eliminó algún registro
+      return result.rowsAffected > 0;
+    } catch (error) {
+      console.error(`Error al eliminar coincidencia con ID ${id}:`, error);
+      return false;
+    }
+  }
+  
+  async deleteCoincidenciasPorLote(ids: number[]): Promise<{borradas: number, total: number}> {
+    if (!ids || ids.length === 0) {
+      return { borradas: 0, total: 0 };
+    }
+    
+    try {
+      console.log(`Intentando eliminar ${ids.length} coincidencias en lote`);
+      
+      // Eliminar registros por ID en la lista
+      const result = await db
+        .delete(coincidencias)
+        .where(inArray(coincidencias.id, ids));
+      
+      console.log(`Resultado de eliminación por lote: ${JSON.stringify(result)}`);
+      
+      return { 
+        borradas: result.rowsAffected, 
+        total: ids.length 
+      };
+    } catch (error) {
+      console.error(`Error al eliminar coincidencias en lote:`, error);
+      return { borradas: 0, total: ids.length };
+    }
+  }
+  
   async updateCoincidenciaEstado(
     id: number, 
     estado: "NoLeido" | "Leido" | "Descartado", 
@@ -3892,6 +3955,66 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error al obtener número de coincidencias no leídas:", error);
       return 0;
+    }
+  }
+  
+  async deleteCoincidencia(id: number): Promise<boolean> {
+    try {
+      const sql = `DELETE FROM coincidencias WHERE id = ?`;
+      const stmt = sqlite.prepare(sql);
+      const result = stmt.run(id);
+      
+      return result.changes > 0;
+    } catch (error) {
+      console.error(`Error al eliminar coincidencia ${id}:`, error);
+      return false;
+    }
+  }
+  
+  async deleteCoincidenciasPorLote(ids: number[]): Promise<{borradas: number, total: number}> {
+    try {
+      // Verificar que hay IDs para borrar
+      if (!ids || ids.length === 0) {
+        return { borradas: 0, total: 0 };
+      }
+      
+      console.log(`Intentando eliminar ${ids.length} coincidencias por lote: [${ids.join(', ')}]`);
+      
+      // Inicia una transacción para hacer todo el borrado como una operación atómica
+      sqlite.exec('BEGIN TRANSACTION');
+      
+      let borradas = 0;
+      const sql = `DELETE FROM coincidencias WHERE id = ?`;
+      const stmt = sqlite.prepare(sql);
+      
+      // Procesa cada ID en el lote
+      for (const id of ids) {
+        try {
+          const result = stmt.run(id);
+          if (result.changes > 0) {
+            borradas++;
+          }
+        } catch (deleteError) {
+          console.error(`Error al eliminar coincidencia ${id} en el lote:`, deleteError);
+          // Continuar con las demás aunque una falle
+        }
+      }
+      
+      // Finalizar la transacción
+      sqlite.exec('COMMIT');
+      
+      console.log(`Se eliminaron ${borradas} de ${ids.length} coincidencias en el lote`);
+      return { borradas, total: ids.length };
+    } catch (error) {
+      // Si hay un error, revertir toda la transacción
+      try {
+        sqlite.exec('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('Error al revertir la transacción:', rollbackError);
+      }
+      
+      console.error('Error al eliminar coincidencias por lote:', error);
+      return { borradas: 0, total: ids.length };
     }
   }
   

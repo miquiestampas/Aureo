@@ -15,7 +15,8 @@ import {
   FileText,
   FileSpreadsheet,
   ExternalLink,
-  Info
+  Info,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +25,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter
 } from "@/components/ui/card";
 import {
   Dialog,
@@ -34,6 +36,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { SortableColumnHeader } from "@/components/ui/sortable-column-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -94,6 +114,8 @@ export default function Coincidencias() {
     action: "marcar"
   });
   const [reviewNotes, setReviewNotes] = useState("");
+  const [selectedCoincidencias, setSelectedCoincidencias] = useState<number[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   
   // Cargar datos de coincidencias
   const { 
@@ -178,6 +200,42 @@ export default function Coincidencias() {
         title: "Error",
         description: `Error al descartar coincidencia: ${error.message}`,
         variant: "destructive",
+      });
+    },
+  });
+  
+  // Mutación para eliminar coincidencias en lote
+  const batchDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const response = await fetch('/api/coincidencias/eliminar-lote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ids }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al eliminar coincidencias');
+      }
+      
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Coincidencias eliminadas',
+        description: `Se han eliminado ${data.borradas} coincidencias correctamente`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/coincidencias'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/coincidencias/noleidas/count'] });
+      setSelectedCoincidencias([]);
+      setDeleteDialogOpen(false);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: `Error al eliminar coincidencias: ${error.message}`,
+        variant: 'destructive',
       });
     },
   });
@@ -412,6 +470,12 @@ export default function Coincidencias() {
                     data={filteredCoincidencias}
                     searchColumn="valorCoincidente"
                     searchPlaceholder="Buscar por valor coincidente..."
+                    enableRowSelection={true}
+                    onDeleteSelected={(selectedRows) => {
+                      const selectedIds = selectedRows.map((row: any) => row.id);
+                      setSelectedCoincidencias(selectedIds);
+                      setDeleteDialogOpen(true);
+                    }}
                   />
                 </CardContent>
               </Card>
@@ -611,6 +675,29 @@ export default function Coincidencias() {
             )}
           </DialogContent>
         </Dialog>
+        
+        {/* Diálogo para confirmación de eliminación por lotes */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar coincidencias seleccionadas?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. Se eliminarán permanentemente {selectedCoincidencias.length} coincidencias seleccionadas.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setSelectedCoincidencias([])}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => batchDeleteMutation.mutate(selectedCoincidencias)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         
         {/* Diálogo para marcar como leída o descartar */}
         <Dialog 
