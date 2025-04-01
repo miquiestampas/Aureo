@@ -820,7 +820,7 @@ export default function DashboardPage() {
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Archivos Fallidos</dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      {systemStatus?.failedFiles ?? '...'}
+                      {systemStatus?.failedFiles !== undefined ? systemStatus.failedFiles : 0}
                     </dd>
                   </dl>
                 </div>
