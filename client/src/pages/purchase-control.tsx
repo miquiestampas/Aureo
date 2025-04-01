@@ -128,6 +128,8 @@ export default function PurchaseControlPage() {
   const [advancedSearch, setAdvancedSearch] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  // Estado para registros visualizados (permanecerán destacados)
+  const [viewedRecords, setViewedRecords] = useState<Set<number>>(new Set());
   const [selectedRecord, setSelectedRecord] = useState<ExcelData | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [sortConfig, setSortConfig] = useState<{
@@ -194,6 +196,13 @@ export default function PurchaseControlPage() {
     setSelectedRecord(record);
     getAlerts(record.id);
     setIsDetailOpen(true);
+    
+    // Añadir el ID al conjunto de registros visitados
+    setViewedRecords(prev => {
+      const newSet = new Set(prev);
+      newSet.add(record.id);
+      return newSet;
+    });
   };
 
   // Descargar archivo Excel original
@@ -897,7 +906,10 @@ export default function PurchaseControlPage() {
                   </TableHeader>
                   <TableBody>
                     {getSortedResults().map((record) => (
-                      <TableRow key={record.id}>
+                      <TableRow 
+                        key={record.id}
+                        className={viewedRecords.has(record.id) ? "bg-blue-50" : ""}
+                      >
                         <TableCell>
                           {/* Indicador de alerta si existe */}
                           {record.hasAlerts && (
