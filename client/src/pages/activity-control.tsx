@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation, useSearch } from "wouter";
 import { 
   Card, CardContent, CardHeader, CardTitle, CardDescription
 } from "@/components/ui/card";
@@ -73,11 +74,18 @@ interface StoreActivity {
 
 export default function ActivityControlPage() {
   const { toast } = useToast();
+  const [location, setLocation] = useLocation();
+  const search = useSearch();
+  const searchParams = new URLSearchParams(search);
+  const filterParam = searchParams.get('filter');
+  
   const [codeFilter, setCodeFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
   const [localityFilter, setLocalityFilter] = useState("");
   const [districtFilter, setDistrictFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>(
+    filterParam === 'critical' ? 'danger' : 'all'
+  );
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [stores, setStores] = useState<Store[]>([]);
   const [storeActivities, setStoreActivities] = useState<StoreActivity[]>([]);

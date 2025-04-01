@@ -800,9 +800,9 @@ export default function DashboardPage() {
               </div>
             </CardContent>
             <CardFooter className="bg-gray-50 px-6 py-3">
-              <Link href="/store-management">
+              <Link href="/activity-control?filter=critical">
                 <div className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer">
-                  Ver tiendas inactivas
+                  Ver tiendas críticas
                 </div>
               </Link>
             </CardFooter>
