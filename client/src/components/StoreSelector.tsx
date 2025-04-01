@@ -18,6 +18,7 @@ interface StoreSelectorProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  storeType?: 'PDF' | 'Excel' | null;
 }
 
 export function StoreSelector({
@@ -25,11 +26,26 @@ export function StoreSelector({
   onChange,
   placeholder = "Seleccionar tienda",
   className,
-  disabled = false
+  disabled = false,
+  storeType = null
 }: StoreSelectorProps) {
   // Fetch stores
   const { data: stores, isLoading, error } = useQuery<Store[]>({
-    queryKey: ['/api/stores'],
+    queryKey: storeType ? ['/api/stores', { type: storeType }] : ['/api/stores'],
+    queryFn: async ({ queryKey }) => {
+      const [endpoint, params] = queryKey;
+      let url = endpoint as string;
+      
+      if (params && (params as any).type) {
+        url += `?type=${(params as any).type}`;
+      }
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Error al cargar tiendas');
+      }
+      return response.json();
+    }
   });
 
   // Transform stores data to combobox options

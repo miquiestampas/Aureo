@@ -68,7 +68,14 @@ export default function PdfListingsPage() {
   
   // Obtener información de la tienda seleccionada
   const { data: stores } = useQuery<any[]>({
-    queryKey: ['/api/stores'],
+    queryKey: ['/api/stores', { type: 'PDF' }],
+    queryFn: async ({ queryKey }) => {
+      const response = await fetch('/api/stores?type=PDF');
+      if (!response.ok) {
+        throw new Error('Error al cargar tiendas');
+      }
+      return response.json();
+    }
   });
   
   // Manejar cambio de tienda seleccionada
@@ -217,6 +224,7 @@ export default function PdfListingsPage() {
                   value={selectedStoreId}
                   onChange={handleStoreChange}
                   placeholder="Seleccione una tienda"
+                  storeType="PDF"
                 />
               </div>
               <div>
