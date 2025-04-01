@@ -6,6 +6,7 @@ import { format, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { Store as StoreType, ExcelData } from "../shared/types";
 import StoreInfoDialog from "../components/StoreInfoDialog";
+import * as XLSX from "xlsx";
 
 // Components
 import {
@@ -317,6 +318,85 @@ export default function PurchaseControlPage() {
             : 'asc' 
           : 'asc',
     });
+  };
+  
+  // Exportar resultados a Excel
+  const handleExportToExcel = () => {
+    if (!searchMutation.data?.results || searchMutation.data.results.length === 0) {
+      toast({
+        title: "No hay datos para exportar",
+        description: "Realice una búsqueda primero para obtener resultados que exportar.",
+        variant: "default",
+      });
+      return;
+    }
+
+    try {
+      // Preparar los datos para el Excel
+      const excelData = getSortedResults().map(record => ({
+        'Tienda': record.storeCode,
+        'Fecha': formatDate(record.orderDate),
+        'Número de Orden': record.orderNumber,
+        'Cliente': record.customerName || '',
+        'Documento': record.customerContact || '',
+        'Dirección': record.customerAddress || '',
+        'Provincia/País': record.customerLocation || '',
+        'Detalles del Artículo': record.itemDetails || '',
+        'Metales': record.metals || '',
+        'Piedras': record.stones || '',
+        'Grabados': record.engravings || '',
+        'Peso (gr)': record.itemWeight || '',
+        'Quilates': record.carats || '',
+        'Precio': record.price || '',
+        'Comprobante': record.receiptNumber || '',
+      }));
+
+      // Crear un libro de Excel
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Resultados");
+
+      // Configurar los anchos de columna
+      const columnWidths = [
+        { wch: 10 }, // Tienda
+        { wch: 12 }, // Fecha
+        { wch: 15 }, // Número de Orden
+        { wch: 25 }, // Cliente
+        { wch: 15 }, // Documento
+        { wch: 30 }, // Dirección
+        { wch: 20 }, // Provincia/País
+        { wch: 40 }, // Detalles del Artículo
+        { wch: 15 }, // Metales
+        { wch: 15 }, // Piedras
+        { wch: 15 }, // Grabados
+        { wch: 10 }, // Peso
+        { wch: 10 }, // Quilates
+        { wch: 12 }, // Precio
+        { wch: 15 }, // Comprobante
+      ];
+      
+      worksheet['!cols'] = columnWidths;
+
+      // Generar nombre de archivo
+      const dateStr = format(new Date(), 'yyyyMMdd_HHmmss');
+      const fileName = `control_compras_${dateStr}.xlsx`;
+
+      // Descargar el archivo
+      XLSX.writeFile(workbook, fileName);
+
+      toast({
+        title: "Excel generado correctamente",
+        description: `Se ha descargado el archivo ${fileName}`,
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error al exportar a Excel:", error);
+      toast({
+        title: "Error al generar Excel",
+        description: "Ocurrió un error al crear el archivo Excel.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -681,11 +761,22 @@ export default function PurchaseControlPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Resultados de la Búsqueda</CardTitle>
-                <div className="text-sm text-gray-500">
-                  {searchMutation.data.results.length}{" "}
-                  {searchMutation.data.results.length === 1
-                    ? "registro encontrado"
-                    : "registros encontrados"}
+                <div className="flex items-center gap-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleExportToExcel}
+                    className="flex items-center gap-1"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    <span>Exportar a Excel</span>
+                  </Button>
+                  <div className="text-sm text-gray-500">
+                    {searchMutation.data.results.length}{" "}
+                    {searchMutation.data.results.length === 1
+                      ? "registro encontrado"
+                      : "registros encontrados"}
+                  </div>
                 </div>
               </div>
             </CardHeader>
