@@ -19,6 +19,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Form,
   FormControl,
   FormDescription,
@@ -245,23 +251,24 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       id: "actions",
       header: "Acciones",
       cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => onViewDetails(row.original)}
-            title="Ver detalles"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => window.open(`/api/excel-data/${row.original.id}/download`, '_blank')}
-            title="Descargar archivo Excel"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="px-2 py-1 h-8">
+                Acciones
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => onViewDetails(row.original)}>
+                <Eye className="h-4 w-4 mr-2" />
+                <span>Ver detalles</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open(`/api/excel-data/${row.original.id}/download`, '_blank')}>
+                <Download className="h-4 w-4 mr-2" />
+                <span>Descargar Excel</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       ),
     },
