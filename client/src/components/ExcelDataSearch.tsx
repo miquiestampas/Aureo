@@ -777,17 +777,22 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
                 >
                   Modificar búsqueda
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={exportToExcel}
-                  className="flex items-center gap-1"
-                >
-                  <FileSpreadsheet className="h-4 w-4" />
-                  Exportar resultados
-                </Button>
               </div>
             </div>
+            
+            {searchResults.length > 0 && (
+              <div className="flex justify-end mb-4">
+                <Button 
+                  variant="default" 
+                  size="sm"
+                  onClick={exportToExcel}
+                  className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Exportar resultados a Excel
+                </Button>
+              </div>
+            )}
             
             {searchResults.length > 0 ? (
               <DataTable
