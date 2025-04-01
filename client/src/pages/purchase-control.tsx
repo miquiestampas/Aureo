@@ -867,11 +867,11 @@ export default function PurchaseControlPage() {
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             onClick={() => handleViewDetails(record)}
+                            title="Ver detalles"
                           >
-                            <Eye className="h-4 w-4 mr-2" />
-                            Ver Detalles
+                            <Eye className="h-4 w-4" />
                           </Button>
                         </TableCell>
                       </TableRow>

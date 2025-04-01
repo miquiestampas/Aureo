@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Search, X } from "lucide-react";
+import { Calendar as CalendarIcon, Eye, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Store as StoreType, ExcelData, ExcelSearchResults } from "../shared/types";
@@ -247,10 +247,11 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       cell: ({ row }) => (
         <Button 
           variant="ghost" 
-          size="sm"
+          size="icon"
           onClick={() => onViewDetails(row.original)}
+          title="Ver detalles"
         >
-          Ver detalles
+          <Eye className="h-4 w-4" />
         </Button>
       ),
     },
