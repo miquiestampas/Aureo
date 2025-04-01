@@ -810,17 +810,27 @@ export default function PurchaseControlPage() {
                               variant="link" 
                               className="p-0 h-auto font-medium hover:text-primary text-left justify-start" 
                               onClick={() => {
+                                // Configurar la búsqueda avanzada y actualizar el estado
                                 setAdvancedSearch(true);
-                                setSearchParams({
+                                const newParams = {
                                   ...searchParams,
+                                  query: "",
                                   customerName: record.customerName || "",
                                   storeCode: "all"
-                                });
+                                };
+                                setSearchParams(newParams);
+
+                                // Ejecutar la búsqueda inmediatamente
                                 searchMutation.mutate({
                                   query: "",
                                   customerName: record.customerName || "",
                                   storeCode: "all"
                                 });
+
+                                // Registrar la búsqueda en el historial
+                                if (record.customerName) {
+                                  recordSearchHistory(`Cliente: ${record.customerName}`);
+                                }
                               }}
                             >
                               {record.customerName}
