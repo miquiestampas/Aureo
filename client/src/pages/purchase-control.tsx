@@ -839,7 +839,42 @@ export default function PurchaseControlPage() {
                             "—"
                           )}
                         </TableCell>
-                        <TableCell>{record.customerContact}</TableCell>
+                        <TableCell>
+                          {record.customerContact ? (
+                            <Button 
+                              variant="link" 
+                              className="p-0 h-auto font-medium hover:text-primary text-left justify-start" 
+                              onClick={() => {
+                                // Configurar la búsqueda avanzada y actualizar el estado
+                                setAdvancedSearch(true);
+                                const newParams = {
+                                  ...searchParams,
+                                  query: "",
+                                  customerContact: record.customerContact || "",
+                                  storeCode: "all",
+                                  customerName: "" // Limpiamos el nombre para no combinar filtros
+                                };
+                                setSearchParams(newParams);
+
+                                // Ejecutar la búsqueda inmediatamente
+                                searchMutation.mutate({
+                                  query: "",
+                                  customerContact: record.customerContact || "",
+                                  storeCode: "all"
+                                });
+
+                                // Registrar la búsqueda en el historial
+                                if (record.customerContact) {
+                                  recordSearchHistory(`Documento: ${record.customerContact}`);
+                                }
+                              }}
+                            >
+                              {record.customerContact}
+                            </Button>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
                         <TableCell>
                           {record.itemDetails.length > 30
                             ? `${record.itemDetails.substring(0, 30)}...`
