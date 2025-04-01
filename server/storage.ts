@@ -3031,8 +3031,11 @@ export class DatabaseStorage implements IStorage {
       
       console.log(`Resultado de eliminación por lote: ${JSON.stringify(result)}`);
       
+      // En SQLite con better-sqlite3, result.changes contiene el número de filas afectadas
+      const borradas = result?.changes || 0;
+      
       return { 
-        borradas: result.rowsAffected, 
+        borradas, 
         total: ids.length 
       };
     } catch (error) {
@@ -3980,39 +3983,24 @@ export class DatabaseStorage implements IStorage {
       
       console.log(`Intentando eliminar ${ids.length} coincidencias por lote: [${ids.join(', ')}]`);
       
-      // Inicia una transacción para hacer todo el borrado como una operación atómica
-      sqlite.exec('BEGIN TRANSACTION');
-      
+      // Para evitar problemas con transacciones SQLite, usamos un enfoque más simple:
       let borradas = 0;
-      const sql = `DELETE FROM coincidencias WHERE id = ?`;
+      
+      // Usar placeholders para prepared statement con múltiples valores
+      // Crear un conjunto de placeholders (?, ?, ?...) para la consulta IN
+      const placeholders = ids.map(() => '?').join(',');
+      const sql = `DELETE FROM coincidencias WHERE id IN (${placeholders})`;
+      
+      // Preparar y ejecutar la consulta con todos los IDs a la vez
       const stmt = sqlite.prepare(sql);
+      const result = stmt.run(...ids);
       
-      // Procesa cada ID en el lote
-      for (const id of ids) {
-        try {
-          const result = stmt.run(id);
-          if (result.changes > 0) {
-            borradas++;
-          }
-        } catch (deleteError) {
-          console.error(`Error al eliminar coincidencia ${id} en el lote:`, deleteError);
-          // Continuar con las demás aunque una falle
-        }
-      }
-      
-      // Finalizar la transacción
-      sqlite.exec('COMMIT');
+      // Obtener el número de filas afectadas
+      borradas = result.changes;
       
       console.log(`Se eliminaron ${borradas} de ${ids.length} coincidencias en el lote`);
       return { borradas, total: ids.length };
     } catch (error) {
-      // Si hay un error, revertir toda la transacción
-      try {
-        sqlite.exec('ROLLBACK');
-      } catch (rollbackError) {
-        console.error('Error al revertir la transacción:', rollbackError);
-      }
-      
       console.error('Error al eliminar coincidencias por lote:', error);
       return { borradas: 0, total: ids.length };
     }

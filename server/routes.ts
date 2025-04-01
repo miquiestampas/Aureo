@@ -3292,23 +3292,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const result = await storage.deleteCoincidenciasPorLote(ids);
         
-        if (result.borradas > 0) {
-          console.log(`${result.borradas} de ${result.total} coincidencias eliminadas correctamente`);
-          return res.json({ 
-            success: true, 
-            message: `${result.borradas} de ${result.total} coincidencias eliminadas correctamente`,
-            eliminadas: result.borradas,
-            total: result.total
-          });
-        } else {
-          console.log(`No se pudo eliminar ninguna coincidencia del lote de ${result.total}`);
-          return res.status(404).json({ 
-            success: false, 
-            error: "No se pudo eliminar ninguna coincidencia",
-            eliminadas: 0,
-            total: result.total
-          });
-        }
+        console.log(`${result.borradas} de ${result.total} coincidencias eliminadas correctamente`);
+        return res.json({ 
+          success: true, 
+          message: `${result.borradas} de ${result.total} coincidencias eliminadas correctamente`,
+          borradas: result.borradas,
+          total: result.total,
+          deletedCount: result.borradas // Añadir para mantener compatibilidad con el frontend
+        });
       } catch (error) {
         console.error("Error al eliminar coincidencias en lote:", error);
         next(error);
