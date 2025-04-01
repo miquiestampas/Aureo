@@ -59,6 +59,7 @@ interface SystemStatus {
   criticalStores: number; // Tiendas sin actividad en el último mes
   processedToday: number;
   pendingFiles: number;
+  failedFiles: number; // Archivos que fallaron al procesarse
   fileWatchingActive: boolean;
   lastSystemCheck: string;
   databaseSize: number; // Tamaño relativo de la BD en porcentaje (0-100)
@@ -808,6 +809,39 @@ export default function DashboardPage() {
             </CardFooter>
           </Card>
           
+          {/* Archivos Fallidos Card */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-red-600 rounded-md p-3">
+                  <XCircle className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Archivos Fallidos</dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {systemStatus?.failedFiles ?? '...'}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="bg-gray-50 px-6 py-3">
+              <div 
+                className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer"
+                onClick={() => {
+                  setStatusFilter("Failed");
+                  setFileTypeFilter("all");
+                  setDateRange({ from: undefined, to: undefined });
+                  // Auto-scroll a la sección de actividades
+                  document.getElementById("actividad-reciente")?.scrollIntoView({ behavior: "smooth" });
+                }}
+              >
+                Ver archivos fallidos
+              </div>
+            </CardFooter>
+          </Card>
+          
           {/* Coincidencias no leídas Card */}
           <Card>
             <CardContent className="pt-6">
@@ -932,7 +966,7 @@ export default function DashboardPage() {
         )}
         
         {/* Recent Activity Section */}
-        <div className="mt-8">
+        <div className="mt-8" id="actividad-reciente">
           <div className="flex items-center justify-between">
             <h2 className="text-lg leading-6 font-medium text-gray-900">Actividad Reciente</h2>
             <div className="flex space-x-2">

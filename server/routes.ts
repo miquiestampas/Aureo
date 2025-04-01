@@ -1823,6 +1823,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         activity.status === 'Pending' || activity.status === 'Processing'
       ).length;
       
+      // Count failed files
+      const failedFiles = recentActivities.filter(activity => 
+        activity.status === 'Failed'
+      ).length;
+      
       // Calcula tiendas críticas (sin actividad en el último mes)
       const oneMonthAgo = new Date();
       oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
@@ -1887,6 +1892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         criticalStores: criticalStores.length,
         processedToday,
         pendingFiles,
+        failedFiles,
         fileWatchingActive,
         lastSystemCheck: new Date().toISOString(),
         databaseSize
