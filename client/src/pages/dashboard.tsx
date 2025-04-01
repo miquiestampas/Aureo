@@ -781,32 +781,6 @@ export default function DashboardPage() {
             </CardFooter>
           </Card>
           
-          {/* Processed Today Card */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
-                  <FileCheck className="h-6 w-6 text-white" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Procesados Hoy</dt>
-                    <dd className="text-lg font-medium text-gray-900">
-                      {systemStatus?.processedToday ?? '...'}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="bg-gray-50 px-6 py-3">
-              <Link href="/excel-stores">
-                <div className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer">
-                  Ver archivos recientes
-                </div>
-              </Link>
-            </CardFooter>
-          </Card>
-          
           {/* Coincidencias no leídas Card */}
           <Card>
             <CardContent className="pt-6">
