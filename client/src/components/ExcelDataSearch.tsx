@@ -245,9 +245,9 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
       id: "actions",
       header: "Acciones",
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Button 
-            variant="ghost" 
+            variant="outline" 
             size="icon"
             onClick={() => onViewDetails(row.original)}
             title="Ver detalles"
@@ -255,7 +255,7 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
             <Eye className="h-4 w-4" />
           </Button>
           <Button 
-            variant="ghost" 
+            variant="outline" 
             size="icon"
             onClick={() => window.open(`/api/excel-data/${row.original.id}/download`, '_blank')}
             title="Descargar archivo Excel"
