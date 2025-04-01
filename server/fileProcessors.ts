@@ -705,12 +705,90 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         // Obtener todas las tiendas y buscar una coincidencia ignorando espacios
         const allStores = await storage.getStores();
         
-        // Buscar tienda cuyo código sin espacios coincida con el código detectado sin espacios
-        const storeMatch = allStores.find(store => {
+        // Primero, intentar búsqueda ignorando espacios
+        let storeMatch = allStores.find(store => {
           const storeCodeNoSpaces = store.code.replace(/\s+/g, '');
           const detectedCodeNoSpaces = normalizedExcelStoreCode.replace(/\s+/g, '');
           return storeCodeNoSpaces === detectedCodeNoSpaces;
         });
+        
+        // Si no encontramos coincidencia exacta sin espacios, buscar la más similar
+        if (!storeMatch) {
+          console.log(`No se encontró coincidencia sin espacios, intentando similitud para "${normalizedExcelStoreCode}"`);
+          
+          // Función para calcular similitud de Levenshtein (distancia de edición)
+          function levenshteinDistance(a: string, b: string): number {
+            if (a.length === 0) return b.length;
+            if (b.length === 0) return a.length;
+            
+            const matrix = [];
+            
+            // Inicializar matriz
+            for (let i = 0; i <= b.length; i++) {
+              matrix[i] = [i];
+            }
+            
+            for (let j = 0; j <= a.length; j++) {
+              matrix[0][j] = j;
+            }
+            
+            // Llenar matriz
+            for (let i = 1; i <= b.length; i++) {
+              for (let j = 1; j <= a.length; j++) {
+                if (b.charAt(i-1) === a.charAt(j-1)) {
+                  matrix[i][j] = matrix[i-1][j-1];
+                } else {
+                  matrix[i][j] = Math.min(
+                    matrix[i-1][j-1] + 1, // sustitución
+                    matrix[i][j-1] + 1,   // inserción
+                    matrix[i-1][j] + 1    // eliminación
+                  );
+                }
+              }
+            }
+            
+            return matrix[b.length][a.length];
+          }
+          
+          // Función para calcular similitud normalizada (0-100%)
+          function calculateSimilarityPercentage(a: string, b: string): number {
+            const distance = levenshteinDistance(a, b);
+            const maxLength = Math.max(a.length, b.length);
+            if (maxLength === 0) return 100; // Evitar división por cero
+            return ((maxLength - distance) / maxLength) * 100;
+          }
+          
+          // Calcular similitud para todas las tiendas
+          let bestMatch = null;
+          let bestSimilarity = 0;
+          const similarityThreshold = 70; // Umbral mínimo de similitud (%)
+          
+          for (const store of allStores) {
+            // Solo considerar tiendas activas del mismo tipo (Excel)
+            if (store.active && store.type === 'Excel') {
+              // Comparar códigos de tienda sin espacios y en mayúsculas
+              const storeCodeNormalized = store.code.replace(/\s+/g, '').toUpperCase();
+              const detectedCodeNormalized = normalizedExcelStoreCode.replace(/\s+/g, '').toUpperCase();
+              
+              // Calcular similitud
+              const similarity = calculateSimilarityPercentage(storeCodeNormalized, detectedCodeNormalized);
+              
+              console.log(`Similitud entre "${detectedCodeNormalized}" y "${storeCodeNormalized}": ${similarity.toFixed(2)}%`);
+              
+              // Actualizar mejor coincidencia si supera el umbral y es mejor que la anterior
+              if (similarity > similarityThreshold && similarity > bestSimilarity) {
+                bestMatch = store;
+                bestSimilarity = similarity;
+              }
+            }
+          }
+          
+          // Si encontramos una buena coincidencia
+          if (bestMatch) {
+            console.log(`Encontrada tienda con alta similitud (${bestSimilarity.toFixed(2)}%): "${bestMatch.code}"`);
+            storeMatch = bestMatch;
+          }
+        }
         
         if (storeMatch) {
           console.log(`Encontrada tienda con coincidencia flexible: "${storeMatch.code}"`);
@@ -928,12 +1006,90 @@ export async function processPdfFile(filePath: string, activityId: number, store
         // Obtener todas las tiendas y buscar una coincidencia ignorando espacios
         const allStores = await storage.getStores();
         
-        // Buscar tienda cuyo código sin espacios coincida con el código detectado sin espacios
-        const storeMatch = allStores.find(store => {
+        // Primero, intentar búsqueda ignorando espacios
+        let storeMatch = allStores.find(store => {
           const storeCodeNoSpaces = store.code.replace(/\s+/g, '');
           const detectedCodeNoSpaces = normalizedPdfStoreCode.replace(/\s+/g, '');
           return storeCodeNoSpaces === detectedCodeNoSpaces;
         });
+        
+        // Si no encontramos coincidencia exacta sin espacios, buscar la más similar
+        if (!storeMatch) {
+          console.log(`No se encontró coincidencia sin espacios, intentando similitud para "${normalizedPdfStoreCode}"`);
+          
+          // Función para calcular similitud de Levenshtein (distancia de edición)
+          function levenshteinDistance(a: string, b: string): number {
+            if (a.length === 0) return b.length;
+            if (b.length === 0) return a.length;
+            
+            const matrix = [];
+            
+            // Inicializar matriz
+            for (let i = 0; i <= b.length; i++) {
+              matrix[i] = [i];
+            }
+            
+            for (let j = 0; j <= a.length; j++) {
+              matrix[0][j] = j;
+            }
+            
+            // Llenar matriz
+            for (let i = 1; i <= b.length; i++) {
+              for (let j = 1; j <= a.length; j++) {
+                if (b.charAt(i-1) === a.charAt(j-1)) {
+                  matrix[i][j] = matrix[i-1][j-1];
+                } else {
+                  matrix[i][j] = Math.min(
+                    matrix[i-1][j-1] + 1, // sustitución
+                    matrix[i][j-1] + 1,   // inserción
+                    matrix[i-1][j] + 1    // eliminación
+                  );
+                }
+              }
+            }
+            
+            return matrix[b.length][a.length];
+          }
+          
+          // Función para calcular similitud normalizada (0-100%)
+          function calculateSimilarityPercentage(a: string, b: string): number {
+            const distance = levenshteinDistance(a, b);
+            const maxLength = Math.max(a.length, b.length);
+            if (maxLength === 0) return 100; // Evitar división por cero
+            return ((maxLength - distance) / maxLength) * 100;
+          }
+          
+          // Calcular similitud para todas las tiendas
+          let bestMatch = null;
+          let bestSimilarity = 0;
+          const similarityThreshold = 70; // Umbral mínimo de similitud (%)
+          
+          for (const store of allStores) {
+            // Solo considerar tiendas activas del mismo tipo (PDF)
+            if (store.active && store.type === 'PDF') {
+              // Comparar códigos de tienda sin espacios y en mayúsculas
+              const storeCodeNormalized = store.code.replace(/\s+/g, '').toUpperCase();
+              const detectedCodeNormalized = normalizedPdfStoreCode.replace(/\s+/g, '').toUpperCase();
+              
+              // Calcular similitud
+              const similarity = calculateSimilarityPercentage(storeCodeNormalized, detectedCodeNormalized);
+              
+              console.log(`Similitud entre "${detectedCodeNormalized}" y "${storeCodeNormalized}": ${similarity.toFixed(2)}%`);
+              
+              // Actualizar mejor coincidencia si supera el umbral y es mejor que la anterior
+              if (similarity > similarityThreshold && similarity > bestSimilarity) {
+                bestMatch = store;
+                bestSimilarity = similarity;
+              }
+            }
+          }
+          
+          // Si encontramos una buena coincidencia
+          if (bestMatch) {
+            console.log(`Encontrada tienda con alta similitud (${bestSimilarity.toFixed(2)}%): "${bestMatch.code}"`);
+            storeMatch = bestMatch;
+          }
+        }
         
         if (storeMatch) {
           console.log(`Encontrada tienda con coincidencia flexible: "${storeMatch.code}"`);
