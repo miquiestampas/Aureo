@@ -721,12 +721,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Actividad de archivo no encontrada" });
       }
       
-      // Verificar que la actividad está en estado pendiente de asignación
-      if (activity.status !== 'PendingStoreAssignment') {
+      // Verificar que la actividad está en estado pendiente de asignación o procesado
+      // Permitimos reasignar tiendas a archivos en cualquier estado excepto 'Failed'
+      if (activity.status === 'Failed') {
         return res.status(400).json({ 
-          message: "Esta actividad no está pendiente de asignación de tienda" 
+          message: "No se puede asignar tienda a una actividad que ha fallado. Borre la actividad y procese el archivo nuevamente." 
         });
       }
+      
+      console.log(`Asignando tienda ${storeCode} a actividad ${activityId} con estado actual: ${activity.status}`);
       
       let targetStoreCode = storeCode;
       
