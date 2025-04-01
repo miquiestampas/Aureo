@@ -68,9 +68,9 @@ import {
   Info,
   ArrowUpDown,
   ChevronsUpDown,
+  Download,
   X,
   Eye,
-  Download,
   Printer,
   AlertTriangle,
   Quote,
@@ -194,6 +194,48 @@ export default function PurchaseControlPage() {
     setSelectedRecord(record);
     getAlerts(record.id);
     setIsDetailOpen(true);
+  };
+
+  // Descargar archivo Excel original
+  const handleDownloadExcel = async (record: ExcelData) => {
+    try {
+      const response = await fetch(`/api/excel-data/${record.id}/download`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "No se pudo descargar el archivo Excel");
+      }
+      
+      // Convertir la respuesta a blob
+      const blob = await response.blob();
+      
+      // Crear un objeto URL para el blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Crear un enlace temporal
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${record.storeCode}_${record.orderNumber}.xlsx`;
+      
+      // Añadir al DOM, hacer clic y eliminar
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Excel descargado",
+        description: "El archivo Excel ha sido descargado correctamente",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error al descargar Excel:", error);
+      toast({
+        title: "Error al descargar",
+        description: error instanceof Error ? error.message : "No se pudo descargar el archivo Excel",
+        variant: "destructive",
+      });
+    }
   };
   
   // Mostrar información de la tienda
@@ -956,14 +998,24 @@ export default function PurchaseControlPage() {
                         </TableCell>
                         <TableCell>{record.price} €</TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewDetails(record)}
-                            title="Ver detalles"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <div className="flex justify-end space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewDetails(record)}
+                              title="Ver detalles"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDownloadExcel(record)}
+                              title="Descargar Excel"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1135,9 +1187,13 @@ export default function PurchaseControlPage() {
                       <Printer className="h-4 w-4 mr-2" />
                       Imprimir
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleDownloadExcel(selectedRecord)}
+                    >
                       <Download className="h-4 w-4 mr-2" />
-                      Exportar
+                      Descargar Excel
                     </Button>
                   </div>
                 </div>
