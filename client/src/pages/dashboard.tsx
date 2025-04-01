@@ -56,6 +56,7 @@ interface SystemStatus {
   totalStores: number;
   excelStores: number;
   pdfStores: number;
+  criticalStores: number; // Tiendas sin actividad en el último mes
   processedToday: number;
   pendingFiles: number;
   fileWatchingActive: boolean;
@@ -776,6 +777,32 @@ export default function DashboardPage() {
               <Link href="/store-management">
                 <div className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer">
                   Ver todas las tiendas
+                </div>
+              </Link>
+            </CardFooter>
+          </Card>
+          
+          {/* Tiendas Críticas Card */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-red-500 rounded-md p-3">
+                  <Building2 className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Tiendas Críticas</dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {systemStatus?.criticalStores ?? '...'}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="bg-gray-50 px-6 py-3">
+              <Link href="/store-management">
+                <div className="text-sm font-medium text-primary hover:text-primary/90 cursor-pointer">
+                  Ver tiendas inactivas
                 </div>
               </Link>
             </CardFooter>

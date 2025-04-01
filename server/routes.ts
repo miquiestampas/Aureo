@@ -1802,10 +1802,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/system/status", async (req, res) => {
     try {
       // Get system stats
-      const [excelStores, pdfStores, recentActivities] = await Promise.all([
+      const [excelStores, pdfStores, recentActivities, allStores] = await Promise.all([
         storage.getStoresByType('Excel'),
         storage.getStoresByType('PDF'),
-        storage.getRecentFileActivities(50)
+        storage.getRecentFileActivities(100),
+        storage.getStores()
       ]);
       
       // Calculate processed today count
@@ -1821,6 +1822,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pendingFiles = recentActivities.filter(activity => 
         activity.status === 'Pending' || activity.status === 'Processing'
       ).length;
+      
+      // Calcula tiendas críticas (sin actividad en el último mes)
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      
+      // Crear un mapa de las últimas actividades por tienda
+      const storeLastActivityMap: Record<string, Date> = {};
+      
+      recentActivities.forEach(activity => {
+        if (activity.storeCode && activity.status === 'Processed') {
+          const activityDate = new Date(activity.processingDate);
+          // Si la tienda no tiene fecha o la fecha actual es más reciente, actualizar
+          if (
+            !storeLastActivityMap[activity.storeCode] || 
+            activityDate > storeLastActivityMap[activity.storeCode]
+          ) {
+            storeLastActivityMap[activity.storeCode] = activityDate;
+          }
+        }
+      });
+      
+      // Contar cuántas tiendas activas no tienen actividad reciente
+      const criticalStores = allStores.filter(store => {
+        // Solo considerar tiendas activas
+        if (!store.active) return false;
+        
+        // Si no hay registro de actividad o la última actividad es anterior a un mes
+        const lastActivity = storeLastActivityMap[store.code];
+        return !lastActivity || lastActivity < oneMonthAgo;
+      });
       
       // Check if file watchers are enabled
       const fileProcessingConfig = await storage.getConfig('FILE_PROCESSING_ENABLED');
@@ -1853,6 +1884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalStores: excelStores.length + pdfStores.length,
         excelStores: excelStores.length,
         pdfStores: pdfStores.length,
+        criticalStores: criticalStores.length,
         processedToday,
         pendingFiles,
         fileWatchingActive,
