@@ -33,7 +33,7 @@ export function StoreActivityStats({ storeCode }: StoreActivityStatsProps) {
     );
   }
 
-  if (!statsData) {
+  if (!statsData || typeof statsData !== 'object') {
     return (
       <div className="text-center py-4 text-muted-foreground">
         No hay estadísticas disponibles
@@ -50,7 +50,7 @@ export function StoreActivityStats({ storeCode }: StoreActivityStatsProps) {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statsData.totalOrders}</div>
+            <div className="text-2xl font-bold">{statsData.totalOrders ?? 0}</div>
             <p className="text-xs text-muted-foreground">
               órdenes procesadas
             </p>
@@ -63,7 +63,7 @@ export function StoreActivityStats({ storeCode }: StoreActivityStatsProps) {
             <BarChart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statsData.averagePrice}</div>
+            <div className="text-2xl font-bold">{statsData.averagePrice ?? "0 €"}</div>
             <p className="text-xs text-muted-foreground">
               valor medio de las operaciones
             </p>
@@ -76,7 +76,7 @@ export function StoreActivityStats({ storeCode }: StoreActivityStatsProps) {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statsData.mostCommonMetal}</div>
+            <div className="text-2xl font-bold">{statsData.mostCommonMetal ?? "Sin datos"}</div>
             <p className="text-xs text-muted-foreground">
               metal más frecuente en órdenes
             </p>
@@ -89,7 +89,7 @@ export function StoreActivityStats({ storeCode }: StoreActivityStatsProps) {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statsData.lastActivity}</div>
+            <div className="text-2xl font-bold">{statsData.lastActivity ?? "Sin actividad"}</div>
             <p className="text-xs text-muted-foreground">
               fecha de última operación
             </p>

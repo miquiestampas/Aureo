@@ -34,7 +34,8 @@ export function StoreAdvancedStats({ storeCode }: StoreAdvancedStatsProps) {
     );
   }
 
-  if (!statsData || (statsData.ordersByMonth.length === 0 && statsData.sellersByRegion.length === 0)) {
+  if (!statsData || !statsData.ordersByMonth || !statsData.sellersByRegion || 
+      (statsData.ordersByMonth.length === 0 && statsData.sellersByRegion.length === 0)) {
     return (
       <div className="text-center py-8 text-muted-foreground">
         No hay datos suficientes para mostrar estadísticas avanzadas.
@@ -61,7 +62,7 @@ export function StoreAdvancedStats({ storeCode }: StoreAdvancedStatsProps) {
               </CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
-              {statsData.ordersByMonth.length === 0 ? (
+              {!statsData.ordersByMonth || statsData.ordersByMonth.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No hay datos de órdenes disponibles
                 </div>
@@ -73,7 +74,8 @@ export function StoreAdvancedStats({ storeCode }: StoreAdvancedStatsProps) {
                       <div className="w-full">
                         <div className="flex items-center gap-2">
                           <Progress 
-                            value={item.count / statsData.performanceMetrics.peakMonthValue * 100} 
+                            value={(statsData.performanceMetrics?.peakMonthValue > 0) ? 
+                              (item.count / statsData.performanceMetrics.peakMonthValue * 100) : 0} 
                             className="h-2" 
                           />
                           <span className="text-sm">{item.count}</span>
@@ -124,7 +126,7 @@ export function StoreAdvancedStats({ storeCode }: StoreAdvancedStatsProps) {
               </CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
-              {statsData.priceDistribution.length === 0 ? (
+              {!statsData.priceDistribution || statsData.priceDistribution.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No hay datos de precios disponibles
                 </div>
@@ -136,7 +138,8 @@ export function StoreAdvancedStats({ storeCode }: StoreAdvancedStatsProps) {
                       <div className="w-full">
                         <div className="flex items-center gap-2">
                           <Progress 
-                            value={item.count / Math.max(...statsData.priceDistribution.map((d: any) => d.count)) * 100} 
+                            value={statsData.priceDistribution.length > 0 ? 
+                              (item.count / Math.max(...statsData.priceDistribution.map((d: any) => d.count || 0)) * 100) : 0} 
                             className="h-2" 
                           />
                           <span className="text-sm">{item.count}</span>
@@ -220,33 +223,39 @@ export function StoreAdvancedStats({ storeCode }: StoreAdvancedStatsProps) {
         </TabsContent>
         
         <TabsContent value="customers" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{statsData.customerMetrics.totalCustomers}</div>
-                <p className="text-xs text-muted-foreground">
-                  clientes únicos
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Clientes Habituales</CardTitle>
-                <Star className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{statsData.customerMetrics.returningCustomers}</div>
-                <p className="text-xs text-muted-foreground">
-                  tasa de retorno: {statsData.customerMetrics.returningRate}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          {!statsData.customerMetrics ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No hay datos de clientes disponibles
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{statsData.customerMetrics?.totalCustomers || 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    clientes únicos
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Clientes Habituales</CardTitle>
+                  <Star className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{statsData.customerMetrics?.returningCustomers || 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    tasa de retorno: {statsData.customerMetrics?.returningRate || "0%"}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
