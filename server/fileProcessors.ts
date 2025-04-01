@@ -588,11 +588,27 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       });
       
       if (rows.length > 1) {
-        // Extraer código de tienda de la segunda fila (índice 1)
-        const secondRow = rows[1];
-        const values = Object.values(secondRow);
-        if (values.length > 0) {
-          excelStoreCode = values[0]?.toString() || '';
+        // Buscar la primera fila no vacía después del encabezado
+        let foundStoreCode = false;
+        
+        console.log("Buscando código de tienda en las primeras filas del archivo CSV/XLS...");
+        
+        // Recorrer hasta 10 filas después del encabezado buscando una celda A no vacía
+        for (let i = 1; i < Math.min(rows.length, 11); i++) {
+          const row = rows[i];
+          const values = Object.values(row);
+          
+          // Si hay valores y el primer valor no está vacío
+          if (values.length > 0 && values[0] && values[0].toString().trim() !== '') {
+            excelStoreCode = values[0].toString().trim();
+            foundStoreCode = true;
+            console.log(`Encontrado código de tienda "${excelStoreCode}" en la fila ${i+1}`);
+            break;
+          }
+        }
+        
+        if (!foundStoreCode) {
+          console.log("No se encontró código de tienda en las primeras filas del archivo CSV/XLS.");
         }
       }
       
@@ -639,12 +655,28 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = xlsxUtils.sheet_to_json(worksheet, { header: 1 });
       
-      // Extraer código de tienda si hay al menos una fila después del encabezado
-      if (jsonData.length > 1) {
-        const secondRow = jsonData[1] as any[];
-        if (secondRow && secondRow.length > 0) {
-          excelStoreCode = secondRow[0]?.toString() || '';
+      // Buscar código de tienda en las primeras filas (ignorando líneas en blanco)
+      console.log("Buscando código de tienda en las primeras filas del archivo XLS...");
+      let foundStoreCode = false;
+      
+      // Recorrer hasta 10 filas después del encabezado buscando una celda A no vacía
+      for (let i = 1; i < Math.min(jsonData.length, 11); i++) {
+        const row = jsonData[i] as any[];
+        
+        // Verificar que la fila no está vacía y tiene valores
+        if (row && row.length > 0 && row[0] !== undefined && row[0] !== null) {
+          const firstValue = row[0].toString().trim();
+          if (firstValue !== '') {
+            excelStoreCode = firstValue;
+            foundStoreCode = true;
+            console.log(`Encontrado código de tienda "${excelStoreCode}" en la fila ${i+1} del archivo XLS`);
+            break;
+          }
         }
+      }
+      
+      if (!foundStoreCode) {
+        console.log("No se encontró código de tienda en las primeras filas del archivo XLS.");
       }
       
       // Saltar la primera fila (encabezado)
@@ -670,10 +702,29 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         throw new Error('El archivo Excel no contiene hojas');
       }
       
-      // Intentar obtener el código de tienda de la celda A2
-      const cellA2 = worksheet.getCell('A2');
-      if (cellA2 && cellA2.value) {
-        excelStoreCode = cellA2.value.toString();
+      // Intentar obtener el código de tienda buscando en todas las filas hasta encontrar una no vacía
+      // Empezar desde la fila 2 (después del encabezado)
+      let storeCodeFound = false;
+      let currentRow = 2;
+      const maxRowsToCheck = 10; // Límite para no revisar todo el archivo
+      
+      console.log("Buscando código de tienda en las primeras filas del archivo...");
+      
+      while (!storeCodeFound && currentRow <= maxRowsToCheck) {
+        const cellA = worksheet.getCell(`A${currentRow}`);
+        if (cellA && cellA.value) {
+          const value = cellA.value.toString().trim();
+          if (value !== '') {
+            excelStoreCode = value;
+            storeCodeFound = true;
+            console.log(`Encontrado código de tienda "${excelStoreCode}" en la fila ${currentRow}, celda A${currentRow}`);
+          }
+        }
+        currentRow++;
+      }
+      
+      if (!storeCodeFound) {
+        console.log("No se encontró código de tienda en las primeras filas del archivo.");
       }
       
       // Procesar filas (saltar fila de encabezado)
