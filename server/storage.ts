@@ -81,6 +81,7 @@ export interface IStorage {
   updateFileActivity(id: number, updates: Partial<FileActivity>): Promise<FileActivity | undefined>;
   getRecentFileActivities(limit: number): Promise<FileActivity[]>;
   getFileActivitiesByStore(storeCode: string): Promise<FileActivity[]>;
+  getFileActivities(): Promise<FileActivity[]>;
   getPendingStoreAssignmentActivities(): Promise<FileActivity[]>;
   deleteFileActivity(id: number): Promise<boolean>;
   
@@ -416,6 +417,15 @@ export class MemStorage implements IStorage {
   async getFileActivitiesByStore(storeCode: string): Promise<FileActivity[]> {
     return Array.from(this.fileActivities.values())
       .filter(activity => activity.storeCode === storeCode)
+      .sort((a, b) => {
+        const dateA = new Date(a.processingDate).getTime();
+        const dateB = new Date(b.processingDate).getTime();
+        return dateB - dateA; // Sort in descending order (newest first)
+      });
+  }
+  
+  async getFileActivities(): Promise<FileActivity[]> {
+    return Array.from(this.fileActivities.values())
       .sort((a, b) => {
         const dateA = new Date(a.processingDate).getTime();
         const dateB = new Date(b.processingDate).getTime();
@@ -1890,6 +1900,23 @@ export class DatabaseStorage implements IStorage {
       return pendingActivities;
     } catch (error) {
       console.error("Error al buscar actividades pendientes de asignación:", error);
+      return [];
+    }
+  }
+  
+  async getFileActivities(): Promise<FileActivity[]> {
+    try {
+      console.log("Obteniendo todas las actividades de archivos");
+      
+      const allActivities = await db
+        .select()
+        .from(fileActivities)
+        .orderBy(desc(fileActivities.processingDate));
+      
+      console.log(`Se encontraron ${allActivities.length} actividades en total`);
+      return allActivities;
+    } catch (error) {
+      console.error("Error al obtener todas las actividades:", error);
       return [];
     }
   }

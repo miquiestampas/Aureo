@@ -804,6 +804,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Descargar archivo original
+  // Endpoint para descargar archivo a partir del ID de excel_data
+  app.get("/api/excel-data/:id/download", async (req, res, next) => {
+    try {
+      const excelDataId = parseInt(req.params.id);
+      if (isNaN(excelDataId)) {
+        return res.status(400).json({ message: "ID de excel_data inválido" });
+      }
+      
+      // Obtener el registro de excel_data
+      const excelData = await storage.getExcelDataById(excelDataId);
+      if (!excelData) {
+        return res.status(404).json({ message: "Datos de Excel no encontrados" });
+      }
+      
+      // Buscar todas las actividades de archivos
+      const activities = await storage.getFileActivities();
+      
+      // Filtrar para encontrar la actividad correspondiente al excelData
+      // Normalmente el archivo que generó un registro excelData tiene el mismo código de tienda
+      const matchingActivity = activities.find(activity => 
+        activity.storeCode === excelData.storeCode && 
+        activity.fileType === 'Excel' &&
+        activity.status === 'Processed'
+      );
+      
+      if (!matchingActivity) {
+        return res.status(404).json({ message: "No se encontró el archivo original" });
+      }
+      
+      // Usar la lógica de descarga existente con la actividad encontrada
+      const activity = matchingActivity;
+      
+      console.log(`Descargando archivo original para excelData ID ${excelDataId}: ${activity.filename}`);
+      
+      // Intentar encontrar el archivo correcto
+      let filePath = '';
+      let fileName = '';
+      
+      // Directorios base a comprobar para Excel
+      const baseDirs = ["./uploads/excel", "./data/excel"];
+      
+      // Buscar en todas las rutas posibles
+      for (const baseDir of baseDirs) {
+        // Rutas a comprobar (incluye directorio de "procesados")
+        const pathsToCheck = [
+          path.join(baseDir, activity.filename),                   // Ruta original
+          path.join(baseDir, "procesados", activity.filename)      // Carpeta "procesados"
+        ];
+        
+        // Comprobar todas las rutas
+        for (const checkPath of pathsToCheck) {
+          if (fs.existsSync(checkPath)) {
+            filePath = checkPath;
+            fileName = activity.filename;
+            console.log(`Encontrado archivo en: ${filePath}`);
+            break;
+          }
+        }
+        
+        if (filePath && fileName) break; // Si encontramos el archivo, salir del bucle exterior
+        
+        // Si no se encontró el archivo exacto, buscar por nombre parcial
+        if (!fileName) {
+          const baseFileName = activity.filename.replace(/\.[^/.]+$/, ''); // Nombre sin extensión
+          const extension = path.extname(activity.filename);
+          
+          // Buscar en directorio principal
+          if (fs.existsSync(baseDir)) {
+            const mainDir = fs.readdirSync(baseDir);
+            for (const file of mainDir) {
+              if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+                filePath = path.join(baseDir, file);
+                fileName = file;
+                console.log(`Encontrado archivo por coincidencia parcial: ${filePath}`);
+                break;
+              }
+            }
+          }
+          
+          // Si no se encontró, buscar en directorio "procesados"
+          if (!fileName) {
+            const processedDir = path.join(baseDir, "procesados");
+            if (fs.existsSync(processedDir)) {
+              const processedFiles = fs.readdirSync(processedDir);
+              for (const file of processedFiles) {
+                if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+                  filePath = path.join(processedDir, file);
+                  fileName = file;
+                  console.log(`Encontrado archivo por coincidencia parcial en procesados: ${filePath}`);
+                  break;
+                }
+              }
+            }
+          }
+          
+          if (filePath && fileName) break; // Si encontramos el archivo, salir del bucle exterior
+        }
+      }
+      
+      // Verificar si encontramos el archivo
+      if (!fileName || !filePath || !fs.existsSync(filePath)) {
+        // Registrar las rutas que se intentaron para depuración
+        console.error(`No se encontró el archivo ${activity.filename} en ninguna de las rutas buscadas`);
+        return res.status(404).json({ 
+          message: "Archivo no encontrado en el sistema. Se intentó buscar en todas las ubicaciones posibles."
+        });
+      }
+      
+      console.log(`Descargando archivo: ${filePath}`);
+      // Enviar el archivo como descarga, manteniendo el nombre original
+      res.download(filePath, activity.filename);
+    } catch (err) {
+      console.error("Error buscando archivo para descargar:", err);
+      next(err);
+    }
+  });
+  
   app.get("/api/file-activities/:id/download", async (req, res, next) => {
     try {
       const activityId = parseInt(req.params.id);
