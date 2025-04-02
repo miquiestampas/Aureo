@@ -598,7 +598,7 @@ export default function Coincidencias() {
                     <div>
                       <span className="text-xs font-medium text-muted-foreground">Fecha orden:</span>
                       <p className="text-sm">
-                        {format(new Date(viewingCoincidencia.ordenInfo.orderDate), "dd/MM/yyyy", { locale: es })}
+                        {viewingCoincidencia.ordenInfo.orderDate ? format(new Date(viewingCoincidencia.ordenInfo.orderDate), "dd/MM/yyyy", { locale: es }) : "—"}
                       </p>
                     </div>
                     <div>
