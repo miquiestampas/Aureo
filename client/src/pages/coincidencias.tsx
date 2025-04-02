@@ -79,6 +79,8 @@ interface Coincidencia {
   idExcelData: number;
   nombrePersona?: string;
   descripcionObjeto?: string;
+  interesado?: string;
+  notas?: string;
   puntuacionCoincidencia: number;
   tipoMatch: "Exacto" | "Parcial";
   campoCoincidente: string;
@@ -569,6 +571,18 @@ export default function Coincidencias() {
                           <p className="text-sm">{viewingCoincidencia.descripcionObjeto || "N/A"}</p>
                         </div>
                       </>
+                    )}
+                    {viewingCoincidencia.interesado && (
+                      <div>
+                        <span className="text-xs font-medium text-muted-foreground">Interesado:</span>
+                        <p className="text-sm">{viewingCoincidencia.interesado}</p>
+                      </div>
+                    )}
+                    {viewingCoincidencia.notas && (
+                      <div>
+                        <span className="text-xs font-medium text-muted-foreground">Notas:</span>
+                        <p className="text-sm">{viewingCoincidencia.notas}</p>
+                      </div>
                     )}
                     <div>
                       <span className="text-xs font-medium text-muted-foreground">Campo coincidente:</span>
