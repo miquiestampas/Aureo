@@ -3353,7 +3353,10 @@ function setupFileUpload() {
     destination: function(req, file, cb) {
       // Determine destination based on file type
       if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-          file.mimetype === 'application/vnd.ms-excel') {
+          file.mimetype === 'application/vnd.ms-excel' ||
+          file.mimetype === 'text/csv' ||
+          file.mimetype === 'application/csv' ||
+          file.mimetype === 'text/plain') {
         cb(null, excelDir);
       } else if (file.mimetype === 'application/pdf') {
         cb(null, pdfDir);
