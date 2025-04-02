@@ -2904,16 +2904,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Obtener datos de señalamientos si corresponde
             let nombrePersona = undefined;
             let descripcionObjeto = undefined;
-            
+            let interesado = undefined;
+            let notas = undefined;
             if (coincidencia.tipoCoincidencia === "Persona" && coincidencia.idSenalPersona) {
               const persona = await storage.getSenalPersona(coincidencia.idSenalPersona);
               if (persona) {
                 nombrePersona = persona.nombre;
+                interesado = persona.interesado;
+                notas = persona.notas;
               }
             } else if (coincidencia.tipoCoincidencia === "Objeto" && coincidencia.idSenalObjeto) {
               const objeto = await storage.getSenalObjeto(coincidencia.idSenalObjeto);
               if (objeto) {
                 descripcionObjeto = objeto.descripcion;
+                interesado = objeto.interesado;
+                notas = objeto.notas;
               }
             }
             
@@ -2922,6 +2927,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ...coincidencia,
               nombrePersona,
               descripcionObjeto,
+              interesado,
+              notas,
               ordenInfo: excelData ? {
                 storeCode: excelData.storeCode || "",
                 storeName: storeName,
@@ -3191,16 +3198,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Obtener datos de señalamientos si corresponde
             let nombrePersona = undefined;
             let descripcionObjeto = undefined;
-            
+            let interesado = undefined;
+            let notas = undefined;
             if (coincidencia.tipoCoincidencia === "Persona" && coincidencia.idSenalPersona) {
               const persona = await storage.getSenalPersona(coincidencia.idSenalPersona);
               if (persona) {
                 nombrePersona = persona.nombre;
+                interesado = persona.interesado;
+                notas = persona.notas;
               }
             } else if (coincidencia.tipoCoincidencia === "Objeto" && coincidencia.idSenalObjeto) {
               const objeto = await storage.getSenalObjeto(coincidencia.idSenalObjeto);
               if (objeto) {
                 descripcionObjeto = objeto.descripcion;
+                interesado = objeto.interesado;
+                notas = objeto.notas;
               }
             }
             
@@ -3209,6 +3221,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ...coincidencia,
               nombrePersona,
               descripcionObjeto,
+              interesado,
+              notas,
               ordenInfo: excelData ? {
                 storeCode: excelData.storeCode || "",
                 storeName: storeName,
