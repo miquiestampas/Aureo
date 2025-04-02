@@ -394,7 +394,10 @@ export default function StoreManagementPage() {
       "Email": store.email || "—",
       "CIF": store.cif || "—",
       "Razón Social": store.businessName || "—",
-      "Propietario": store.ownerName || "—"
+      "Propietario": store.ownerName || "—",
+      "DNI Propietario": store.ownerIdNumber || "—",
+      "Fecha Inicio": store.startDate ? new Date(store.startDate).toLocaleDateString('es-ES') : "—",
+      "Fecha Cese": (!store.active && store.endDate) ? new Date(store.endDate).toLocaleDateString('es-ES') : "—"
     })));
 
     // Ajustar anchos de columna
@@ -412,6 +415,9 @@ export default function StoreManagementPage() {
       { wch: 15 }, // CIF
       { wch: 25 }, // Razón Social
       { wch: 25 }, // Propietario
+      { wch: 15 }, // DNI Propietario
+      { wch: 15 }, // Fecha Inicio
+      { wch: 15 }, // Fecha Cese
     ];
 
     worksheet["!cols"] = columnWidths;
