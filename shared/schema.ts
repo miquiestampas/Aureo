@@ -297,6 +297,7 @@ export const senalPersonas = sqliteTable("senal_personas", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   nombre: text("nombre"),  // Ya no es notNull para permitir registros con solo DNI
   documentoId: text("documento_id"),  // DNI, NIE, pasaporte
+  interesado: text("interesado"),  // Nuevo: Campo indexable para identificar quién solicitó el señalamiento
   notas: text("notas"),
   estado: text("estado").notNull().default("Activo"), // "Activo", "Inactivo"
   creadoPor: integer("creado_por").notNull(), // ID del usuario creador
@@ -308,6 +309,7 @@ export const senalPersonas = sqliteTable("senal_personas", {
 export const insertSenalPersonaSchema = createInsertSchema(senalPersonas).pick({
   nombre: true,
   documentoId: true,
+  interesado: true,
   notas: true,
   estado: true,
   creadoPor: true,
@@ -322,6 +324,7 @@ export const senalObjetos = sqliteTable("senal_objetos", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   descripcion: text("descripcion"),  // Ya no es notNull para permitir registros con otros campos
   grabacion: text("grabacion"),  // Grabados específicos
+  interesado: text("interesado"),  // Nuevo: Campo indexable para identificar quién solicitó el señalamiento
   notas: text("notas"),
   estado: text("estado").notNull().default("Activo"), // "Activo", "Inactivo"
   creadoPor: integer("creado_por").notNull(), // ID del usuario creador
@@ -333,6 +336,7 @@ export const senalObjetos = sqliteTable("senal_objetos", {
 export const insertSenalObjetoSchema = createInsertSchema(senalObjetos).pick({
   descripcion: true,
   grabacion: true,
+  interesado: true,
   notas: true,
   estado: true,
   creadoPor: true,

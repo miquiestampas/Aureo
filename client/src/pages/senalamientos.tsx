@@ -79,6 +79,7 @@ interface SenalPersona {
   id: number;
   nombre: string;
   documentoId: string | null;
+  interesado: string | null;
   notas: string | null;
   estado: "Activo" | "Inactivo";
   creadoPor: number;
@@ -91,6 +92,7 @@ interface SenalObjeto {
   id: number;
   descripcion: string;
   grabacion: string | null;
+  interesado: string | null;
   notas: string | null;
   estado: "Activo" | "Inactivo";
   creadoPor: number;
@@ -109,6 +111,10 @@ const personaSchema = z.object({
     z.string().min(1, "El documento debe tener al menos 1 caracter"),
     z.literal("")
   ]).optional(),
+  interesado: z.union([
+    z.string().min(1, "El interesado debe tener al menos 1 caracter"),
+    z.literal("")
+  ]).nullable().optional(),
   notas: z.string().nullable().optional(),
   estado: z.enum(["Activo", "Inactivo"])
 }).refine(data => {
@@ -128,6 +134,10 @@ const objetoSchema = z.object({
     z.string().min(1, "La grabación debe tener al menos 1 caracter"),
     z.literal("")
   ]).optional(),
+  interesado: z.union([
+    z.string().min(1, "El interesado debe tener al menos 1 caracter"),
+    z.literal("")
+  ]).nullable().optional(),
   notas: z.string().nullable().optional(),
   estado: z.enum(["Activo", "Inactivo"])
 }).refine(data => {
@@ -161,6 +171,7 @@ export default function Senalamientos() {
     defaultValues: {
       nombre: "",
       documentoId: "",
+      interesado: "",
       notas: "",
       estado: "Activo"
     }
@@ -172,6 +183,7 @@ export default function Senalamientos() {
     defaultValues: {
       descripcion: "",
       grabacion: "",
+      interesado: "",
       notas: "",
       estado: "Activo"
     }
@@ -420,6 +432,7 @@ export default function Senalamientos() {
     personaForm.reset({
       nombre: persona.nombre || undefined,
       documentoId: persona.documentoId || undefined,
+      interesado: persona.interesado || undefined,
       notas: persona.notas || undefined,
       estado: persona.estado
     });
@@ -432,6 +445,7 @@ export default function Senalamientos() {
     objetoForm.reset({
       descripcion: objeto.descripcion,
       grabacion: objeto.grabacion || undefined,
+      interesado: objeto.interesado || undefined,
       notas: objeto.notas || undefined,
       estado: objeto.estado
     });
@@ -453,6 +467,10 @@ export default function Senalamientos() {
     {
       accessorKey: "documentoId",
       header: ({ column }: any) => <SortableColumnHeader column={column} title="Documento" />,
+    },
+    {
+      accessorKey: "interesado",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Interesado" />,
     },
     {
       accessorKey: "estado",
@@ -547,6 +565,10 @@ export default function Senalamientos() {
     {
       accessorKey: "grabacion",
       header: ({ column }: any) => <SortableColumnHeader column={column} title="Grabación" />,
+    },
+    {
+      accessorKey: "interesado",
+      header: ({ column }: any) => <SortableColumnHeader column={column} title="Interesado" />,
     },
     {
       accessorKey: "estado",
@@ -762,7 +784,26 @@ export default function Senalamientos() {
                   )}
                 />
                 
-
+                <FormField
+                  control={personaForm.control}
+                  name="interesado"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Interesado</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Persona o entidad interesada" 
+                          {...field} 
+                          value={field.value || ""} 
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Persona o entidad externa interesada en el seguimiento
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
                 <FormField
                   control={personaForm.control}
@@ -872,7 +913,26 @@ export default function Senalamientos() {
                   )}
                 />
                 
-
+                <FormField
+                  control={objetoForm.control}
+                  name="interesado"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Interesado</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Persona o entidad interesada" 
+                          {...field} 
+                          value={field.value || ""} 
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Persona o entidad externa interesada en el seguimiento
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
                 <FormField
                   control={objetoForm.control}
