@@ -162,11 +162,12 @@ async function handleNewExcelFile(filePath: string) {
     const allStores = await storage.getStores();
     let foundStore = null;
     
-    // Primero intentar coincidencia exacta de código
+    // Solo permitir coincidencia exacta de código (NO coincidencias parciales)
     for (const store of allStores) {
-      if (filename.includes(store.code)) {
+      // Usamos === para solo aceptar coincidencias exactas
+      if (filename === store.code || filename.startsWith(store.code + '_') || filename.startsWith(store.code + '.')) {
         foundStore = store;
-        console.log(`Excel matched with store by code: ${store.code}`);
+        console.log(`Excel matched with store by exact code: ${store.code}`);
         break;
       }
     }
@@ -285,11 +286,12 @@ async function handleNewPdfFile(filePath: string) {
     const allStores = await storage.getStores();
     let foundStore = null;
     
-    // Primero intentar coincidencia exacta de código
+    // Solo permitir coincidencia exacta de código (NO coincidencias parciales)
     for (const store of allStores) {
-      if (filename.includes(store.code)) {
+      // Usamos === para solo aceptar coincidencias exactas
+      if (filename === store.code || filename.startsWith(store.code + '_') || filename.startsWith(store.code + '.')) {
         foundStore = store;
-        console.log(`PDF matched with store by code: ${store.code}`);
+        console.log(`PDF matched with store by exact code: ${store.code}`);
         break;
       }
     }

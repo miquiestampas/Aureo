@@ -21,20 +21,22 @@ function levenshteinDistance(a: string, b: string): number {
     matrix[i] = [i];
   }
   
-  for (let j = 0; j <= a.length; j++) {
-    matrix[0][j] = j;
+  for (let i = 0; i <= a.length; i++) {
+    matrix[0][i] = i;
   }
   
-  // Llenar matriz
+  // Rellenar matriz
   for (let i = 1; i <= b.length; i++) {
     for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i-1) === a.charAt(j-1)) {
-        matrix[i][j] = matrix[i-1][j-1];
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
       } else {
         matrix[i][j] = Math.min(
-          matrix[i-1][j-1] + 1, // sustitución
-          matrix[i][j-1] + 1,   // inserción
-          matrix[i-1][j] + 1    // eliminación
+          matrix[i - 1][j - 1] + 1, // substitución
+          Math.min(
+            matrix[i][j - 1] + 1,   // inserción
+            matrix[i - 1][j] + 1    // eliminación
+          )
         );
       }
     }
@@ -43,744 +45,547 @@ function levenshteinDistance(a: string, b: string): number {
   return matrix[b.length][a.length];
 }
 
-// Función para calcular similitud normalizada (0-100%)
+// Función para calcular porcentaje de similitud
 function calculateSimilarityPercentage(a: string, b: string): number {
-  const distance = levenshteinDistance(a, b);
+  if (a === b) return 100; // Coincidencia exacta
+  
   const maxLength = Math.max(a.length, b.length);
-  if (maxLength === 0) return 100; // Evitar división por cero
-  return ((maxLength - distance) / maxLength) * 100;
+  if (maxLength === 0) return 100; // Ambos strings vacíos
+  
+  const distance = levenshteinDistance(a, b);
+  const similarity = ((maxLength - distance) / maxLength) * 100;
+  return similarity;
 }
 
-// Import pdf-parse dynamically to avoid initialization errors
-// We'll only use it when we actually need to parse a PDF
-let pdfParse: any = null;
-const getPdfParser = async () => {
-  if (!pdfParse) {
-    try {
-      pdfParse = await import('pdf-parse');
-    } catch (error) {
-      console.error("Error importing pdf-parse:", error);
-      throw new Error("Error al cargar la biblioteca para procesar PDF");
-    }
-  }
-  return pdfParse.default;
-};
-
-// Función para verificar si hay coincidencias con la lista de vigilancia
-// Función para normalizar texto eliminando caracteres especiales, espacios extras y convirtiendo a minúsculas
+// Función para normalizar texto (eliminar acentos, convertir a minúsculas)
 function normalizeText(text: string): string {
-  if (!text) return '';
   return text
     .toLowerCase()
-    .normalize('NFD') // Normaliza caracteres acentuados
-    .replace(/[\u0300-\u036f]/g, '') // Elimina diacríticos
-    .replace(/[^a-z0-9\s]/g, '') // Elimina caracteres especiales y guiones
-    .replace(/\s+/g, ' ') // Reemplaza múltiples espacios con uno solo
-    .trim(); // Elimina espacios al inicio y final
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Eliminar acentos
+    .replace(/[^\w\s]/g, '');        // Eliminar símbolos
 }
 
 // Función para calcular la similitud entre dos textos
 function calculateSimilarity(text1: string, text2: string): { score: number, isExact: boolean } {
-  // Normaliza ambos textos
-  const normalizedText1 = normalizeText(text1);
-  const normalizedText2 = normalizeText(text2);
+  // Normalizar textos
+  const normalized1 = normalizeText(text1);
+  const normalized2 = normalizeText(text2);
   
-  // Si alguno de los textos está vacío después de normalizar, retorna 0
-  if (!normalizedText1 || !normalizedText2) {
-    return { score: 0, isExact: false };
+  // Verificar coincidencia exacta después de normalizar
+  if (normalized1 === normalized2) {
+    return {
+      score: 100,
+      isExact: true
+    };
   }
   
-  // Verificar si hay una coincidencia exacta después de normalizar
-  if (normalizedText1 === normalizedText2) {
-    return { score: 1, isExact: true };
-  }
+  // Calcular similitud por distancia de Levenshtein
+  const score = calculateSimilarityPercentage(normalized1, normalized2);
   
-  // Verificar si uno está contenido en el otro
-  if (normalizedText1.includes(normalizedText2) || normalizedText2.includes(normalizedText1)) {
-    // La puntuación depende de la longitud relativa
-    const longerText = normalizedText1.length > normalizedText2.length ? normalizedText1 : normalizedText2;
-    const shorterText = normalizedText1.length <= normalizedText2.length ? normalizedText1 : normalizedText2;
-    
-    // Si el texto más corto es menos del 30% del más largo, reducir la puntuación
-    const lengthRatio = shorterText.length / longerText.length;
-    if (lengthRatio < 0.3) {
-      return { 
-        score: 0.7 + (0.25 * lengthRatio), // entre 0.7 y 0.95
-        isExact: false 
-      };
-    }
-    
-    return { score: 0.95, isExact: false };
-  }
-  
-  // Calcular similitud por palabras compartidas
-  const words1 = normalizedText1.split(' ').filter(w => w.length > 2); // Ignorar palabras muy cortas
-  const words2 = normalizedText2.split(' ').filter(w => w.length > 2);
-  
-  if (words1.length === 0 || words2.length === 0) {
-    return { score: 0, isExact: false };
-  }
-  
-  // Contar palabras compartidas
-  const sharedWords = words1.filter(word => words2.some(w2 => w2 === word || w2.includes(word) || word.includes(w2)));
-  
-  // Calcular puntuación basada en palabras compartidas
-  const score = sharedWords.length / Math.max(words1.length, words2.length);
-  
-  return { 
-    score: Math.min(0.9, score), // Máximo 0.9 para coincidencias parciales por palabras
-    isExact: false 
+  return {
+    score,
+    isExact: false
   };
 }
 
+// Función para verificar coincidencias en la watchlist
 async function checkWatchlistMatches(excelData: ExcelData) {
-  try {
-    // 1. Verificar coincidencias de personas
-    const watchlistPersons = await storage.getWatchlistPersons() || [];
+  console.log(`Verificando coincidencias en watchlist para ${excelData.documentNumber}`);
+  
+  // Buscar en señalamientos de personas
+  const personWatchlist = await storage.getSenalamientosPersonas();
+  
+  // Optimización: solo procesar si hay datos en la watchlist
+  if (personWatchlist.length > 0) {
+    console.log(`Verificando ${personWatchlist.length} señalamientos de personas`);
     
-    // Verificar que watchlistPersons sea iterable
-    if (!Array.isArray(watchlistPersons)) {
-      console.warn("La lista de vigilancia de personas no es un array iterable. Saltando verificación de personas.");
-      return;
+    // Buscar por número de documento
+    if (excelData.documentNumber) {
+      // Primero buscar coincidencia exacta de documento
+      const exactDocumentMatch = personWatchlist.find(item => 
+        item.numeroDocumento && 
+        item.numeroDocumento.trim().toLowerCase() === excelData.documentNumber.trim().toLowerCase()
+      );
+      
+      if (exactDocumentMatch) {
+        console.log(`¡Coincidencia EXACTA por número de documento! ${excelData.documentNumber}`);
+        
+        const alert: InsertAlert = {
+          excelDataId: excelData.id,
+          senalamientoId: exactDocumentMatch.id,
+          tipo: 'Persona',
+          confidence: 100,
+          matchField: 'Número de documento',
+          status: 'Pendiente',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        await storage.createAlert(alert);
+        console.log(`Alerta creada: coincidencia exacta de documento`);
+        
+        // No buscar más coincidencias por nombre si ya tenemos una coincidencia exacta de documento
+        return;
+      }
+      
+      // Si no hay coincidencia exacta, buscar similitud en documentos
+      for (const watchItem of personWatchlist) {
+        if (watchItem.numeroDocumento) {
+          const similarity = calculateSimilarity(excelData.documentNumber, watchItem.numeroDocumento);
+          
+          if (similarity.score >= 80) {
+            console.log(`Coincidencia similar de documento: ${excelData.documentNumber} ~ ${watchItem.numeroDocumento} (${similarity.score.toFixed(2)}%)`);
+            
+            const alert: InsertAlert = {
+              excelDataId: excelData.id,
+              senalamientoId: watchItem.id,
+              tipo: 'Persona',
+              confidence: similarity.score,
+              matchField: 'Número de documento',
+              status: 'Pendiente',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            
+            await storage.createAlert(alert);
+            console.log(`Alerta creada: coincidencia similar de documento`);
+          }
+        }
+      }
     }
     
-    // Verificar coincidencias por nombre
-    for (const person of watchlistPersons) {
-      if (excelData.customerName && person.fullName) {
-        // Calcular similitud de nombre usando la nueva función
-        const nameSimilarity = calculateSimilarity(excelData.customerName, person.fullName);
+    // Buscar coincidencias por nombre
+    if (excelData.name) {
+      // Primero buscar coincidencia exacta por nombre
+      const exactNameMatch = personWatchlist.find(item => 
+        item.nombre && 
+        normalizeText(item.nombre) === normalizeText(excelData.name)
+      );
+      
+      if (exactNameMatch) {
+        console.log(`¡Coincidencia EXACTA por nombre! ${excelData.name}`);
         
-        // Crear alerta si la similitud es suficiente (mayor a 0.7 o 70%)
-        if (nameSimilarity.score >= 0.7) {
-          const confidence = nameSimilarity.score * 100;
-          
-          const alert: InsertAlert = {
-            excelDataId: excelData.id,
-            watchlistPersonId: person.id,
-            watchlistItemId: null,
-            alertType: "Persona",
-            status: "Nueva",
-            matchConfidence: confidence,
-            reviewedBy: null,
-            reviewNotes: null
-          };
-          
-          // Crear coincidencia en el sistema con información detallada
-          const coincidencia = {
-            tipoCoincidencia: "Persona",
-            idSenalPersona: person.id,
-            idSenalObjeto: null,
-            idExcelData: excelData.id,
-            puntuacionCoincidencia: confidence,
-            tipoMatch: nameSimilarity.isExact ? "Exacto" : "Parcial",
-            campoCoincidente: "nombre",
-            valorCoincidente: person.fullName
-          };
-          
-          await storage.createCoincidencia(coincidencia);
-          await storage.createAlert(alert);
-          
-          console.log(`🚨 Alerta creada: Coincidencia de persona "${person.fullName}" con confianza ${confidence.toFixed(2)}% (${nameSimilarity.isExact ? 'Exacta' : 'Parcial'})`);
+        const alert: InsertAlert = {
+          excelDataId: excelData.id,
+          senalamientoId: exactNameMatch.id,
+          tipo: 'Persona',
+          confidence: 100,
+          matchField: 'Nombre',
+          status: 'Pendiente',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        await storage.createAlert(alert);
+        console.log(`Alerta creada: coincidencia exacta de nombre`);
+      } else {
+        // Si no hay coincidencia exacta, buscar similitud en nombres
+        for (const watchItem of personWatchlist) {
+          if (watchItem.nombre) {
+            const similarity = calculateSimilarity(excelData.name, watchItem.nombre);
+            
+            if (similarity.score >= 70) {
+              console.log(`Coincidencia similar de nombre: ${excelData.name} ~ ${watchItem.nombre} (${similarity.score.toFixed(2)}%)`);
+              
+              const alert: InsertAlert = {
+                excelDataId: excelData.id,
+                senalamientoId: watchItem.id,
+                tipo: 'Persona',
+                confidence: similarity.score,
+                matchField: 'Nombre',
+                status: 'Pendiente',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              };
+              
+              await storage.createAlert(alert);
+              console.log(`Alerta creada: coincidencia similar de nombre`);
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Buscar en señalamientos de objetos (coincidencias por país y ciudad)
+  const objectWatchlist = await storage.getSenalamientosObjetos();
+  
+  if (objectWatchlist.length > 0 && (excelData.city || excelData.country)) {
+    console.log(`Verificando ${objectWatchlist.length} señalamientos de objetos/ubicaciones`);
+    
+    for (const watchItem of objectWatchlist) {
+      let hasMatch = false;
+      let matchField = '';
+      let confidence = 0;
+      
+      // Verificar coincidencia por ciudad
+      if (excelData.city && watchItem.ubicacion) {
+        const citySimilarity = calculateSimilarity(excelData.city, watchItem.ubicacion);
+        
+        if (citySimilarity.score >= 80) {
+          hasMatch = true;
+          matchField = 'Ciudad';
+          confidence = citySimilarity.score;
+          console.log(`Coincidencia de ciudad: ${excelData.city} ~ ${watchItem.ubicacion} (${citySimilarity.score.toFixed(2)}%)`);
         }
       }
       
-      // También verificar por número de identificación si está disponible
-      if (excelData.customerContact && person.identificationNumber) {
-        // Calcular similitud para el número de identificación
-        const idSimilarity = calculateSimilarity(excelData.customerContact, person.identificationNumber);
+      // Verificar coincidencia por país
+      if (!hasMatch && excelData.country && watchItem.ubicacion) {
+        const countrySimilarity = calculateSimilarity(excelData.country, watchItem.ubicacion);
         
-        if (idSimilarity.score >= 0.8) { // Mayor umbral para IDs
-          const confidence = idSimilarity.score * 100;
-          
-          const alert: InsertAlert = {
-            excelDataId: excelData.id,
-            watchlistPersonId: person.id,
-            watchlistItemId: null,
-            alertType: "Persona",
-            status: "Nueva",
-            matchConfidence: confidence,
-            reviewedBy: null,
-            reviewNotes: null
-          };
-          
-          // Crear coincidencia en el sistema con información detallada
-          const coincidencia = {
-            tipoCoincidencia: "Persona",
-            idSenalPersona: person.id,
-            idSenalObjeto: null,
-            idExcelData: excelData.id,
-            puntuacionCoincidencia: confidence,
-            tipoMatch: idSimilarity.isExact ? "Exacto" : "Parcial",
-            campoCoincidente: "documento",
-            valorCoincidente: person.identificationNumber
-          };
-          
-          await storage.createCoincidencia(coincidencia);
-          await storage.createAlert(alert);
-          
-          console.log(`🚨 Alerta creada: Coincidencia de ID "${person.identificationNumber}" con confianza ${confidence.toFixed(2)}% (${idSimilarity.isExact ? 'Exacta' : 'Parcial'})`);
-        }
-      }
-    }
-    
-    // 2. Verificar coincidencias de artículos
-    const watchlistItems = await storage.getWatchlistItems() || [];
-    
-    // Verificar que watchlistItems sea iterable
-    if (!Array.isArray(watchlistItems)) {
-      console.warn("La lista de vigilancia de artículos no es un array iterable. Saltando verificación de artículos.");
-      return;
-    }
-    
-    for (const item of watchlistItems) {
-      // Verificar similitud de la descripción del artículo
-      if (excelData.itemDetails && item.description) {
-        const descSimilarity = calculateSimilarity(excelData.itemDetails, item.description);
-        
-        if (descSimilarity.score >= 0.65) { // Umbral más bajo para artículos
-          const confidence = descSimilarity.score * 100;
-          
-          const alert: InsertAlert = {
-            excelDataId: excelData.id,
-            watchlistPersonId: null,
-            watchlistItemId: item.id,
-            alertType: "Objeto",
-            status: "Nueva",
-            matchConfidence: confidence,
-            reviewedBy: null,
-            reviewNotes: null
-          };
-          
-          // Crear coincidencia en el sistema con información detallada
-          const coincidencia = {
-            tipoCoincidencia: "Objeto",
-            idSenalPersona: null,
-            idSenalObjeto: item.id,
-            idExcelData: excelData.id,
-            puntuacionCoincidencia: confidence,
-            tipoMatch: descSimilarity.isExact ? "Exacto" : "Parcial",
-            campoCoincidente: "descripcion",
-            valorCoincidente: item.description
-          };
-          
-          await storage.createCoincidencia(coincidencia);
-          await storage.createAlert(alert);
-          
-          console.log(`🚨 Alerta creada: Coincidencia de artículo "${item.description}" con confianza ${confidence.toFixed(2)}% (${descSimilarity.isExact ? 'Exacta' : 'Parcial'})`);
+        if (countrySimilarity.score >= 85) {
+          hasMatch = true;
+          matchField = 'País';
+          confidence = countrySimilarity.score;
+          console.log(`Coincidencia de país: ${excelData.country} ~ ${watchItem.ubicacion} (${countrySimilarity.score.toFixed(2)}%)`);
         }
       }
       
-      // También verificar por número de serie si está disponible
-      if (excelData.itemDetails && item.serialNumber) {
-        const serialSimilarity = calculateSimilarity(excelData.itemDetails, item.serialNumber);
+      // Si encontramos coincidencia, crear alerta
+      if (hasMatch) {
+        const alert: InsertAlert = {
+          excelDataId: excelData.id,
+          senalamientoId: watchItem.id,
+          tipo: 'Objeto',
+          confidence: confidence,
+          matchField: matchField,
+          status: 'Pendiente',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
         
-        if (serialSimilarity.score >= 0.85) { // Mayor umbral para números de serie
-          const confidence = serialSimilarity.score * 100;
-          
-          const alert: InsertAlert = {
-            excelDataId: excelData.id,
-            watchlistPersonId: null,
-            watchlistItemId: item.id,
-            alertType: "Objeto",
-            status: "Nueva",
-            matchConfidence: confidence,
-            reviewedBy: null,
-            reviewNotes: null
-          };
-          
-          // Crear coincidencia en el sistema con información detallada
-          const coincidencia = {
-            tipoCoincidencia: "Objeto",
-            idSenalPersona: null,
-            idSenalObjeto: item.id,
-            idExcelData: excelData.id,
-            puntuacionCoincidencia: confidence,
-            tipoMatch: serialSimilarity.isExact ? "Exacto" : "Parcial",
-            campoCoincidente: "serial",
-            valorCoincidente: item.serialNumber
-          };
-          
-          await storage.createCoincidencia(coincidencia);
-          await storage.createAlert(alert);
-          
-          console.log(`🚨 Alerta creada: Coincidencia de número de serie "${item.serialNumber}" con confianza ${confidence.toFixed(2)}% (${serialSimilarity.isExact ? 'Exacta' : 'Parcial'})`);
-        }
+        await storage.createAlert(alert);
+        console.log(`Alerta creada: coincidencia de ${matchField.toLowerCase()}`);
       }
     }
-    
-  } catch (error) {
-    console.error("Error al verificar coincidencias con lista de vigilancia:", error);
   }
 }
 
-// Función para procesar los valores de una fila y crear una entrada InsertExcelData
-// Función para validar una fecha y devolver una fecha válida o la fecha actual
+// Función para validar/convertir fechas de Excel
 function validateDate(dateValue: any): Date {
   if (!dateValue) return new Date();
   
-  try {
-    // Excel puede entregar diferentes formatos de fecha
-    let date;
-    
-    if (typeof dateValue === 'number') {
-      // Si es un número, podría ser un serial de Excel 
-      // (días desde 1/1/1900 para Windows, o 1/1/1904 para Mac)
-      const excelEpoch = new Date(1899, 11, 30); // 30/12/1899
-      date = new Date(excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000);
-    } else if (dateValue instanceof Date) {
-      // Si ya es un objeto Date, usarlo directamente
-      date = dateValue;
-    } else if (typeof dateValue === 'string') {
-      // Si es un string, convertirlo a Date
-      date = new Date(dateValue);
+  let date: Date;
+  
+  // Si ya es una fecha, usarla directamente
+  if (dateValue instanceof Date) {
+    date = dateValue;
+  }
+  // Si es un número, asumir que es un número de Excel (días desde 1900)
+  else if (typeof dateValue === 'number') {
+    // Convertir fecha de Excel (días desde 1900) a JavaScript Date
+    // Excel usa un sistema donde 1 = 1/1/1900
+    const excelEpoch = new Date(1899, 11, 30); // 30/12/1899
+    date = new Date(excelEpoch.getTime() + dateValue * 24 * 60 * 60 * 1000);
+  }
+  // Si es string, intentar parsearlo
+  else if (typeof dateValue === 'string') {
+    // Intentar convertir string a fecha
+    const parsedDate = new Date(dateValue);
+    if (!isNaN(parsedDate.getTime())) {
+      date = parsedDate;
     } else {
-      // Para otros casos, intentar convertir a string y luego a Date
-      date = new Date(String(dateValue));
+      // Si falla, usar fecha actual
+      date = new Date();
     }
-    
-    // Verificar si la fecha es válida (no es NaN y está dentro de un rango razonable)
-    if (isNaN(date.getTime()) || date.getFullYear() < 1900 || date.getFullYear() > 2100) {
-      console.warn(`Fecha inválida detectada: ${dateValue} (tipo: ${typeof dateValue}), usando fecha actual`);
-      return new Date();
-    }
-    
-    console.log(`Fecha procesada correctamente: ${dateValue} -> ${date.toISOString()}`);
-    return date;
-  } catch (error) {
-    console.warn(`Error al procesar fecha: ${dateValue} (tipo: ${typeof dateValue}), usando fecha actual`, error);
-    return new Date();
   }
+  // Por defecto usar fecha actual
+  else {
+    date = new Date();
+  }
+  
+  return date;
 }
 
-// Función para procesar los valores de una fila y crear una entrada InsertExcelData
-// Mapeo correcto de columnas (basado en la imagen enviada por el usuario):
-// A=código tienda, B=número de orden, C=fecha, D=nombre cliente, E=DNI/pasaporte, 
-// F=dirección, G=provincia/país, H=objeto, I=peso, J=clase de metal, 
-// K=grabaciones/nº serie, L=piedras/kilates, M=precio, N=empeño, O=fecha venta
+// Función para crear un objeto de datos de Excel a partir de valores de fila
 function createExcelDataFromValues(values: any[], storeCode: string, activityId: number): InsertExcelData | null {
-  console.log(`Procesando valores para Excel: ${JSON.stringify(values)}`);
-  
-  // Si los valores son null, undefined o un array vacío, retornar null
-  if (!values || !Array.isArray(values)) {
-    console.log("Ignorando fila con valores nulos o no es un array");
-    return null;
-  }
-  
-  // Crear una función de ayuda para acceder a valores de forma segura
-  const safeGetValue = (index: number, defaultValue: string = ''): string => {
-    // Si el índice está fuera de rango o el valor es null/undefined, devolver el valor por defecto
-    if (index < 0 || index >= values.length || values[index] === null || values[index] === undefined) {
-      return defaultValue;
-    }
-    
-    // Convertir a string y eliminar espacios
-    try {
-      return values[index].toString().trim();
-    } catch (error) {
-      console.warn(`Error al convertir valor en índice ${index} a string:`, error);
-      return defaultValue;
-    }
-  };
-  
-  // Verificar si estamos trabajando con valores desplazados
-  // En un array estándar, values[0] generalmente es undefined o un valor interno
-  // Por lo que empezamos desde values[1] por precaución
-  
-  // Ajuste para manejar arrays que comienzan con un offset
-  const hasOffset = (values[0] === undefined || values[0] === null) && values.length > 1;
-  const offset = hasOffset ? 1 : 0;
-  
-  console.log(`Usando offset: ${offset} para valores ${JSON.stringify(values.slice(0, 5))}`);
-  
-  // Columna A: Código de tienda
-  const excelStoreCode = safeGetValue(offset);
-  // Si no tenemos código de tienda en la celda ni como parámetro, no podemos procesar la fila
-  const finalStoreCode = excelStoreCode || storeCode;
-  if (!finalStoreCode) {
-    console.log("Ignorando fila sin código de tienda");
-    return null;
-  }
-  
-  if (excelStoreCode) {
-    console.log(`Excel file has store code ${excelStoreCode} in cell A`);
-  }
-  
-  // Columna B: Número de orden (requerido)
-  const orderNumber = safeGetValue(offset + 1);
-  
-  // Si no hay filas suficientes o faltan datos críticos, mostrar más información y salir
-  if (values.length < 4 + offset) {
-    console.log(`Fila con datos insuficientes. Longitud: ${values.length}, Offset: ${offset}, Valores disponibles: ${JSON.stringify(values)}`);
-    return null;
-  }
-  
-  if (!orderNumber) {
-    console.log("Ignorando fila sin número de orden");
-    return null;
-  }
-  
-  // Columna C: Fecha de orden
-  let orderDate;
   try {
-    // Obtener valor original para diagnóstico
-    const rawOrderDateValue = offset + 2 < values.length ? values[offset + 2] : null;
-    console.log(`Valor de fecha original: ${rawOrderDateValue}`);
+    if (!values || values.length < 5) {
+      console.log(`Ignorando fila con datos insuficientes: ${JSON.stringify(values)}`);
+      return null; // Ignorar filas sin suficientes columnas
+    }
     
-    orderDate = validateDate(rawOrderDateValue);
-    if (!rawOrderDateValue || isNaN(orderDate.getTime())) {
-      console.log(`Ignorando fila sin fecha de orden válida. Valor: ${rawOrderDateValue}`);
-      return null;
+    // Estructura aproximada:
+    // [fechaCompra, hora, name, documentNumber, importe, ubicación, productos]
+    
+    // Extraer los valores de las columnas
+    const dateValue = values[0];
+    const timeValue = values[1];
+    const name = values[2];
+    const documentNumber = values[3];
+    let amount = values[4];
+    
+    // Validaciones básicas
+    if (!name || !documentNumber) {
+      console.log(`Ignorando fila sin nombre o documento: ${JSON.stringify(values)}`);
+      return null; // Ignorar filas sin datos críticos
     }
-  } catch (error) {
-    console.log("Ignorando fila con fecha de orden inválida");
-    return null;
-  }
-  
-  // Columna D: Nombre del cliente
-  const customerName = safeGetValue(offset + 3);
-  if (!customerName) {
-    console.log("Ignorando fila sin nombre del cliente");
-    return null;
-  }
-  
-  // Columna E: Contacto del cliente (DNI/Pasaporte)
-  const customerContact = safeGetValue(offset + 4);
-  
-  // Columna F: Dirección del cliente (campo separado)
-  const customerAddress = safeGetValue(offset + 5);
-  
-  // Columna G: Provincia/País del cliente (campo separado)
-  const customerLocation = safeGetValue(offset + 6);
-  
-  // Columna H: Objeto (Detalles del artículo)
-  const itemDetails = safeGetValue(offset + 7);
-  
-  // Columna I: Peso
-  const itemWeight = safeGetValue(offset + 8);
-  
-  // Columna J: Clase de metal
-  const metals = safeGetValue(offset + 9);
-  
-  // Columna K: Grabaciones/Número de serie
-  const engravings = safeGetValue(offset + 10);
-  
-  // Columna L: Piedras/Kilates
-  const stones = safeGetValue(offset + 11);
-  
-  // Quilates, extraemos del mismo campo que piedras o procesamos si está separado
-  let carats = '';
-  if (stones) {
-    const caratsMatch = stones.match(/(\d+(\.\d+)?)\s*[kK]/);
-    if (caratsMatch && caratsMatch[1]) {
-      carats = caratsMatch[1];
+    
+    // Convertir fecha al formato ISO
+    const purchaseDate = validateDate(dateValue);
+    const isoDate = purchaseDate.toISOString();
+    
+    // Convertir importe a número
+    if (typeof amount === 'string') {
+      // Eliminar símbolos de moneda y separadores de miles
+      amount = amount.replace(/[^\d.,]/g, '');
+      // Reemplazar coma por punto para decimales
+      amount = amount.replace(',', '.');
+      amount = parseFloat(amount);
     }
-  }
-  
-  // Columna M: Precio
-  const price = safeGetValue(offset + 12);
-  
-  // Columna N: Empeño (Boleta)
-  const pawnTicket = safeGetValue(offset + 13);
-  
-  // Columna O: Fecha de venta
-  let saleDate: Date | null = null;
-  if (offset + 14 < values.length && values[offset + 14]) {
-    try {
-      const date = validateDate(values[offset + 14]);
-      if (date && !isNaN(date.getTime())) {
-        saleDate = date;
+    
+    // Si no es un número válido, establecer en 0
+    if (isNaN(amount)) {
+      amount = 0;
+    }
+    
+    // Extraer ubicación (puede ser "Madrid, España" o similar)
+    let location = values[5] || '';
+    let city = '';
+    let country = '';
+    
+    if (typeof location === 'string') {
+      // Intentar separar ciudad y país
+      const parts = location.split(/,\s*/);
+      if (parts.length >= 2) {
+        city = parts[0].trim();
+        country = parts[1].trim();
+      } else {
+        // Si no hay coma, asumir que es el país
+        country = location.trim();
       }
-    } catch (error) {
-      console.warn(`Error al procesar fecha de venta: ${safeGetValue(offset + 14)}, usando null`, error);
     }
-  }
-  
-  // Logging para depuración
-  console.log(`Datos extraídos: 
-    Tienda: ${finalStoreCode}
-    Orden: ${orderNumber}
-    Fecha: ${orderDate}
-    Cliente: ${customerName}
-    Contacto: ${customerContact}
-    Detalles: ${itemDetails}
-    Metales: ${metals}
-    Precio: ${price}
-  `);
-  
-  // Verificación final: la fila debe tener al menos los campos obligatorios
-  if (!finalStoreCode || !orderNumber || !orderDate || !customerName) {
-    console.log("Ignorando fila sin datos obligatorios (código tienda, número de orden, fecha, nombre cliente)");
+    
+    // Extraer productos/conceptos (puede ser un string o un array)
+    let products = values[6] || '';
+    if (Array.isArray(products)) {
+      products = products.join(', ');
+    }
+    
+    // Crear y retornar objeto de datos
+    return {
+      fileActivityId: activityId,
+      storeCode: storeCode,
+      purchaseDate: isoDate,
+      name: name.toString(),
+      documentNumber: documentNumber.toString(),
+      amount: amount,
+      city: city,
+      country: country,
+      products: products.toString(),
+      status: 'Active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error(`Error al crear objeto de datos de Excel:`, error);
     return null;
   }
-  
-  // Convertir todas las fechas a formato ISO string para SQLite
-  return {
-    storeCode: finalStoreCode,
-    orderNumber: orderNumber,
-    orderDate: orderDate.toISOString(), // Convertimos Date a string para SQLite
-    customerName: customerName,
-    customerContact: customerContact,
-    customerAddress: customerAddress, // Nuevo campo separado
-    customerLocation: customerLocation, // Nuevo campo separado
-    itemDetails: itemDetails,
-    itemWeight: itemWeight, // Nuevo campo separado
-    metals: metals,
-    engravings: engravings,
-    stones: stones,
-    carats: carats,
-    price: price,
-    pawnTicket: pawnTicket,
-    saleDate: saleDate ? saleDate.toISOString() : null, // Convertimos Date a string para SQLite si existe
-    fileActivityId: activityId
-  };
 }
 
-// Process Excel file (xls, xlsx, csv)
+// Función dinámica para cargar el parser de PDF solo cuando se necesita
+async function getPdfParser() {
+  try {
+    // Importar dinámicamente la librería pdf-parse
+    const pdfParse = await import('pdf-parse');
+    return pdfParse.default;
+  } catch (error) {
+    console.error('Error al cargar el parser de PDF:', error);
+    throw new Error('No se pudo cargar el parser de PDF');
+  }
+}
+
+// Main function to process Excel files
 export async function processExcelFile(filePath: string, activityId: number, storeCode: string) {
   try {
     // Update file activity to Processing status
     await storage.updateFileActivityStatus(activityId, 'Processing');
     emitFileProcessingStatus(activityId, 'Processing');
     
-    // Verificar si la tienda por defecto existe
-    let defaultStore = await storage.getStoreByCode(storeCode);
-    
-    // Si la tienda por defecto no existe, buscar alguna tienda Excel disponible
-    if (!defaultStore) {
-      console.log(`Default store with code ${storeCode} does not exist, trying to find an Excel store...`);
-      const excelStores = await storage.getStoresByType('Excel');
-      if (excelStores.length > 0) {
-        defaultStore = excelStores[0];
-        storeCode = defaultStore.code;
-        console.log(`Using existing Excel store as default: ${storeCode}`);
-      } else {
-        throw new Error(`No Excel stores exist in the system. Please create at least one Excel store.`);
-      }
-    }
-    
     // Verify file exists and is readable
     if (!fs.existsSync(filePath)) {
       throw new Error(`File ${filePath} does not exist`);
     }
     
-    // Get file extension
-    const fileExt = path.extname(filePath).toLowerCase();
     let processedRows: InsertExcelData[] = [];
     
-    // Extracting store code from the file
-    let excelStoreCode = '';
+    // Get file extension
+    const ext = path.extname(filePath).toLowerCase();
     
-    // First extract the store code from cell A2 based on the file type
-    if (fileExt === '.csv') {
-      // Procesar archivo CSV para obtener código de tienda con soporte de caracteres especiales
-      const rows: any[] = [];
-      await new Promise<void>((resolve, reject) => {
-        // Leer el contenido completo del archivo primero para determinar su estructura
-        const fileContent = fs.readFileSync(filePath, { encoding: 'utf8' });
-        
-        // Log para depuración
-        console.log(`Contenido del CSV (primeras 200 caracteres): ${fileContent.substring(0, 200)}...`);
-        
-        // Detectar el tipo de separador (puede ser que usen punto y coma en lugar de coma)
-        const commaCount = (fileContent.match(/,/g) || []).length;
-        const semicolonCount = (fileContent.match(/;/g) || []).length;
-        const separator = semicolonCount > commaCount ? ';' : ',';
-        
-        console.log(`Usando separador: "${separator}" (comas: ${commaCount}, punto y coma: ${semicolonCount})`);
-        
-        // Analizar si el archivo tiene encabezados o no
-        const firstLineBreak = fileContent.indexOf('\n');
-        const firstLine = firstLineBreak > 0 ? fileContent.substring(0, firstLineBreak) : fileContent;
-        const estimatedColumnCount = firstLine.split(separator).length;
-        
-        console.log(`Primera línea: "${firstLine}"`);
-        console.log(`Número estimado de columnas: ${estimatedColumnCount}`);
-        
-        // Crear headers predeterminados si son necesarios
-        const defaultHeaders = Array.from({ length: estimatedColumnCount }, (_, i) => `column${i}`);
-        
-        // Usar utf8 para asegurar que se leen correctamente los caracteres especiales
-        fs.createReadStream(filePath, { encoding: 'utf8' })
-          .pipe(csvParser({
-            // Opciones para mejorar compatibilidad con caracteres especiales
-            separator: separator,    // Usar el separador detectado
-            escape: '"',             // Carácter de escape
-            quote: '"',              // Carácter de comillas
-            strict: false,           // Desactivar modo estricto para ser más tolerante
-            skipComments: true,      // Saltar líneas de comentarios
-            headers: defaultHeaders, // Usar headers predeterminados si son necesarios
-            skipLines: 0             // No saltar líneas al inicio
-          }))
-          .on('data', (row) => {
-            // Procesar los valores que llegan para asegurar que se manejan correctamente
-            const processedRow: any = {};
-            for (const key in row) {
-              const value = row[key];
-              // Convertir a string y preservar caracteres especiales
-              processedRow[key] = value !== undefined && value !== null ? value.toString() : '';
-            }
-            rows.push(processedRow);
-          })
-          .on('end', () => {
-            resolve();
-          })
-          .on('error', (error) => {
-            console.error("Error al procesar CSV:", error);
-            reject(error);
-          });
-      });
-      
-      if (rows.length > 1) {
-        // Buscar la primera fila no vacía después del encabezado
-        let foundStoreCode = false;
-        
-        console.log("Buscando código de tienda en las primeras filas del archivo CSV/XLS...");
-        
-        // Recorrer hasta 10 filas después del encabezado buscando una celda A no vacía
-        for (let i = 1; i < Math.min(rows.length, 11); i++) {
-          const row = rows[i];
-          const values = Object.values(row);
-          
-          // Si hay valores y el primer valor no está vacío
-          if (values.length > 0 && values[0] && values[0].toString().trim() !== '') {
-            excelStoreCode = values[0].toString().trim();
-            foundStoreCode = true;
-            console.log(`Encontrado código de tienda "${excelStoreCode}" en la fila ${i+1}`);
-            break;
-          }
-        }
-        
-        if (!foundStoreCode) {
-          console.log("No se encontró código de tienda en las primeras filas del archivo CSV/XLS.");
-        }
-      }
-      
-      // Continuar con el procesamiento normal
-      // Saltar la primera fila (encabezado) e indexar los valores por posición
-      rows.forEach((row, index) => {
-        if (index === 0) return; // Saltar encabezado
-        
-        // Extraer valores de las columnas en orden, asegurando que los caracteres especiales se preserven
-        const values = Object.values(row);
-        
-        // Convertir explícitamente cada valor a string para manejar caracteres especiales
-        const processedValues = values.map(val => {
-          if (val === null || val === undefined) return '';
-          
-          // Asegurar que el valor es una cadena y preservar caracteres especiales
-          const strVal = val.toString();
-          
-          // Debug para detectar problemas con caracteres especiales
-          if (strVal.includes('�')) {
-            console.warn(`Detectado carácter de reemplazo en valor "${strVal}"`);
-          }
-          
-          return strVal;
-        });
-        
-        console.log("CSV row values (processed):", processedValues);
-        
-        const excelData = createExcelDataFromValues(processedValues, storeCode, activityId);
-        if (excelData) {
-          processedRows.push(excelData);
-        }
-      });
-    } 
-    else if (fileExt === '.xls') {
-      // Procesar archivo XLS (formato antiguo) usando la biblioteca XLSX
-      const workbook = readXLSX(filePath);
-      const sheetName = workbook.SheetNames[0];
-      
-      if (!sheetName) {
-        throw new Error('El archivo Excel no contiene hojas');
-      }
-      
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = xlsxUtils.sheet_to_json(worksheet, { header: 1 });
-      
-      // Buscar código de tienda en las primeras filas (ignorando líneas en blanco)
-      console.log("Buscando código de tienda en las primeras filas del archivo XLS...");
-      let foundStoreCode = false;
-      
-      // Recorrer hasta 10 filas después del encabezado buscando una celda A no vacía
-      for (let i = 1; i < Math.min(jsonData.length, 11); i++) {
-        const row = jsonData[i] as any[];
-        
-        // Verificar que la fila no está vacía y tiene valores
-        if (row && row.length > 0 && row[0] !== undefined && row[0] !== null) {
-          const firstValue = row[0].toString().trim();
-          if (firstValue !== '') {
-            excelStoreCode = firstValue;
-            foundStoreCode = true;
-            console.log(`Encontrado código de tienda "${excelStoreCode}" en la fila ${i+1} del archivo XLS`);
-            break;
-          }
-        }
-      }
-      
-      if (!foundStoreCode) {
-        console.log("No se encontró código de tienda en las primeras filas del archivo XLS.");
-      }
-      
-      // Saltar la primera fila (encabezado)
-      for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i] as any[];
-        if (row.length > 0) {
-          console.log("XLS row values:", row);
-          const excelData = createExcelDataFromValues(row, storeCode, activityId);
-          if (excelData) {
-            processedRows.push(excelData);
-          }
-        }
-      }
-    } 
-    else {
-      // Procesar archivo XLSX usando ExcelJS (formato moderno)
+    if (ext === '.xlsx' || ext === '.xls') {
+      // Process Excel file with ExcelJS
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.readFile(filePath);
       
-      // Asumir que la primera hoja contiene los datos
+      // Get the first worksheet
       const worksheet = workbook.worksheets[0];
       if (!worksheet) {
-        throw new Error('El archivo Excel no contiene hojas');
+        throw new Error('Excel file does not contain any worksheet');
       }
       
-      // Intentar obtener el código de tienda buscando en todas las filas hasta encontrar una no vacía
-      // Empezar desde la fila 2 (después del encabezado)
-      let storeCodeFound = false;
-      let currentRow = 2;
-      const maxRowsToCheck = 10; // Límite para no revisar todo el archivo
+      // Find header row and extract data rows
+      let headerRowIndex = 0;
+      let foundHeader = false;
       
-      console.log("Buscando código de tienda en las primeras filas del archivo...");
-      
-      while (!storeCodeFound && currentRow <= maxRowsToCheck) {
-        const cellA = worksheet.getCell(`A${currentRow}`);
-        if (cellA && cellA.value) {
-          const value = cellA.value.toString().trim();
-          if (value !== '') {
-            excelStoreCode = value;
-            storeCodeFound = true;
-            console.log(`Encontrado código de tienda "${excelStoreCode}" en la fila ${currentRow}, celda A${currentRow}`);
-          }
-        }
-        currentRow++;
-      }
-      
-      if (!storeCodeFound) {
-        console.log("No se encontró código de tienda en las primeras filas del archivo.");
-      }
-      
-      // Procesar filas (saltar fila de encabezado)
+      // Buscar la fila de encabezado (máximo primeras 10 filas)
       worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-        // Saltar fila de encabezado
-        if (rowNumber === 1) return;
+        if (rowNumber > 10 || foundHeader) return;
         
-        const values = row.values as any[];
+        const rowValues = row.values as any[];
+        if (!rowValues) return;
+        
+        // Comprobar si esta fila parece un encabezado
+        const potentialHeaderValues = Array.isArray(rowValues) ? rowValues.slice(1) : [];
+        const headerText = potentialHeaderValues.join(' ').toLowerCase();
+        
+        if (
+          headerText.includes('fecha') || 
+          headerText.includes('nombre') || 
+          headerText.includes('document') ||
+          headerText.includes('id') ||
+          headerText.includes('import')
+        ) {
+          headerRowIndex = rowNumber;
+          foundHeader = true;
+          console.log(`Found header row at index ${headerRowIndex}`);
+        }
+      });
+      
+      // Si no se encontró encabezado, asumir que la primera fila es el encabezado
+      if (!foundHeader) {
+        headerRowIndex = 1;
+        console.log(`No header row found, assuming first row (${headerRowIndex}) is header`);
+      }
+      
+      // Procesar filas de datos (las que están después del encabezado)
+      let rowCount = 0;
+      let maxRows = 1000; // Para evitar bucles infinitos en archivos grandes
+      
+      // Función para verificar si una fila está vacía
+      const isEmptyRow = (rowValues: any[]) => {
+        if (!rowValues || !Array.isArray(rowValues)) return true;
+        return rowValues.slice(1).every(val => val === undefined || val === null || val === '');
+      };
+      
+      worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (rowNumber <= headerRowIndex || rowCount >= maxRows) return;
+        
+        const rowValues = row.values as any[];
+        if (isEmptyRow(rowValues)) return; // Saltar filas vacías
+        
+        const values = Array.isArray(rowValues) ? rowValues.slice(1) : [];
+        
+        // Crear objeto de datos
         const excelData = createExcelDataFromValues(values, storeCode, activityId);
         if (excelData) {
           processedRows.push(excelData);
+          rowCount++;
         }
       });
+      
+      console.log(`Processed ${rowCount} data rows from Excel file`);
+      
+    } else if (ext === '.csv') {
+      // Process CSV file
+      const rows: any[] = [];
+      
+      // Read CSV file
+      const csvStream = fs.createReadStream(filePath)
+        .pipe(csvParser({
+          skipLines: 0,
+          headers: false
+        }));
+      
+      // Collect all rows
+      for await (const row of csvStream) {
+        rows.push(Object.values(row));
+      }
+      
+      // Find header row (maximum first 10 rows)
+      let headerRowIndex = 0;
+      let foundHeader = false;
+      
+      for (let i = 0; i < Math.min(10, rows.length); i++) {
+        const headerText = rows[i].join(' ').toLowerCase();
+        
+        if (
+          headerText.includes('fecha') || 
+          headerText.includes('nombre') || 
+          headerText.includes('document') ||
+          headerText.includes('id') ||
+          headerText.includes('import')
+        ) {
+          headerRowIndex = i;
+          foundHeader = true;
+          console.log(`Found header row at index ${headerRowIndex}`);
+          break;
+        }
+      }
+      
+      // If no header row found, assume first row is header
+      if (!foundHeader && rows.length > 0) {
+        headerRowIndex = 0;
+        console.log(`No header row found, assuming first row (${headerRowIndex}) is header`);
+      }
+      
+      // Skip header row and process data rows
+      for (let i = headerRowIndex + 1; i < rows.length; i++) {
+        // Skip empty rows
+        if (rows[i].every((val: any) => val === undefined || val === null || val === '')) {
+          continue;
+        }
+        
+        // Create data object
+        const excelData = createExcelDataFromValues(rows[i], storeCode, activityId);
+        if (excelData) {
+          processedRows.push(excelData);
+        }
+      }
+      
+      console.log(`Processed ${processedRows.length} data rows from CSV file`);
+    }
+    
+    console.log(`Total rows processed from file: ${processedRows.length}`);
+    
+    // Analizar las primeras filas del Excel para detectar el código de tienda
+    // (A menudo el código de tienda está en las primeras filas)
+    let excelStoreCode = '';
+    const maxRowsToCheck = 10;
+    
+    // Buscar celda con código de tienda (patrón común: "Tienda: XXX" o similar)
+    for (let i = 0; i < Math.min(maxRowsToCheck, processedRows.length); i++) {
+      const row = processedRows[i];
+      
+      // Buscar en diversos campos (nombre, documento, productos, etc.)
+      const fieldsToCheck = [row.name, row.documentNumber, row.products, row.city, row.country];
+      
+      for (const field of fieldsToCheck) {
+        if (!field) continue;
+        
+        // Patrones comunes para códigos de tienda en texto
+        const storeCodePatterns = [
+          /tienda\s*:\s*([A-Z0-9]+)/i,      // "Tienda: ABC123"
+          /store\s*:\s*([A-Z0-9]+)/i,        // "Store: ABC123"
+          /local\s*:\s*([A-Z0-9]+)/i,        // "Local: ABC123"
+          /código\s*:\s*([A-Z0-9]+)/i,       // "Código: ABC123"
+          /code\s*:\s*([A-Z0-9]+)/i          // "Code: ABC123"
+        ];
+        
+        for (const pattern of storeCodePatterns) {
+          const match = field.match(pattern);
+          if (match && match[1]) {
+            excelStoreCode = match[1];
+            console.log(`Found store code in data row ${i}: ${excelStoreCode}`);
+            break;
+          }
+        }
+        
+        if (excelStoreCode) break;
+      }
+      
+      if (excelStoreCode) break;
     }
     
     // Verificar si el código de tienda extraído existe
@@ -792,61 +597,23 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       // Primero intentar búsqueda exacta
       let excelStore = await storage.getStoreByCode(normalizedExcelStoreCode);
       
-      // Si no encontramos coincidencia exacta, intentar búsqueda flexible
+      // Eliminamos la búsqueda flexible para evitar asignaciones incorrectas
+      // Solo permitiremos coincidencias exactas o asignaciones manuales
       if (!excelStore) {
-        console.log(`No se encontró tienda con código exacto "${normalizedExcelStoreCode}", intentando búsqueda flexible`);
+        console.log(`No se encontró tienda con código exacto "${normalizedExcelStoreCode}". Se requerirá asignación manual.`);
         
-        // Obtener todas las tiendas y buscar una coincidencia ignorando espacios
+        // Sólo permitimos coincidencia exacta (eliminando espacios)
         const allStores = await storage.getStores();
         
-        // Primero, intentar búsqueda ignorando espacios
-        let storeMatch = allStores.find(store => {
-          const storeCodeNoSpaces = store.code.replace(/\s+/g, '');
-          const detectedCodeNoSpaces = normalizedExcelStoreCode.replace(/\s+/g, '');
+        // Intentamos sólo coincidencia exacta ignorando espacios
+        const storeMatch = allStores.find(store => {
+          const storeCodeNoSpaces = store.code.replace(/\s+/g, '').toLowerCase();
+          const detectedCodeNoSpaces = normalizedExcelStoreCode.replace(/\s+/g, '').toLowerCase();
           return storeCodeNoSpaces === detectedCodeNoSpaces;
         });
         
-        // Si no encontramos coincidencia exacta sin espacios, buscar la más similar
-        if (!storeMatch) {
-          console.log(`No se encontró coincidencia sin espacios, intentando similitud para "${normalizedExcelStoreCode}"`);
-          
-          // Función para calcular similitud de Levenshtein (distancia de edición)
-          // Usar funciones de utilidad definidas a nivel de módulo
-          
-          // Calcular similitud para todas las tiendas
-          let bestMatch = null;
-          let bestSimilarity = 0;
-          const similarityThreshold = 70; // Umbral mínimo de similitud (%)
-          
-          for (const store of allStores) {
-            // Solo considerar tiendas activas del mismo tipo (Excel)
-            if (store.active && store.type === 'Excel') {
-              // Comparar códigos de tienda sin espacios y en mayúsculas
-              const storeCodeNormalized = store.code.replace(/\s+/g, '').toUpperCase();
-              const detectedCodeNormalized = normalizedExcelStoreCode.replace(/\s+/g, '').toUpperCase();
-              
-              // Calcular similitud
-              const similarity = calculateSimilarityPercentage(storeCodeNormalized, detectedCodeNormalized);
-              
-              console.log(`Similitud entre "${detectedCodeNormalized}" y "${storeCodeNormalized}": ${similarity.toFixed(2)}%`);
-              
-              // Actualizar mejor coincidencia si supera el umbral y es mejor que la anterior
-              if (similarity > similarityThreshold && similarity > bestSimilarity) {
-                bestMatch = store;
-                bestSimilarity = similarity;
-              }
-            }
-          }
-          
-          // Si encontramos una buena coincidencia
-          if (bestMatch) {
-            console.log(`Encontrada tienda con alta similitud (${bestSimilarity.toFixed(2)}%): "${bestMatch.code}"`);
-            storeMatch = bestMatch;
-          }
-        }
-        
         if (storeMatch) {
-          console.log(`Encontrada tienda con coincidencia flexible: "${storeMatch.code}"`);
+          console.log(`Encontrada tienda con coincidencia exacta (sin espacios): "${storeMatch.code}"`);
           excelStore = storeMatch;
         }
       }
@@ -1031,36 +798,10 @@ export async function processPdfFile(filePath: string, activityId: number, store
           }
         }
         
-        // Si todavía no hemos encontrado, buscar por nombres comunes
+        // Eliminamos la búsqueda por patrones de tiendas comunes
+        // para evitar asignaciones incorrectas (por ejemplo, que Montera 7 se asigne a Montera)
         if (!pdfStoreCode) {
-          // Patrones de tiendas conocidas que pueden aparecer en nombres de archivo
-          const store_patterns = [
-            { pattern: /montera\s*(\d*)/i, code: 'Montera' },  // Montera, Montera 4, Montera4, etc.
-            { pattern: /central/i, code: 'Central' },
-            { pattern: /plaza/i, code: 'Plaza' },
-            { pattern: /norte/i, code: 'Norte' },
-            { pattern: /sur/i, code: 'Sur' }
-          ];
-          
-          for (const storePattern of store_patterns) {
-            if (storePattern.pattern.test(originalFilename)) {
-              pdfStoreCode = storePattern.code;
-              console.log(`Found known store pattern in filename: ${originalFilename} -> ${pdfStoreCode}`);
-              break;
-            }
-          }
-          
-          // Si no hay coincidencia por patrón, intentar búsqueda directa por nombre
-          if (!pdfStoreCode) {
-            const known_stores = ['Montera', 'Central', 'Plaza', 'Norte', 'Sur'];
-            for (const knownStore of known_stores) {
-              if (originalFilename.toLowerCase().includes(knownStore.toLowerCase())) {
-                pdfStoreCode = knownStore;
-                console.log(`Found known store name in filename: ${pdfStoreCode}`);
-                break;
-              }
-            }
-          }
+          console.log(`No se encontraron patrones de código de tienda en el nombre del archivo: ${originalFilename}`);
         }
       }
     }
@@ -1074,72 +815,23 @@ export async function processPdfFile(filePath: string, activityId: number, store
       // Primero intentar búsqueda exacta por código
       let pdfStore = await storage.getStoreByCode(normalizedPdfStoreCode);
       
-      // Si no encontramos coincidencia exacta, intentar búsqueda flexible
+      // Eliminamos la búsqueda flexible para evitar asignaciones incorrectas
+      // Solo permitiremos coincidencias exactas o asignaciones manuales
       if (!pdfStore) {
-        console.log(`No se encontró tienda con código exacto "${normalizedPdfStoreCode}", intentando búsqueda flexible`);
+        console.log(`No se encontró tienda con código exacto "${normalizedPdfStoreCode}". Se requerirá asignación manual.`);
         
-        // Obtener todas las tiendas para la búsqueda
+        // Sólo permitimos coincidencia exacta (eliminando espacios)
         const allStores = await storage.getStores();
         
-        // Primero, comprobar si coincide con el nombre de alguna tienda
-        let storeMatch = allStores.find(store => {
-          const storeName = store.name?.toLowerCase() || '';
-          const detectedCode = normalizedPdfStoreCode.toLowerCase();
-          
-          // Comparar si el nombre de la tienda contiene el código detectado o viceversa
-          return storeName.includes(detectedCode) || detectedCode.includes(storeName);
+        // Intentamos sólo coincidencia exacta ignorando espacios
+        const storeMatch = allStores.find(store => {
+          const storeCodeNoSpaces = store.code.replace(/\s+/g, '').toLowerCase();
+          const detectedCodeNoSpaces = normalizedPdfStoreCode.replace(/\s+/g, '').toLowerCase();
+          return storeCodeNoSpaces === detectedCodeNoSpaces;
         });
         
-        // Si no encontramos por nombre, intentar búsqueda ignorando espacios en el código
-        if (!storeMatch) {
-          storeMatch = allStores.find(store => {
-            const storeCodeNoSpaces = store.code.replace(/\s+/g, '').toLowerCase();
-            const detectedCodeNoSpaces = normalizedPdfStoreCode.replace(/\s+/g, '').toLowerCase();
-            return storeCodeNoSpaces === detectedCodeNoSpaces;
-          });
-        }
-        
-        // Si no encontramos coincidencia exacta sin espacios, buscar la más similar
-        if (!storeMatch) {
-          console.log(`No se encontró coincidencia sin espacios, intentando similitud para "${normalizedPdfStoreCode}"`);
-          
-          // Función para calcular similitud de Levenshtein (distancia de edición)
-          // Usar funciones de utilidad definidas a nivel de módulo
-          
-          // Calcular similitud para todas las tiendas
-          let bestMatch = null;
-          let bestSimilarity = 0;
-          const similarityThreshold = 70; // Umbral mínimo de similitud (%)
-          
-          for (const store of allStores) {
-            // Solo considerar tiendas activas del mismo tipo (PDF)
-            if (store.active && store.type === 'PDF') {
-              // Comparar códigos de tienda sin espacios y en mayúsculas
-              const storeCodeNormalized = store.code.replace(/\s+/g, '').toUpperCase();
-              const detectedCodeNormalized = normalizedPdfStoreCode.replace(/\s+/g, '').toUpperCase();
-              
-              // Calcular similitud
-              const similarity = calculateSimilarityPercentage(storeCodeNormalized, detectedCodeNormalized);
-              
-              console.log(`Similitud entre "${detectedCodeNormalized}" y "${storeCodeNormalized}": ${similarity.toFixed(2)}%`);
-              
-              // Actualizar mejor coincidencia si supera el umbral y es mejor que la anterior
-              if (similarity > similarityThreshold && similarity > bestSimilarity) {
-                bestMatch = store;
-                bestSimilarity = similarity;
-              }
-            }
-          }
-          
-          // Si encontramos una buena coincidencia
-          if (bestMatch) {
-            console.log(`Encontrada tienda con alta similitud (${bestSimilarity.toFixed(2)}%): "${bestMatch.code}"`);
-            storeMatch = bestMatch;
-          }
-        }
-        
         if (storeMatch) {
-          console.log(`Encontrada tienda con coincidencia flexible: "${storeMatch.code}"`);
+          console.log(`Encontrada tienda con coincidencia exacta (sin espacios): "${storeMatch.code}"`);
           pdfStore = storeMatch;
         }
       }
