@@ -176,8 +176,7 @@ export interface IStorage {
     favorables: number,
     desfavorables: number,
     conSancion: number,
-    sinSancion: number,
-    importeTotalSanciones: number
+    sinSancion: number
   }>;
   
   // Documentos de Inspección
@@ -4628,8 +4627,7 @@ export class DatabaseStorage implements IStorage {
     favorables: number,
     desfavorables: number,
     conSancion: number,
-    sinSancion: number,
-    importeTotalSanciones: number
+    sinSancion: number
   }> {
     try {
       // Obtener todas las inspecciones
@@ -4641,8 +4639,7 @@ export class DatabaseStorage implements IStorage {
         favorables: todasLasInspecciones.filter(i => i.resultado === 'Favorable').length,
         desfavorables: todasLasInspecciones.filter(i => i.resultado === 'Desfavorable').length,
         conSancion: todasLasInspecciones.filter(i => i.sancion).length,
-        sinSancion: todasLasInspecciones.filter(i => !i.sancion).length,
-        importeTotalSanciones: todasLasInspecciones.reduce((total, i) => total + (i.importeSancion || 0), 0)
+        sinSancion: todasLasInspecciones.filter(i => !i.sancion).length
       };
       
       return stats;

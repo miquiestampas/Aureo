@@ -388,7 +388,6 @@ export const inspecciones = sqliteTable("inspecciones", {
   fechaInspeccion: text("fecha_inspeccion").notNull().default(String(new Date().toISOString())),
   inspectores: text("inspectores").notNull(), // Lista de funcionarios que realizan la inspección (separados por comas)
   resultado: text("resultado").notNull(), // "Favorable", "Desfavorable", "Con Sanción", "Sin Sanción"
-  sancionImporte: integer("sancion_importe"), // Importe de la sanción si aplica
   observaciones: text("observaciones"), // Anotaciones sobre la inspección
   estado: text("estado").notNull().default("Activa"), // "Activa", "Cerrada", "En Seguimiento"
   creadoPor: integer("creado_por").notNull(), // ID del usuario que registra la inspección
@@ -402,7 +401,6 @@ export const insertInspeccionSchema = createInsertSchema(inspecciones).pick({
   fechaInspeccion: true,
   inspectores: true,
   resultado: true,
-  sancionImporte: true,
   observaciones: true,
   estado: true,
   creadoPor: true,

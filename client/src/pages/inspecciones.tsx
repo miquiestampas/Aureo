@@ -38,7 +38,6 @@ interface Inspeccion {
   fechaInspeccion: string;
   inspectores: string;
   resultado: string;
-  sancionImporte: number | null;
   observaciones: string | null;
   creadoPor: number;
   creadoEn: string;
@@ -72,7 +71,6 @@ const inspeccionSchema = z.object({
   fechaInspeccion: z.string().min(1, { message: "La fecha es requerida" }),
   inspectores: z.string().min(1, { message: "Los inspectores son requeridos" }),
   resultado: z.string().min(1, { message: "El resultado es requerido" }),
-  sancionImporte: z.number().nullable().optional(),
   observaciones: z.string().nullable().optional(),
   estado: z.string().min(1, { message: "El estado es requerido" }),
 });
@@ -227,7 +225,6 @@ export default function Inspecciones() {
       fechaInspeccion: new Date().toISOString().split('T')[0],
       inspectores: "",
       resultado: "Satisfactorio",
-      sancionImporte: null,
       observaciones: "",
       estado: "Finalizada",
     },
@@ -240,7 +237,6 @@ export default function Inspecciones() {
       fechaInspeccion: selectedInspeccion?.fechaInspeccion ? selectedInspeccion.fechaInspeccion.split('T')[0] : "",
       inspectores: selectedInspeccion?.inspectores || "",
       resultado: selectedInspeccion?.resultado || "",
-      sancionImporte: selectedInspeccion?.sancionImporte || null,
       observaciones: selectedInspeccion?.observaciones || "",
       estado: selectedInspeccion?.estado || "",
     },
@@ -263,7 +259,6 @@ export default function Inspecciones() {
         fechaInspeccion: selectedInspeccion.fechaInspeccion.split('T')[0],
         inspectores: selectedInspeccion.inspectores,
         resultado: selectedInspeccion.resultado,
-        sancionImporte: selectedInspeccion.sancionImporte,
         observaciones: selectedInspeccion.observaciones,
         estado: selectedInspeccion.estado,
       });
@@ -668,27 +663,6 @@ export default function Inspecciones() {
                 )}
               />
               
-              {newForm.watch("resultado") === "Sancionado" && (
-                <FormField
-                  control={newForm.control}
-                  name="sancionImporte"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Importe de la sanción (€)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="0.00" 
-                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
-                          value={field.value === null ? "" : field.value}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-              
               <FormField
                 control={newForm.control}
                 name="observaciones"
@@ -829,26 +803,7 @@ export default function Inspecciones() {
                 )}
               />
               
-              {editForm.watch("resultado") === "Sancionado" && (
-                <FormField
-                  control={editForm.control}
-                  name="sancionImporte"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Importe de la sanción (€)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="0.00" 
-                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
-                          value={field.value === null ? "" : field.value}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+
               
               <FormField
                 control={editForm.control}
