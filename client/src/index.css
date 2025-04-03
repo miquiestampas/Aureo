@@ -21,12 +21,3 @@
   color: #000000 !important;
   border-color: #FFD000 !important;
 }
-
-/* Sidebar customization */
-[data-sidebar=root] {
-  --sidebar-bg: #FFE600;
-  --sidebar-border: 0 0% 0%;
-  --sidebar-foreground: 0 0% 0%;
-  --sidebar-accent: 0 0% 0% / 0.1;
-  --sidebar-accent-foreground: 0 0% 0%;
-}

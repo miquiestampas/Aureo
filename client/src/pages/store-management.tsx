@@ -96,7 +96,6 @@ import { DataTable, SortableColumnHeader } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -223,8 +222,6 @@ export default function StoreManagementPage() {
   // Estados para la visualización de archivos procesados
   const [storeActivities, setStoreActivities] = useState<any[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState<any>(null);
-  const [isActivityDetailDialogOpen, setIsActivityDetailDialogOpen] = useState(false);
   
   // Estados para importación de tiendas
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -638,12 +635,6 @@ export default function StoreManagementPage() {
   const handleViewStoreDetails = (store: StoreData) => {
     setSelectedStore(store);
     setIsDetailDialogOpen(true);
-  };
-
-  // Ver detalles de una actividad de archivo
-  const handleViewActivityDetails = (activity: any) => {
-    setSelectedActivity(activity);
-    setIsActivityDetailDialogOpen(true);
   };
 
   // Cargar archivos procesados de tienda en un diálogo
@@ -2293,16 +2284,6 @@ export default function StoreManagementPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600"
-                              title="Ver Detalles"
-                              onClick={() => handleViewActivityDetails(activity)}
-                            >
-                              <Info className="h-4 w-4" />
-                              <span className="sr-only">Ver Detalles</span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
                               className="h-8 w-8 p-0"
                               title="Descargar"
                               onClick={() => {
@@ -2348,94 +2329,6 @@ export default function StoreManagementPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsRecordsDialogOpen(false)}>
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo para ver detalles de la actividad */}
-      <Dialog open={isActivityDetailDialogOpen} onOpenChange={setIsActivityDetailDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Detalles de la Actividad</DialogTitle>
-            <DialogDescription>
-              Información detallada del archivo procesado
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedActivity && (
-            <div className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Archivo</h4>
-                  <p className="font-medium">{selectedActivity.filename}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Tipo</h4>
-                  <p className="font-medium">{selectedActivity.fileType}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Estado</h4>
-                  <Badge variant={
-                    selectedActivity.status === "Success" ? "default" :
-                    selectedActivity.status === "Failed" ? "destructive" :
-                    selectedActivity.status === "Processing" ? "secondary" : "outline"
-                  }>
-                    {selectedActivity.status === "Success" ? "Procesado con éxito" :
-                    selectedActivity.status === "Failed" ? "Error" :
-                    selectedActivity.status === "Processing" ? "Procesando" : selectedActivity.status}
-                  </Badge>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Fecha de procesamiento</h4>
-                  <p className="font-medium">{new Date(selectedActivity.processingDate).toLocaleString()}</p>
-                </div>
-              </div>
-              
-              <Separator />
-              
-              <div>
-                <h4 className="text-sm font-medium text-gray-500">Tienda asignada</h4>
-                <p className="font-medium">{selectedActivity.storeCode}</p>
-              </div>
-              
-              {selectedActivity.detectedStoreCode && selectedActivity.detectedStoreCode !== selectedActivity.storeCode && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Tienda detectada en archivo</h4>
-                  <p className="font-medium">{selectedActivity.detectedStoreCode}</p>
-                </div>
-              )}
-              
-              {selectedActivity.metadata && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Metadatos</h4>
-                  <div className="bg-gray-50 p-3 rounded border text-sm">
-                    <pre className="whitespace-pre-wrap break-words">
-                      {JSON.stringify(JSON.parse(selectedActivity.metadata), null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              )}
-              
-              {selectedActivity.errorMessage && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500 text-red-500">Mensaje de error</h4>
-                  <div className="bg-red-50 p-3 rounded border border-red-200 text-sm text-red-800">
-                    {selectedActivity.errorMessage}
-                  </div>
-                </div>
-              )}
-              
-              <div>
-                <h4 className="text-sm font-medium text-gray-500">Procesado por</h4>
-                <p className="font-medium">{selectedActivity.processedBy}</p>
-              </div>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsActivityDetailDialogOpen(false)}>
               Cerrar
             </Button>
           </DialogFooter>

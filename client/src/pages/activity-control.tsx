@@ -26,8 +26,7 @@ import {
   CalendarClock,
   Filter,
   Download,
-  Eye,
-  Info
+  Eye
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { format, differenceInDays } from "date-fns";
@@ -95,8 +94,6 @@ export default function ActivityControlPage() {
   const [storeActivityHistory, setStoreActivityHistory] = useState<FileActivity[]>([]);
   const [isLoadingActivityHistory, setIsLoadingActivityHistory] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState("");
-  const [selectedActivity, setSelectedActivity] = useState<FileActivity | null>(null);
-  const [isActivityDetailDialogOpen, setIsActivityDetailDialogOpen] = useState(false);
 
   // Fetch stores
   const { data: storesData = [], isLoading: isLoadingStores } = useQuery<Store[]>({
@@ -236,12 +233,6 @@ export default function ActivityControlPage() {
     
     // Abrir en una nueva pestaña
     window.open(`/api/file-activities/${activity.id}/view`, '_blank');
-  };
-  
-  // Ver detalles de una actividad
-  const handleViewActivityDetails = (activity: FileActivity) => {
-    setSelectedActivity(activity);
-    setIsActivityDetailDialogOpen(true);
   };
   
   // Manejar selección de tienda en el StoreSelector
@@ -403,28 +394,15 @@ export default function ActivityControlPage() {
       header: "Acciones",
       cell: ({ row }) => {
         return (
-          <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-8 px-2"
-              onClick={() => handleViewActivityHistory(row.original)}
-            >
-              <CalendarClock className="mr-2 h-4 w-4" />
-              Ver historial
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-8 px-2"
-              onClick={() => row.original.lastActivity && handleViewActivityDetails(row.original.lastActivity)}
-              disabled={!row.original.lastActivity}
-              title="Ver detalles de última actividad"
-            >
-              <Info className="mr-2 h-4 w-4" />
-              Ver detalles
-            </Button>
-          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8 px-2"
+            onClick={() => handleViewActivityHistory(row.original)}
+          >
+            <CalendarClock className="mr-2 h-4 w-4" />
+            Ver historial
+          </Button>
         );
       }
     }
@@ -760,15 +738,6 @@ export default function ActivityControlPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600"
-                                  onClick={() => handleViewActivityDetails(activity)}
-                                  title="Ver Detalles"
-                                >
-                                  <Info className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
                                   className="h-8 w-8 p-0"
                                   onClick={() => handleDownloadFile(activity.id)}
                                   title="Descargar archivo"
@@ -798,107 +767,6 @@ export default function ActivityControlPage() {
                 
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setShowActivityDialog(false)}>
-                    Cerrar
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            
-            {/* Dialog para ver detalles de actividad */}
-            <Dialog open={isActivityDetailDialogOpen} onOpenChange={setIsActivityDetailDialogOpen}>
-              <DialogContent className="max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>
-                    Detalles de Actividad
-                  </DialogTitle>
-                  <DialogDescription>
-                    Información detallada del archivo procesado
-                  </DialogDescription>
-                </DialogHeader>
-                
-                {selectedActivity && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-medium text-gray-500">Nombre del archivo</h3>
-                        <p className="text-base">{selectedActivity.filename}</p>
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-medium text-gray-500">Tipo</h3>
-                        <div className="flex items-center">
-                          {selectedActivity.fileType === "Excel" ? (
-                            <>
-                              <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" />
-                              <span>Excel</span>
-                            </>
-                          ) : (
-                            <>
-                              <FileText className="mr-2 h-4 w-4 text-red-600" />
-                              <span>PDF</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-medium text-gray-500">Código de tienda</h3>
-                        <p className="text-base">{selectedActivity.storeCode}</p>
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-medium text-gray-500">Estado</h3>
-                        <Badge variant={
-                          selectedActivity.status === 'Processed' ? 'default' :
-                          selectedActivity.status === 'Processing' ? 'secondary' :
-                          selectedActivity.status === 'Pending' ? 'outline' : 'destructive'
-                        }>
-                          {selectedActivity.status === 'Processed' ? 'Procesado' :
-                          selectedActivity.status === 'Processing' ? 'Procesando' :
-                          selectedActivity.status === 'Pending' ? 'Pendiente' : 'Error'}
-                        </Badge>
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-medium text-gray-500">Fecha de procesamiento</h3>
-                        <p className="text-base">{new Date(selectedActivity.processingDate).toLocaleString()}</p>
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-medium text-gray-500">Procesado por</h3>
-                        <p className="text-base">{selectedActivity.processedBy}</p>
-                      </div>
-                      {selectedActivity.errorMessage && (
-                        <div className="space-y-2 col-span-2">
-                          <h3 className="text-sm font-medium text-gray-500">Mensaje de error</h3>
-                          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm">
-                            {selectedActivity.errorMessage}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="pt-4 flex justify-end space-x-3 border-t">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownloadFile(selectedActivity.id)}
-                      >
-                        <Download className="mr-2 h-4 w-4" />
-                        Descargar archivo
-                      </Button>
-                      
-                      {selectedActivity.fileType === 'PDF' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewPdf(selectedActivity)}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          Ver PDF
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-                
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsActivityDetailDialogOpen(false)}>
                     Cerrar
                   </Button>
                 </DialogFooter>
