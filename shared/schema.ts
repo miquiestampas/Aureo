@@ -360,6 +360,7 @@ export const coincidencias = sqliteTable("coincidencias", {
   estado: text("estado").notNull().default("NoLeido"), // "NoLeido", "Leido", "Descartado"
   revisadoPor: integer("revisado_por"), // ID del usuario que revisó
   notasRevision: text("notas_revision"),
+  interesado: text("interesado"), // Nueva columna: Identifica quién tiene interés en esta coincidencia
   creadoEn: text("creado_en").notNull().default(String(new Date().toISOString())),
   revisadoEn: text("revisado_en"),
 });
@@ -376,6 +377,7 @@ export const insertCoincidenciaSchema = createInsertSchema(coincidencias).pick({
   estado: true,
   revisadoPor: true,
   notasRevision: true,
+  interesado: true,
 });
 
 export type InsertCoincidencia = z.infer<typeof insertCoincidenciaSchema>;
