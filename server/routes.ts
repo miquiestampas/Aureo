@@ -871,21 +871,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Procesar el archivo de nuevo según su tipo
       if (activity.fileType === 'Excel') {
         // La detección del código de tienda se hace en el procesador
-        const result = await processExcelFile(newFilePath, 0, "");
+        // Usamos el ID de la actividad actual para mantener la relación con los datos
+        const result = await processExcelFile(newFilePath, activityId, activity.storeCode || "");
+        
+        // Si se detectó un código de tienda diferente, actualizarlo en la actividad
+        if (result?.detectedStoreCode && result.detectedStoreCode !== activity.storeCode) {
+          await storage.updateFileActivity(activityId, {
+            storeCode: result.detectedStoreCode
+          });
+          console.log(`Código de tienda actualizado para actividad ${activityId}: ${activity.storeCode} -> ${result.detectedStoreCode}`);
+        }
+        
+        // Verificar el estado final de la actividad
+        const updatedActivity = await storage.getFileActivity(activityId);
+        const finalStatus = updatedActivity?.status || "Desconocido";
+        
         res.json({ 
           success: true, 
-          message: "Archivo Excel renombrado y procesado correctamente", 
+          message: `Archivo Excel renombrado y procesado correctamente (Estado final: ${finalStatus})`, 
           newFilename, 
-          detectedStoreCode: result?.detectedStoreCode 
+          detectedStoreCode: result?.detectedStoreCode,
+          status: finalStatus
         });
       } else if (activity.fileType === 'PDF') {
         // La detección del código de tienda se hace en el procesador
-        const result = await processPdfFile(newFilePath, 0, "");
+        // Usamos el ID de la actividad actual para mantener la relación con los datos
+        const result = await processPdfFile(newFilePath, activityId, activity.storeCode || "");
+        
+        // Si se detectó un código de tienda diferente, actualizarlo en la actividad
+        if (result?.detectedStoreCode && result.detectedStoreCode !== activity.storeCode) {
+          await storage.updateFileActivity(activityId, {
+            storeCode: result.detectedStoreCode
+          });
+          console.log(`Código de tienda actualizado para actividad ${activityId}: ${activity.storeCode} -> ${result.detectedStoreCode}`);
+        }
+        
+        // Verificar el estado final de la actividad
+        const updatedActivity = await storage.getFileActivity(activityId);
+        const finalStatus = updatedActivity?.status || "Desconocido";
+        
         res.json({ 
           success: true, 
-          message: "Archivo PDF renombrado y procesado correctamente", 
+          message: `Archivo PDF renombrado y procesado correctamente (Estado final: ${finalStatus})`, 
           newFilename, 
-          detectedStoreCode: result?.detectedStoreCode 
+          detectedStoreCode: result?.detectedStoreCode,
+          status: finalStatus
         });
       }
     } catch (error) {
