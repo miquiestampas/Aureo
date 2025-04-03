@@ -369,16 +369,22 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
     return {
       fileActivityId: activityId,
       storeCode: storeCode,
-      purchaseDate: isoDate,
-      name: name.toString(),
-      documentNumber: documentNumber.toString(),
-      amount: amount,
-      city: city,
-      country: country,
-      products: products.toString(),
-      status: 'Active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      orderNumber: documentNumber.toString(), // Usar documentNumber como orderNumber (campo requerido)
+      orderDate: isoDate,
+      customerName: name.toString(),
+      customerContact: documentNumber.toString(),
+      customerAddress: city, 
+      customerLocation: country,
+      itemDetails: products.toString(),
+      price: amount,
+      // Campos obligatorios según el esquema
+      itemWeight: "",
+      metals: "",
+      engravings: "",
+      stones: "",
+      carats: "",
+      pawnTicket: "",
+      saleDate: null
     };
   } catch (error) {
     console.error(`Error al crear objeto de datos de Excel:`, error);
