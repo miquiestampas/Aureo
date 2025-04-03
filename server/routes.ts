@@ -2313,13 +2313,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileProcessingConfig = await storage.getConfig('FILE_PROCESSING_ENABLED');
       const fileWatchingActive = fileProcessingConfig?.value === 'true';
       
-      // Calcular el tamaño de la base de datos SQLite (en porcentaje respecto a 1TB máximo)
-      const getDatabaseSize = async () => {
+      // Calcular el tamaño de la base de datos SQLite (en porcentaje respecto a 1TB máximo y en MB)
+      const getDatabaseSizeInfo = async () => {
         try {
           // Obtener estadísticas del archivo de la BD (SQLite)
           const dbPath = process.env.DATABASE_PATH || './aureo_app/datos.sqlite';
           const stats = await fs.promises.stat(dbPath);
           const sizeInBytes = stats.size;
+          const sizeInMB = sizeInBytes / (1024 * 1024);
           const sizeInGB = sizeInBytes / (1024 * 1024 * 1024);
           
           // Calcular porcentaje relativo a 1TB
@@ -2327,14 +2328,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const percentageOfMaxSize = (sizeInGB / 1024) * 100;
           
           // Redondear a 2 decimales
-          return Math.round(percentageOfMaxSize * 100) / 100;
+          return {
+            percentage: Math.round(percentageOfMaxSize * 100) / 100,
+            sizeInMB: Math.round(sizeInMB * 100) / 100 // Redondear a 2 decimales
+          };
         } catch (error) {
           console.error("Error al obtener el tamaño de la base de datos:", error);
-          return 0; // Valor por defecto en caso de error
+          return { percentage: 0, sizeInMB: 0 }; // Valores por defecto en caso de error
         }
       };
       
-      const databaseSize = await getDatabaseSize();
+      const databaseSizeInfo = await getDatabaseSizeInfo();
       
       res.json({
         totalStores: excelStores.length + pdfStores.length,
@@ -2346,7 +2350,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         failedFiles,
         fileWatchingActive,
         lastSystemCheck: new Date().toISOString(),
-        databaseSize
+        databaseSize: databaseSizeInfo.percentage,
+        databaseSizeMB: databaseSizeInfo.sizeInMB
       });
     } catch (err) {
       res.status(500).json({ message: "Error fetching system status" });
