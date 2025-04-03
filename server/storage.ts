@@ -3750,6 +3750,7 @@ export class DatabaseStorage implements IStorage {
   async getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit: number = 50): Promise<Coincidencia[]> {
     try {
       // Construir la consulta SQL directamente para solo mostrar coincidencias con señalamientos activos
+      // y excluir las coincidencias de baja precisión
       let sql = `
         SELECT * FROM coincidencias
         WHERE (
@@ -3757,6 +3758,7 @@ export class DatabaseStorage implements IStorage {
           OR 
           (id_senal_objeto IS NOT NULL AND id_senal_objeto IN (SELECT id FROM senal_objetos WHERE estado = 'Activo'))
         )
+        AND tipo_match <> 'Baja'
         ${estado ? `AND estado = ?` : ''}
         ORDER BY creado_en DESC
         LIMIT ?
@@ -3893,10 +3895,11 @@ export class DatabaseStorage implements IStorage {
   async getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]> {
     try {
       // Usar SQLite directamente para evitar problemas con columnas y tipos
-      // Solo mostrar coincidencias con señalamientos activos
+      // Solo mostrar coincidencias con señalamientos activos y excluir las de baja precisión
       const sql = `
         SELECT * FROM coincidencias
         WHERE id_excel_data = ?
+        AND tipo_match <> 'Baja'
         AND (
           (id_senal_persona IS NOT NULL AND id_senal_persona IN (SELECT id FROM senal_personas WHERE estado = 'Activo'))
           OR 
@@ -3940,10 +3943,11 @@ export class DatabaseStorage implements IStorage {
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     try {
       // Usar SQLite directamente para evitar problemas con columnas
-      // Solo contar coincidencias para señalamientos ACTIVOS
+      // Solo contar coincidencias para señalamientos ACTIVOS y excluir las de baja precisión
       const sql = `
         SELECT COUNT(*) as total FROM coincidencias
         WHERE estado = 'NoLeido'
+        AND tipo_match <> 'Baja'
         AND (
           (id_senal_persona IS NOT NULL AND id_senal_persona IN (SELECT id FROM senal_personas WHERE estado = 'Activo'))
           OR 
