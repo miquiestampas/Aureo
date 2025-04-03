@@ -86,7 +86,7 @@ export function DataTable<TData, TValue>({
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
-  
+
   const selectionColumn: ColumnDef<TData, any> = {
     id: "select",
     header: ({ table }) => (
@@ -109,11 +109,11 @@ export function DataTable<TData, TValue>({
     enableSorting: false,
     enableHiding: false,
   };
-  
+
   const columnsWithSelection = enableRowSelection
     ? [selectionColumn, ...columns]
     : columns;
-  
+
   const table = useReactTable({
     data,
     columns: columnsWithSelection,
@@ -177,7 +177,7 @@ export function DataTable<TData, TValue>({
         ) : (
           <div></div>
         )}
-        
+
         <div className="flex items-center space-x-2">
           {enableRowSelection && onDeleteSelected && Object.keys(rowSelection).length > 0 && (
             <Button
@@ -196,7 +196,7 @@ export function DataTable<TData, TValue>({
               Eliminar ({Object.keys(rowSelection).length})
             </Button>
           )}
-          
+
           {showColumnToggle && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -227,7 +227,7 @@ export function DataTable<TData, TValue>({
           )}
         </div>
       </div>
-      
+
       {/* Table */}
       <div className="rounded-md border">
         <Table>
@@ -273,7 +273,7 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-      
+
       {/* Pagination controls */}
       <div className="flex items-center justify-between space-x-4">
         <div className="text-sm text-muted-foreground">
@@ -290,7 +290,7 @@ export function DataTable<TData, TValue>({
           </span>{" "}
           de <span className="font-medium">{table.getFilteredRowModel().rows.length}</span> resultados
         </div>
-        
+
         <div className="flex items-center space-x-6">
           <div className="flex items-center space-x-2">
             <p className="text-sm font-medium">Filas por página</p>
@@ -308,18 +308,8 @@ export function DataTable<TData, TValue>({
               ))}
             </select>
           </div>
-          
+
           <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              className="hidden h-8 w-8 p-0 lg:flex"
-              onClick={() => table.setPageIndex(0)}
-              disabled={!table.getCanPreviousPage()}
-            >
-              <span className="sr-only">Ir a la primera página</span>
-              <ChevronLeft className="h-4 w-4" />
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
             <Button
               variant="outline"
               className="h-8 w-8 p-0"
@@ -348,12 +338,11 @@ export function DataTable<TData, TValue>({
             </Button>
             <Button
               variant="outline"
-              className="hidden h-8 w-8 p-0 lg:flex"
+              className="h-8 w-8 p-0"
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}
             >
               <span className="sr-only">Go to last page</span>
-              <ChevronRight className="h-4 w-4" />
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
