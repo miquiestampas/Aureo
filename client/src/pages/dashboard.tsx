@@ -318,6 +318,12 @@ export default function DashboardPage() {
   const [selectedActivities, setSelectedActivities] = useState<FileActivity[]>([]);
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
   
+  // Estados para el diálogo de reasignación de tienda
+  const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
+  const [selectedActivityToReassign, setSelectedActivityToReassign] = useState<FileActivity | null>(null);
+  const [selectedStore, setSelectedStore] = useState<string>("");
+  const [filteredStores, setFilteredStores] = useState<Store[]>([]);
+  
   // Consulta para obtener el número de coincidencias no leídas
   const { data: unreadMatchesData } = useQuery<{ count: number }>({
     queryKey: ['/api/coincidencias/noleidas/count'],
@@ -359,6 +365,44 @@ export default function DashboardPage() {
     onError: (error: Error) => {
       toast({
         title: "Error al eliminar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+  
+  // Mutación para reasignar la tienda a una actividad
+  const reassignStoreMutation = useMutation({
+    mutationFn: async ({ activityId, storeCode }: { activityId: number, storeCode: string }) => {
+      const response = await apiRequest("POST", `/api/file-activities/${activityId}/assign-store`, {
+        storeCode
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error al reasignar la tienda");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Tienda reasignada",
+        description: "El archivo ha sido reasignado a la nueva tienda correctamente",
+        variant: "default",
+      });
+      // Limpiar selección y cerrar diálogo
+      setSelectedActivityToReassign(null);
+      setSelectedStore("");
+      setIsReassignDialogOpen(false);
+      
+      // Actualizar datos
+      refetchActivities();
+      refetchStatus();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error al reasignar tienda",
         description: error.message,
         variant: "destructive",
       });
@@ -425,7 +469,31 @@ export default function DashboardPage() {
     deleteActivityMutation.mutate(id);
   };
   
+  // Manejador para abrir el diálogo de reasignación de tienda
+  const handleOpenReassignDialog = (activity: FileActivity) => {
+    setSelectedActivityToReassign(activity);
+    setSelectedStore("");
+    setIsReassignDialogOpen(true);
+    
+    // Cargar las tiendas del mismo tipo que el archivo seleccionado
+    const storesForType = stores.filter(
+      store => store.type === activity.fileType && store.active
+    );
+    setFilteredStores(storesForType);
+  };
+  
+  // Manejador para reasignar la tienda
+  const handleReassignStore = () => {
+    if (!selectedActivityToReassign || !selectedStore) return;
+    
+    reassignStoreMutation.mutate({
+      activityId: selectedActivityToReassign.id,
+      storeCode: selectedStore
+    });
+  };
+  
   // Columns for activities table
+
   const columns: ColumnDef<FileActivity>[] = [
     {
       accessorKey: "filename",
@@ -715,6 +783,17 @@ export default function DashboardPage() {
               onClick={() => handleDownload(row.original.id)}
             >
               <Download className="h-4 w-4" />
+            </Button>
+            
+            {/* Botón de Reasignar Tienda */}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-orange-600 border-orange-200 hover:bg-orange-50"
+              onClick={() => handleOpenReassignDialog(row.original)}
+              title="Reasignar tienda"
+            >
+              <Building2 className="h-4 w-4" />
             </Button>
             
             <AlertDialog>
@@ -1196,6 +1275,66 @@ export default function DashboardPage() {
         storesByType={stores.filter(store => store.type === "Excel" && store.active)} 
         fileType="Excel" 
       />
+      
+      {/* Diálogo para reasignar tienda */}
+      <Dialog open={isReassignDialogOpen} onOpenChange={setIsReassignDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reasignar Tienda al Archivo</DialogTitle>
+            <DialogDescription>
+              Seleccione la nueva tienda a la que desea reasignar el archivo 
+              {selectedActivityToReassign && (
+                <span className="font-medium"> {selectedActivityToReassign.filename}</span>
+              )}.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="store-select">Tienda</Label>
+              <Select
+                value={selectedStore}
+                onValueChange={setSelectedStore}
+              >
+                <SelectTrigger id="store-select">
+                  <SelectValue placeholder="Seleccionar tienda" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredStores.map((store) => (
+                    <SelectItem key={store.id} value={store.code}>
+                      {store.code} - {store.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {selectedActivityToReassign && selectedActivityToReassign.storeCode && (
+              <div className="bg-blue-50 p-3 rounded-md text-sm">
+                <p className="font-medium text-blue-800">Información</p>
+                <p className="text-blue-700 mt-1">
+                  Actualmente este archivo está asignado a la tienda con código <span className="font-medium">{selectedActivityToReassign.storeCode}</span>.
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsReassignDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleReassignStore}
+              disabled={!selectedStore || reassignStoreMutation.isPending}
+            >
+              {reassignStoreMutation.isPending ? "Reasignando..." : "Confirmar Reasignación"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
