@@ -279,165 +279,55 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Búsqueda avanzada de registros</DialogTitle>
-          <DialogDescription>
-            Busca información específica en todos los registros de compras.
-          </DialogDescription>
-        </DialogHeader>
+    <div>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Búsqueda avanzada de registros</DialogTitle>
+            <DialogDescription>
+              Busca información específica en todos los registros de compras.
+            </DialogDescription>
+          </DialogHeader>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="search">Búsqueda</TabsTrigger>
-            <TabsTrigger value="results" disabled={searchResults.length === 0}>
-              Resultados {totalResults > 0 && `(${totalResults})`}
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="search" className="space-y-4 py-4">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-6">
-                    <FormField
-                      control={form.control}
-                      name="searchType"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tipo de búsqueda</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccione tipo de búsqueda" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="General">Búsqueda general</SelectItem>
-                              <SelectItem value="Cliente">Por cliente</SelectItem>
-                              <SelectItem value="Artículo">Por artículo</SelectItem>
-                              <SelectItem value="Orden">Por orden</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Selecciona el tipo de información que estás buscando
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="searchTerms"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Términos de búsqueda</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                placeholder="Ingrese lo que desea buscar..."
-                                className="pl-9"
-                                {...field}
-                              />
-                              {field.value && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute right-0 top-0 h-9 w-9 p-0"
-                                  onClick={() => form.setValue("searchTerms", "")}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </FormControl>
-                          <FormDescription>
-                            {form.getValues("searchType") === "Cliente" && "Buscar por nombre o contacto del cliente"}
-                            {form.getValues("searchType") === "Artículo" && "Buscar por detalles, metales, piedras o grabados"}
-                            {form.getValues("searchType") === "Orden" && "Buscar por número de orden o boleta"}
-                            {form.getValues("searchType") === "General" && "Buscar en todos los campos disponibles"}
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="storeCode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Filtrar por tienda</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Todas las tiendas" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="all">Todas las tiendas</SelectItem>
-                              {stores.map((store) => (
-                                <SelectItem key={store.id} value={store.code}>
-                                  {store.name} ({store.code})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Limitar la búsqueda a una tienda específica
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="search">Búsqueda</TabsTrigger>
+              <TabsTrigger value="results" disabled={searchResults.length === 0}>
+                Resultados {totalResults > 0 && `(${totalResults})`}
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="search" className="space-y-4 py-4">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Primera columna de campos */}
+                    <div className="space-y-6">
                       <FormField
                         control={form.control}
-                        name="fromDate"
+                        name="searchType"
                         render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>Desde fecha</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                      "w-full pl-3 text-left font-normal",
-                                      !field.value && "text-muted-foreground"
-                                    )}
-                                  >
-                                    {field.value ? (
-                                      format(field.value, "PPP")
-                                    ) : (
-                                      <span>Seleccionar fecha</span>
-                                    )}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={field.value}
-                                  onSelect={field.onChange}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
+                          <FormItem>
+                            <FormLabel>Tipo de búsqueda</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccione tipo de búsqueda" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="General">Búsqueda general</SelectItem>
+                                <SelectItem value="Cliente">Por cliente</SelectItem>
+                                <SelectItem value="Artículo">Por artículo</SelectItem>
+                                <SelectItem value="Orden">Por orden</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Selecciona el tipo de información que estás buscando
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -445,58 +335,37 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
                       
                       <FormField
                         control={form.control}
-                        name="toDate"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>Hasta fecha</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                      "w-full pl-3 text-left font-normal",
-                                      !field.value && "text-muted-foreground"
-                                    )}
-                                  >
-                                    {field.value ? (
-                                      format(field.value, "PPP")
-                                    ) : (
-                                      <span>Seleccionar fecha</span>
-                                    )}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={field.value}
-                                  onSelect={field.onChange}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="priceMin"
+                        name="searchTerms"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Precio mínimo</FormLabel>
+                            <FormLabel>Términos de búsqueda</FormLabel>
                             <FormControl>
-                              <Input
-                                type="text"
-                                placeholder="0"
-                                {...field}
-                              />
+                              <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                  placeholder="Ingrese lo que desea buscar..."
+                                  className="pl-9"
+                                  {...field}
+                                />
+                                {field.value && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="absolute right-0 top-0 h-9 w-9 p-0"
+                                    onClick={() => form.setValue("searchTerms", "")}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
                             </FormControl>
+                            <FormDescription>
+                              {form.getValues("searchType") === "Cliente" && "Buscar por nombre o contacto del cliente"}
+                              {form.getValues("searchType") === "Artículo" && "Buscar por detalles, metales, piedras o grabados"}
+                              {form.getValues("searchType") === "Orden" && "Buscar por número de orden o boleta"}
+                              {form.getValues("searchType") === "General" && "Buscar en todos los campos disponibles"}
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -504,243 +373,358 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
                       
                       <FormField
                         control={form.control}
-                        name="priceMax"
+                        name="storeCode"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Precio máximo</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="text"
-                                placeholder="Sin límite"
-                                {...field}
-                              />
-                            </FormControl>
+                            <FormLabel>Filtrar por tienda</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Todas las tiendas" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="all">Todas las tiendas</SelectItem>
+                                {stores.map((store) => (
+                                  <SelectItem key={store.id} value={store.code}>
+                                    {store.name} ({store.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Limitar la búsqueda a una tienda específica
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
                     
-                    <div className="space-y-2">
-                      <FormLabel>Opciones de búsqueda</FormLabel>
+                    {/* Segunda columna de campos */}
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="fromDate"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel>Desde fecha</FormLabel>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant={"outline"}
+                                      className={cn(
+                                        "w-full pl-3 text-left font-normal",
+                                        !field.value && "text-muted-foreground"
+                                      )}
+                                    >
+                                      {field.value ? (
+                                        format(field.value, "PPP")
+                                      ) : (
+                                        <span>Seleccionar fecha</span>
+                                      )}
+                                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={field.value}
+                                    onSelect={field.onChange}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="toDate"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel>Hasta fecha</FormLabel>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant={"outline"}
+                                      className={cn(
+                                        "w-full pl-3 text-left font-normal",
+                                        !field.value && "text-muted-foreground"
+                                      )}
+                                    >
+                                      {field.value ? (
+                                        format(field.value, "PPP")
+                                      ) : (
+                                        <span>Seleccionar fecha</span>
+                                      )}
+                                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={field.value}
+                                    onSelect={field.onChange}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="priceMin"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Precio mínimo</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="text"
+                                  placeholder="0"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="priceMax"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Precio máximo</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="text"
+                                  placeholder="Sin límite"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
                       <div className="space-y-2">
+                        <FormLabel>Opciones de búsqueda</FormLabel>
+                        <div className="space-y-2">
+                          {/* Aquí puedes agregar opciones adicionales si es necesario */}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-                
-                <Separator />
-                
-                <div className="space-y-2">
-                  <FormLabel>Campos de búsqueda</FormLabel>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Selecciona los campos en los que deseas buscar
-                  </p>
                   
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="searchCustomerName"
-                      render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Nombre del cliente</FormLabel>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
+                  <Separator />
+                  
+                  <div className="space-y-2">
+                    <FormLabel>Campos de búsqueda</FormLabel>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Selecciona los campos en los que deseas buscar
+                    </p>
                     
-                    <FormField
-                      control={form.control}
-                      name="searchCustomerContact"
-                      render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Contacto del cliente</FormLabel>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="searchItemDetails"
-                      render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Detalles del artículo</FormLabel>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="searchMetals"
-                      render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Metales</FormLabel>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="searchStones"
-                      render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Piedras</FormLabel>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="searchEngravings"
-                      render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>Grabados</FormLabel>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="searchCustomerName"
+                        render={({ field }) => (
+                          <FormItem className="flex items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Nombre del cliente</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="searchCustomerContact"
+                        render={({ field }) => (
+                          <FormItem className="flex items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Contacto del cliente</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="searchItemDetails"
+                        render={({ field }) => (
+                          <FormItem className="flex items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Detalles del artículo</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="searchMetals"
+                        render={({ field }) => (
+                          <FormItem className="flex items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Metales</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="searchStones"
+                        render={({ field }) => (
+                          <FormItem className="flex items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Piedras</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="searchEngravings"
+                        render={({ field }) => (
+                          <FormItem className="flex items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Grabados</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
-                </div>
-                
-                <DialogFooter className="flex justify-between items-center">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={handleReset}
-                  >
-                    Limpiar filtros
-                  </Button>
-                  <div className="flex space-x-2">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={onClose}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button 
-                      type="submit" 
+                  
+                  <DialogFooter className="flex items-center justify-between gap-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleReset}
                       disabled={searchMutation.isPending}
                     >
-                      {searchMutation.isPending ? "Buscando..." : "Buscar"}
+                      Limpiar filtros
                     </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={onClose}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button 
+                        type="submit"
+                        disabled={searchMutation.isPending}
+                      >
+                        {searchMutation.isPending ? "Buscando..." : "Buscar"}
+                      </Button>
+                    </div>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </TabsContent>
+            
+            <TabsContent value="results" className="py-4">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-medium">Resultados de la búsqueda</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Se encontraron {totalResults} registros que coinciden con tu búsqueda.
+                    </p>
                   </div>
-                </DialogFooter>
-              </form>
-            </Form>
-          </TabsContent>
-          
-          <TabsContent value="results" className="space-y-4 py-4">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="text-lg font-medium">
-                  Resultados de búsqueda ({totalResults})
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {form.getValues("searchType") === "General" ? "Búsqueda general" : 
-                   form.getValues("searchType") === "Cliente" ? "Búsqueda por cliente" :
-                   form.getValues("searchType") === "Artículo" ? "Búsqueda por artículo" :
-                   "Búsqueda por orden"}
-                  : "{form.getValues("searchTerms")}"
-                </p>
+                  <Button
+                    onClick={() => setActiveTab("search")}
+                    variant="outline"
+                  >
+                    Nueva búsqueda
+                  </Button>
+                </div>
+                
+                <DataTable
+                  columns={columns}
+                  data={searchResults}
+                  pageSize={10}
+                />
               </div>
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setActiveTab("search")}
+              
+              <DialogFooter className="mt-6">
+                <Button
+                  onClick={onClose}
+                  variant="secondary"
                 >
-                  Modificar búsqueda
+                  Cerrar
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                >
-                  Exportar resultados
-                </Button>
-              </div>
-            </div>
-            
-            {searchResults.length > 0 ? (
-              <DataTable
-                columns={columns}
-                data={searchResults}
-                searchKey="orderNumber"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Search className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">No hay resultados</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  No se encontraron coincidencias para tu búsqueda.
-                </p>
-              </div>
-            )}
-            
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={onClose}
-              >
-                Cerrar
-              </Button>
-            </DialogFooter>
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
-
-    {/* Diálogo de información de tienda */}
-    <StoreInfoDialog 
-      store={storeInfoDialog.store} 
-      open={storeInfoDialog.open} 
-      onClose={() => setStoreInfoDialog({ open: false, store: null })} 
-    />
+              </DialogFooter>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+      
+      {storeInfoDialog.open && (
+        <StoreInfoDialog 
+          store={storeInfoDialog.store} 
+          open={storeInfoDialog.open} 
+          onClose={() => setStoreInfoDialog({ open: false, store: null })} 
+        />
+      )}
+    </div>
   );
 }

@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--skip-setup', action='store_true', help='Omitir la configuración inicial')
     parser.add_argument('--skip-build', action='store_true', help='Omitir la compilación del frontend')
     parser.add_argument('--debug', action='store_true', help='Iniciar en modo depuración')
-    parser.add_argument('--host', default='0.0.0.0', help='Host para escuchar (por defecto: 0.0.0.0)')
+    parser.add_argument('--host', default='127.0.0.1', help='Host para escuchar (por defecto: 127.0.0.1)')
     parser.add_argument('--port', type=int, default=5000, help='Puerto para escuchar (por defecto: 5000)')
     
     args = parser.parse_args()

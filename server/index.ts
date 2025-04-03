@@ -77,18 +77,10 @@ app.use((req, res, next) => {
   const port = 5000;
   server.listen({
     port,
-    host: "0.0.0.0",
+    host: "127.0.0.1",
     reusePort: true,
   }, () => {
-    log(`Server running at http://0.0.0.0:${port}`);
-    // Mostrar todas las IPs disponibles para facilitar el acceso
-    const networkInterfaces = os.networkInterfaces();
-    Object.keys(networkInterfaces).forEach((interfaceName) => {
-      networkInterfaces[interfaceName]?.forEach((iface: any) => {
-        if (iface.family === 'IPv4' && !iface.internal) {
-          log(`Available on network at: http://${iface.address}:${port}`);
-        }
-      });
-    });
+    log(`Server running at http://127.0.0.1:${port}`);
+    log(`Application available at: http://localhost:${port}`);
   });
 })();

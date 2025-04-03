@@ -1,245 +1,196 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Store as StoreType } from "../shared/types";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { 
-  Building2, 
-  MapPin, 
-  Tag, 
-  Briefcase, 
-  Calendar, 
-  FileText, 
-  ShoppingBag,
-  Phone,
-  Mail,
-  Clock
-} from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Building, Store, MapPin, Calendar, Phone, Mail, ExternalLink } from "lucide-react";
 
+// Define props para el componente
 interface StoreInfoDialogProps {
   store: StoreType | null;
   open: boolean;
   onClose: () => void;
 }
 
-interface StoreStats {
-  totalOrders: number;
-  averagePrice: string;
-  lastActivity: string;
-  mostCommonMetal: string;
-}
-
 export default function StoreInfoDialog({ store, open, onClose }: StoreInfoDialogProps) {
-  const [activeTab, setActiveTab] = useState("info");
-  
-  // Consulta para obtener estadísticas de la tienda
-  const { data: storeStats, isLoading } = useQuery({
-    queryKey: ['storeStats', store?.code],
-    queryFn: async () => {
-      if (!store) return null;
-      
-      try {
-        const response = await fetch(`/api/stores/${store.code}/stats`);
-        if (!response.ok) return null;
-        return await response.json();
-      } catch (error) {
-        console.error("Error al cargar estadísticas de tienda:", error);
-        return null;
-      }
-    },
-    enabled: !!store && open,
-  });
-  
-  // Valores por defecto para las estadísticas
-  const stats: StoreStats = storeStats || {
-    totalOrders: 0,
-    averagePrice: "0",
-    lastActivity: "Sin actividad",
-    mostCommonMetal: "Ninguno"
-  };
-  
+  const [activeTab, setActiveTab] = useState("general");
+
+  // Si no hay tienda seleccionada, no renderizamos nada
   if (!store) return null;
-  
+
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center">
-            <Building2 className="h-6 w-6 mr-2 text-primary" />
-            <DialogTitle className="text-xl">{store.name}</DialogTitle>
-          </div>
-          <Badge variant={store.active ? "default" : "outline"} className="mt-2 self-start">
-            {store.active ? "Tienda Activa" : "Tienda Inactiva"}
-          </Badge>
-          <DialogDescription className="mt-2">
-            Información detallada y estadísticas de la tienda seleccionada
+          <DialogTitle className="text-xl flex items-center gap-2">
+            <Store className="h-5 w-5" />
+            {store.name}
+            <Badge variant="outline" className="ml-2">
+              {store.code}
+            </Badge>
+          </DialogTitle>
+          <DialogDescription>
+            Información detallada de la tienda
           </DialogDescription>
         </DialogHeader>
-        
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="info">Información básica</TabsTrigger>
-            <TabsTrigger value="stats">Estadísticas</TabsTrigger>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="general">Información General</TabsTrigger>
+            <TabsTrigger value="statistics">Estadísticas</TabsTrigger>
+            <TabsTrigger value="advanced">Datos Avanzados</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="info" className="mt-4 space-y-4">
+
+          <TabsContent value="general" className="space-y-4 py-4">
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-md">Detalles principales</CardTitle>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Building className="h-4 w-4" />
+                  Datos de la tienda
+                </CardTitle>
+                <CardDescription>
+                  Información básica de la tienda
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-start">
-                    <Tag className="h-4 w-4 mr-2 mt-1 text-muted-foreground" />
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Código</h4>
-                      <p className="text-base font-medium">{store.code}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-start">
-                    <Briefcase className="h-4 w-4 mr-2 mt-1 text-muted-foreground" />
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Tipo</h4>
-                      <p className="text-base">{store.type || "No especificado"}</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <Separator />
-                
-                <div className="flex items-start">
-                  <MapPin className="h-4 w-4 mr-2 mt-1 text-muted-foreground" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground">Localidad-Distrito</h4>
-                    <p className="text-base">{store.location || "No especificada"}</p>
+                    <h4 className="text-sm font-medium flex items-center gap-1 mb-1">
+                      <MapPin className="h-3.5 w-3.5" />
+                      Ubicación
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {store.location || "No disponible"}
+                    </p>
                   </div>
-                </div>
-                
-                <div className="flex items-start">
-                  <MapPin className="h-4 w-4 mr-2 mt-1 text-muted-foreground" />
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground">Dirección</h4>
-                    <p className="text-base">{store.address || "No especificada"}</p>
+                    <h4 className="text-sm font-medium flex items-center gap-1 mb-1">
+                      <Store className="h-3.5 w-3.5" />
+                      Tipo
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {store.type || "No especificado"}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium flex items-center gap-1 mb-1">
+                      <Calendar className="h-3.5 w-3.5" />
+                      Fecha de apertura
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {store.openingDate ? new Date(store.openingDate).toLocaleDateString() : "No disponible"}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium flex items-center gap-1 mb-1">
+                      <Badge className="h-3.5 w-3.5" />
+                      Estado
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {store.active ? (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50">
+                          Activa
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50">
+                          Inactiva
+                        </Badge>
+                      )}
+                    </p>
                   </div>
                 </div>
-                
-                {/* Información de contacto - Si estuviera disponible */}
-                {(store.phone || store.email) && (
-                  <>
-                    <Separator />
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Información de contacto</h4>
-                      
-                      {store.phone && (
-                        <div className="flex items-center">
-                          <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <p className="text-sm">{store.phone}</p>
-                        </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  Contacto
+                </CardTitle>
+                <CardDescription>
+                  Información de contacto
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-sm font-medium flex items-center gap-1 mb-1">
+                      <Phone className="h-3.5 w-3.5" />
+                      Teléfono
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {store.phone || "No disponible"}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium flex items-center gap-1 mb-1">
+                      <Mail className="h-3.5 w-3.5" />
+                      Email
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {store.email || "No disponible"}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium flex items-center gap-1 mb-1">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Sitio web
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {store.website ? (
+                        <a href={store.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                          {store.website}
+                        </a>
+                      ) : (
+                        "No disponible"
                       )}
-                      
-                      {store.email && (
-                        <div className="flex items-center">
-                          <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <p className="text-sm">{store.email}</p>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-                
-                {/* Detalles adicionales - Si estuvieran disponibles */}
-                {store.details && (
-                  <>
-                    <Separator />
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Detalles adicionales</h4>
-                      <p className="text-sm mt-1">{store.details}</p>
-                    </div>
-                  </>
-                )}
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
-          
-          <TabsContent value="stats" className="mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-md flex items-center">
-                    <ShoppingBag className="h-4 w-4 mr-2" />
-                    Actividad comercial
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <dl className="space-y-2">
-                    <div>
-                      <dt className="text-sm text-muted-foreground">Total de órdenes</dt>
-                      <dd className="text-2xl font-bold">{stats.totalOrders}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm text-muted-foreground">Precio promedio</dt>
-                      <dd className="text-lg font-semibold">{stats.averagePrice}</dd>
-                    </div>
-                  </dl>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-md flex items-center">
-                    <Clock className="h-4 w-4 mr-2" />
-                    Actividad reciente
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <dl className="space-y-2">
-                    <div>
-                      <dt className="text-sm text-muted-foreground">Última actividad</dt>
-                      <dd className="text-base">{stats.lastActivity}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm text-muted-foreground">Metal más común</dt>
-                      <dd className="text-base">{stats.mostCommonMetal}</dd>
-                    </div>
-                  </dl>
-                </CardContent>
-              </Card>
-            </div>
-            
-            {isLoading && (
-              <p className="text-center text-sm text-muted-foreground mt-4">
-                Cargando estadísticas...
-              </p>
-            )}
-            
-            {!isLoading && !storeStats && (
-              <div className="text-center p-4 mt-2">
-                <FileText className="h-12 w-12 mx-auto text-muted-foreground opacity-50" />
-                <p className="text-muted-foreground mt-2">
-                  Las estadísticas detalladas para esta tienda no están disponibles en este momento.
-                </p>
-              </div>
-            )}
+
+          <TabsContent value="statistics" className="space-y-4 py-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Actividad Reciente</CardTitle>
+                <CardDescription>
+                  Estadísticas de actividad de la tienda en los últimos 30 días
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Cargando estadísticas...</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="advanced" className="space-y-4 py-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Datos Avanzados</CardTitle>
+                <CardDescription>
+                  Métricas detalladas y datos históricos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Cargando datos avanzados...</p>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
-        
-        <DialogFooter>
-          <Button onClick={onClose}>
-            Cerrar
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
