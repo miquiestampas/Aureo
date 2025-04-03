@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { storage } from './storage';
 import { processExcelFile, processPdfFile } from './fileProcessors';
+import { fileExists, deleteFileIfExists, moveToProcessed } from './fileUtils';
 import { Server } from 'socket.io';
 
 let excelWatcher: any | null = null;
@@ -11,7 +12,65 @@ let io: Server | null = null;
 
 // Conjunto para mantener el seguimiento de archivos ya procesados
 // y evitar procesamiento duplicado
+// Usamos el nombre completo del archivo incluyendo la ruta para evitar duplicados
 const processedFiles = new Set<string>();
+
+// Función para cargar archivos ya procesados al iniciar
+async function loadProcessedFiles() {
+  try {
+    console.log('[FileWatcher] Cargando registro de archivos procesados anteriormente...');
+    // Buscar archivos en directorios de procesados
+    const pdfDirConfig = await storage.getConfig('PDF_WATCH_DIR');
+    const excelDirConfig = await storage.getConfig('EXCEL_WATCH_DIR');
+    
+    if (pdfDirConfig) {
+      const pdfProcessedDir = path.join(pdfDirConfig.value, 'procesados');
+      if (fileExists(pdfProcessedDir)) {
+        const pdfFiles = fs.readdirSync(pdfProcessedDir);
+        console.log(`[FileWatcher] Encontrados ${pdfFiles.length} PDFs previamente procesados.`);
+        for (const file of pdfFiles) {
+          // Guardar la ruta completa y el nombre del archivo
+          const fullPath = path.join(pdfProcessedDir, file);
+          processedFiles.add(fullPath);
+          processedFiles.add(file);
+          console.log(`[FileWatcher] Registrado PDF procesado: ${file}`);
+        }
+      } else {
+        console.log(`[FileWatcher] El directorio de PDFs procesados no existe. Se creará cuando sea necesario.`);
+      }
+    }
+    
+    if (excelDirConfig) {
+      const excelProcessedDir = path.join(excelDirConfig.value, 'procesados');
+      if (fileExists(excelProcessedDir)) {
+        const excelFiles = fs.readdirSync(excelProcessedDir);
+        console.log(`[FileWatcher] Encontrados ${excelFiles.length} Excel previamente procesados.`);
+        for (const file of excelFiles) {
+          // Guardar la ruta completa y el nombre del archivo
+          const fullPath = path.join(excelProcessedDir, file);
+          processedFiles.add(fullPath);
+          processedFiles.add(file);
+          console.log(`[FileWatcher] Registrado Excel procesado: ${file}`);
+        }
+      } else {
+        console.log(`[FileWatcher] El directorio de Excel procesados no existe. Se creará cuando sea necesario.`);
+      }
+    }
+    
+    // También añadir archivos que ya tienen actividades en la base de datos
+    const activities = await storage.getFileActivities();
+    for (const activity of activities) {
+      // Solo considerar archivos ya procesados o en procesamiento
+      if (activity.status === 'Processed' || activity.status === 'Processing') {
+        processedFiles.add(activity.filename);
+      }
+    }
+    
+    console.log(`Cargados ${processedFiles.size} archivos en el registro de archivos procesados`);
+  } catch (error) {
+    console.error('Error al cargar archivos procesados:', error);
+  }
+}
 
 // Set up the Socket.IO server
 export function setupSocketIO(server: any) {
@@ -42,6 +101,9 @@ export async function initializeFileWatchers() {
       console.log('File processing is disabled in system config');
       return;
     }
+    
+    // Cargar archivos ya procesados para evitar reprocesamiento
+    await loadProcessedFiles();
     
     // Get configured directory paths
     const excelDirConfig = await storage.getConfig('EXCEL_WATCH_DIR');
@@ -149,14 +211,71 @@ async function handleNewExcelFile(filePath: string) {
   try {
     const filename = path.basename(filePath);
     
-    // Verificar si el archivo ya ha sido procesado
-    if (processedFiles.has(filePath)) {
-      console.log(`El archivo Excel ${filename} ya fue procesado anteriormente. Omitiendo.`);
+    // Verificar si la carpeta procesados contiene este archivo
+    const excelDirConfig = await storage.getConfig('EXCEL_WATCH_DIR');
+    if (excelDirConfig) {
+      const procesadosDir = path.join(excelDirConfig.value, 'procesados');
+      const posibleProcessedPath = path.join(procesadosDir, filename);
+      
+      if (fileExists(posibleProcessedPath)) {
+        console.log(`El archivo Excel ${filename} ya existe en la carpeta de procesados. Eliminando archivo duplicado.`);
+        try {
+          // Eliminar el archivo duplicado usando la función de utilidades
+          await deleteFileIfExists(filePath);
+          console.log(`Archivo duplicado eliminado: ${filePath}`);
+        } catch (unlinkError) {
+          console.error(`Error al eliminar archivo duplicado: ${unlinkError}`);
+        }
+        return;
+      }
+    }
+    
+    // Verificar si el archivo ya ha sido procesado según nuestro registro
+    if (processedFiles.has(filePath) || processedFiles.has(filename)) {
+      console.log(`El archivo Excel ${filename} ya fue procesado anteriormente según el registro. Omitiendo.`);
+      
+      // Mover a procesados directamente para evitar reprocesamiento
+      try {
+        // Usar nuestra utilidad moveToProcessed
+        const movedPath = await moveToProcessed(filePath, 'Excel');
+        if (movedPath) {
+          console.log(`Archivo Excel ${filename} movido directamente a procesados sin reprocesar: ${movedPath}`);
+        } else {
+          console.error(`No se pudo mover el archivo Excel ${filename} a procesados`);
+        }
+      } catch (moveError) {
+        console.error(`Error al mover archivo ya procesado: ${moveError}`);
+      }
+      
       return;
     }
     
-    // Agregar el archivo al conjunto de archivos procesados
+    // Comprobar si el archivo ya tiene actividad en la base de datos
+    const activities = await storage.getFileActivities();
+    const existingActivity = activities.find(a => a.filename === filename && (a.status === 'Processed' || a.status === 'Processing'));
+    
+    if (existingActivity) {
+      console.log(`El archivo Excel ${filename} ya tiene una actividad registrada (ID: ${existingActivity.id}). Moviendo a procesados.`);
+      
+      // Mover a procesados directamente para evitar reprocesamiento
+      try {
+        // Usar nuestra utilidad moveToProcessed
+        const movedPath = await moveToProcessed(filePath, 'Excel');
+        if (movedPath) {
+          console.log(`Archivo Excel ${filename} con actividad existente movido a procesados: ${movedPath}`);
+        } else {
+          console.error(`No se pudo mover el archivo Excel ${filename} a procesados`);
+        }
+      } catch (moveError) {
+        console.error(`Error al mover archivo con actividad existente: ${moveError}`);
+      }
+      
+      return;
+    }
+    
+    // Agregar el archivo al conjunto de archivos procesados (tanto por ruta como por nombre)
     processedFiles.add(filePath);
+    processedFiles.add(filename);
     
     // Buscar todas las tiendas y usar la primera que coincida con el nombre del archivo
     const allStores = await storage.getStores();
@@ -273,14 +392,71 @@ async function handleNewPdfFile(filePath: string) {
   try {
     const filename = path.basename(filePath);
     
-    // Verificar si el archivo ya ha sido procesado
-    if (processedFiles.has(filePath)) {
-      console.log(`El archivo PDF ${filename} ya fue procesado anteriormente. Omitiendo.`);
+    // Verificar si la carpeta procesados contiene este archivo
+    const pdfDirConfig = await storage.getConfig('PDF_WATCH_DIR');
+    if (pdfDirConfig) {
+      const procesadosDir = path.join(pdfDirConfig.value, 'procesados');
+      const posibleProcessedPath = path.join(procesadosDir, filename);
+      
+      if (fileExists(posibleProcessedPath)) {
+        console.log(`El archivo PDF ${filename} ya existe en la carpeta de procesados. Eliminando archivo duplicado.`);
+        try {
+          // Eliminar el archivo duplicado usando la función de utilidades
+          await deleteFileIfExists(filePath);
+          console.log(`Archivo duplicado eliminado: ${filePath}`);
+        } catch (unlinkError) {
+          console.error(`Error al eliminar archivo duplicado: ${unlinkError}`);
+        }
+        return;
+      }
+    }
+    
+    // Verificar si el archivo ya ha sido procesado según nuestro registro
+    if (processedFiles.has(filePath) || processedFiles.has(filename)) {
+      console.log(`El archivo PDF ${filename} ya fue procesado anteriormente según el registro. Omitiendo.`);
+      
+      // Mover a procesados directamente para evitar reprocesamiento
+      try {
+        // Usar nuestra utilidad moveToProcessed
+        const movedPath = await moveToProcessed(filePath, 'PDF');
+        if (movedPath) {
+          console.log(`Archivo PDF ${filename} movido directamente a procesados sin reprocesar: ${movedPath}`);
+        } else {
+          console.error(`No se pudo mover el archivo PDF ${filename} a procesados`);
+        }
+      } catch (moveError) {
+        console.error(`Error al mover archivo ya procesado: ${moveError}`);
+      }
+      
       return;
     }
     
-    // Agregar el archivo al conjunto de archivos procesados
+    // Comprobar si el archivo ya tiene actividad en la base de datos
+    const activities = await storage.getFileActivities();
+    const existingActivity = activities.find(a => a.filename === filename && (a.status === 'Processed' || a.status === 'Processing'));
+    
+    if (existingActivity) {
+      console.log(`El archivo PDF ${filename} ya tiene una actividad registrada (ID: ${existingActivity.id}). Moviendo a procesados.`);
+      
+      // Mover a procesados directamente para evitar reprocesamiento
+      try {
+        // Usar nuestra utilidad moveToProcessed
+        const movedPath = await moveToProcessed(filePath, 'PDF');
+        if (movedPath) {
+          console.log(`Archivo PDF ${filename} con actividad existente movido a procesados: ${movedPath}`);
+        } else {
+          console.error(`No se pudo mover el archivo PDF ${filename} a procesados`);
+        }
+      } catch (moveError) {
+        console.error(`Error al mover archivo con actividad existente: ${moveError}`);
+      }
+      
+      return;
+    }
+    
+    // Agregar el archivo al conjunto de archivos procesados (tanto por ruta como por nombre)
     processedFiles.add(filePath);
+    processedFiles.add(filename);
     
     // Buscar todas las tiendas y usar la primera que coincida con el nombre del archivo
     const allStores = await storage.getStores();
