@@ -728,48 +728,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Ubicaciones de los archivos originales y nuevos
       let originalFilePath = '';
-      let newFilePath = '';
       
       console.log(`Renombrando archivo para la actividad ${activityId}: ${activity.filename} -> ${newFilename}`);
       
-      // Determinar las rutas según el tipo de archivo
+      // Posibles ubicaciones de archivos
+      const possibleLocations = [];
+      
       if (activity.fileType === 'Excel') {
         // Para archivos Excel
-        originalFilePath = path.join('./data/excel', activity.status === 'Processed' ? 'procesados' : '', activity.filename);
-        newFilePath = path.join('./data/excel', activity.status === 'Processed' ? 'procesados' : '', newFilename);
+        possibleLocations.push(
+          // Ubicaciones principales para Excel
+          path.join('./data/excel', activity.filename),
+          path.join('./data/excel/procesados', activity.filename),
+          path.join('./uploads/excel', activity.filename),
+          // Ubicación para archivos recién subidos
+          path.join(os.tmpdir(), activity.filename),
+          path.join('./temp', activity.filename)
+        );
       } else if (activity.fileType === 'PDF') {
         // Para archivos PDF
-        originalFilePath = path.join('./data/pdf', activity.status === 'Processed' ? 'procesados' : '', activity.filename);
-        newFilePath = path.join('./data/pdf', activity.status === 'Processed' ? 'procesados' : '', newFilename);
+        possibleLocations.push(
+          // Ubicaciones principales para PDF
+          path.join('./data/pdf', activity.filename),
+          path.join('./data/pdf/procesados', activity.filename),
+          path.join('./uploads/pdf', activity.filename),
+          // Ubicación para archivos recién subidos
+          path.join(os.tmpdir(), activity.filename),
+          path.join('./temp', activity.filename)
+        );
       } else {
         return res.status(400).json({ message: "Tipo de archivo no soportado" });
       }
       
-      // Verificar si el archivo original existe
-      if (!fs.existsSync(originalFilePath)) {
-        console.warn(`El archivo original no existe en la ruta: ${originalFilePath}`);
-        
-        // Buscar el archivo con timestamp en el nombre (formato común para archivos procesados)
-        const dirPath = path.dirname(originalFilePath);
-        const dirFiles = fs.readdirSync(dirPath);
-        
-        // Extraer el nombre base del archivo sin extensión
-        const originalBaseName = path.basename(activity.filename, path.extname(activity.filename));
-        
-        // Buscar archivos que contengan el nombre base original
-        const matchingFiles = dirFiles.filter(file => 
-          file.includes(originalBaseName) && 
-          file.endsWith(path.extname(activity.filename))
-        );
-        
-        if (matchingFiles.length > 0) {
-          // Usar el primer archivo que coincida
-          originalFilePath = path.join(dirPath, matchingFiles[0]);
-          console.log(`Se encontró un archivo alternativo: ${originalFilePath}`);
-        } else {
-          return res.status(404).json({ message: "No se pudo encontrar el archivo físico para renombrar" });
+      // Verificar si el archivo existe en alguna de las ubicaciones
+      for (const location of possibleLocations) {
+        if (fs.existsSync(location)) {
+          originalFilePath = location;
+          console.log(`Se encontró el archivo en: ${originalFilePath}`);
+          break;
         }
       }
+      
+      // Si no se encontró con el nombre exacto, buscar por coincidencia parcial
+      if (!originalFilePath) {
+        console.warn(`No se encontró el archivo con el nombre exacto en ninguna ubicación conocida`);
+        
+        // Determinar los directorios a buscar
+        const dirsToSearch = [];
+        if (activity.fileType === 'Excel') {
+          dirsToSearch.push('./data/excel', './data/excel/procesados', './uploads/excel');
+        } else {
+          dirsToSearch.push('./data/pdf', './data/pdf/procesados', './uploads/pdf');
+        }
+        
+        // Extraer extensión y nombre base
+        const fileExt = path.extname(activity.filename);
+        const baseFileName = path.basename(activity.filename, fileExt);
+        
+        // Buscar en cada directorio por coincidencia parcial
+        for (const dir of dirsToSearch) {
+          if (fs.existsSync(dir)) {
+            try {
+              const files = fs.readdirSync(dir);
+              for (const file of files) {
+                // Comprobar si el archivo contiene parte del nombre original o si solo hay uno con la misma extensión
+                if ((file.includes(baseFileName) || 
+                    (files.length === 1 && file.endsWith(fileExt))) && 
+                    file.endsWith(fileExt)) {
+                  originalFilePath = path.join(dir, file);
+                  console.log(`Se encontró un archivo similar: ${originalFilePath}`);
+                  break;
+                }
+              }
+              if (originalFilePath) break;
+            } catch (err) {
+              console.error(`Error al leer el directorio ${dir}:`, err);
+            }
+          }
+        }
+        
+        if (!originalFilePath) {
+          // Si la actividad fue recién creada, el archivo puede estar en el directorio temporal
+          if (new Date().getTime() - new Date(activity.processingDate).getTime() < 60000) { // menos de 1 minuto
+            // Buscar el PDF o Excel en el directorio temporal del sistema
+            const tempDir = os.tmpdir();
+            if (fs.existsSync(tempDir)) {
+              try {
+                const files = fs.readdirSync(tempDir);
+                for (const file of files) {
+                  if (file.endsWith(fileExt)) {
+                    originalFilePath = path.join(tempDir, file);
+                    console.log(`Se encontró un archivo temporal reciente: ${originalFilePath}`);
+                    break;
+                  }
+                }
+              } catch (err) {
+                console.error(`Error al leer el directorio temporal:`, err);
+              }
+            }
+          }
+        }
+        
+        // Si aún no se ha encontrado, buscar en el directorio actual
+        if (!originalFilePath) {
+          const currentDir = './';
+          try {
+            const files = fs.readdirSync(currentDir);
+            for (const file of files) {
+              if (file.endsWith(fileExt) && (file.includes(baseFileName) || file === activity.filename)) {
+                originalFilePath = path.join(currentDir, file);
+                console.log(`Se encontró un archivo en el directorio actual: ${originalFilePath}`);
+                break;
+              }
+            }
+          } catch (err) {
+            console.error(`Error al leer el directorio actual:`, err);
+          }
+        }
+      }
+      
+      // Si después de todo no se encontró el archivo
+      if (!originalFilePath) {
+        return res.status(404).json({ message: "No se pudo encontrar el archivo físico para renombrar" });
+      }
+      // Generar la ruta para el nuevo archivo en el mismo directorio del original
+      const originalDirPath = path.dirname(originalFilePath);
+      const newFilePath = path.join(originalDirPath, newFilename);
+      
+      console.log(`Ruta del archivo original: ${originalFilePath}`);
+      console.log(`Ruta para el nuevo archivo: ${newFilePath}`);
       
       // Actualizar el registro en la base de datos
       await storage.updateFileActivity(activityId, {
