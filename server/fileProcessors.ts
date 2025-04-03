@@ -8,6 +8,49 @@ import ExcelJS from 'exceljs';
 import { read as readXLSX, utils as xlsxUtils } from 'xlsx';
 import csvParser from 'csv-parser';
 
+// Funciones de utilidad para el cálculo de similitud entre strings
+// Función para calcular distancia de Levenshtein (distancia de edición)
+function levenshteinDistance(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  
+  const matrix: number[][] = [];
+  
+  // Inicializar matriz
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  // Llenar matriz
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i-1) === a.charAt(j-1)) {
+        matrix[i][j] = matrix[i-1][j-1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i-1][j-1] + 1, // sustitución
+          matrix[i][j-1] + 1,   // inserción
+          matrix[i-1][j] + 1    // eliminación
+        );
+      }
+    }
+  }
+  
+  return matrix[b.length][a.length];
+}
+
+// Función para calcular similitud normalizada (0-100%)
+function calculateSimilarityPercentage(a: string, b: string): number {
+  const distance = levenshteinDistance(a, b);
+  const maxLength = Math.max(a.length, b.length);
+  if (maxLength === 0) return 100; // Evitar división por cero
+  return ((maxLength - distance) / maxLength) * 100;
+}
+
 // Import pdf-parse dynamically to avoid initialization errors
 // We'll only use it when we actually need to parse a PDF
 let pdfParse: any = null;
@@ -768,46 +811,7 @@ export async function processExcelFile(filePath: string, activityId: number, sto
           console.log(`No se encontró coincidencia sin espacios, intentando similitud para "${normalizedExcelStoreCode}"`);
           
           // Función para calcular similitud de Levenshtein (distancia de edición)
-          function levenshteinDistance(a: string, b: string): number {
-            if (a.length === 0) return b.length;
-            if (b.length === 0) return a.length;
-            
-            const matrix = [];
-            
-            // Inicializar matriz
-            for (let i = 0; i <= b.length; i++) {
-              matrix[i] = [i];
-            }
-            
-            for (let j = 0; j <= a.length; j++) {
-              matrix[0][j] = j;
-            }
-            
-            // Llenar matriz
-            for (let i = 1; i <= b.length; i++) {
-              for (let j = 1; j <= a.length; j++) {
-                if (b.charAt(i-1) === a.charAt(j-1)) {
-                  matrix[i][j] = matrix[i-1][j-1];
-                } else {
-                  matrix[i][j] = Math.min(
-                    matrix[i-1][j-1] + 1, // sustitución
-                    matrix[i][j-1] + 1,   // inserción
-                    matrix[i-1][j] + 1    // eliminación
-                  );
-                }
-              }
-            }
-            
-            return matrix[b.length][a.length];
-          }
-          
-          // Función para calcular similitud normalizada (0-100%)
-          function calculateSimilarityPercentage(a: string, b: string): number {
-            const distance = levenshteinDistance(a, b);
-            const maxLength = Math.max(a.length, b.length);
-            if (maxLength === 0) return 100; // Evitar división por cero
-            return ((maxLength - distance) / maxLength) * 100;
-          }
+          // Usar funciones de utilidad definidas a nivel de módulo
           
           // Calcular similitud para todas las tiendas
           let bestMatch = null;
@@ -1029,12 +1033,32 @@ export async function processPdfFile(filePath: string, activityId: number, store
         
         // Si todavía no hemos encontrado, buscar por nombres comunes
         if (!pdfStoreCode) {
-          const known_stores = ['Montera', 'Central', 'Plaza', 'Norte', 'Sur'];
-          for (const knownStore of known_stores) {
-            if (originalFilename.toLowerCase().includes(knownStore.toLowerCase())) {
-              pdfStoreCode = knownStore;
-              console.log(`Found known store name in filename: ${pdfStoreCode}`);
+          // Patrones de tiendas conocidas que pueden aparecer en nombres de archivo
+          const store_patterns = [
+            { pattern: /montera\s*(\d*)/i, code: 'Montera' },  // Montera, Montera 4, Montera4, etc.
+            { pattern: /central/i, code: 'Central' },
+            { pattern: /plaza/i, code: 'Plaza' },
+            { pattern: /norte/i, code: 'Norte' },
+            { pattern: /sur/i, code: 'Sur' }
+          ];
+          
+          for (const storePattern of store_patterns) {
+            if (storePattern.pattern.test(originalFilename)) {
+              pdfStoreCode = storePattern.code;
+              console.log(`Found known store pattern in filename: ${originalFilename} -> ${pdfStoreCode}`);
               break;
+            }
+          }
+          
+          // Si no hay coincidencia por patrón, intentar búsqueda directa por nombre
+          if (!pdfStoreCode) {
+            const known_stores = ['Montera', 'Central', 'Plaza', 'Norte', 'Sur'];
+            for (const knownStore of known_stores) {
+              if (originalFilename.toLowerCase().includes(knownStore.toLowerCase())) {
+                pdfStoreCode = knownStore;
+                console.log(`Found known store name in filename: ${pdfStoreCode}`);
+                break;
+              }
             }
           }
         }
@@ -1047,68 +1071,40 @@ export async function processPdfFile(filePath: string, activityId: number, store
       const normalizedPdfStoreCode = pdfStoreCode.trim();
       console.log(`PDF file has detected store code "${normalizedPdfStoreCode}" (original: "${pdfStoreCode}")`);
       
-      // Primero intentar búsqueda exacta
+      // Primero intentar búsqueda exacta por código
       let pdfStore = await storage.getStoreByCode(normalizedPdfStoreCode);
       
       // Si no encontramos coincidencia exacta, intentar búsqueda flexible
       if (!pdfStore) {
         console.log(`No se encontró tienda con código exacto "${normalizedPdfStoreCode}", intentando búsqueda flexible`);
         
-        // Obtener todas las tiendas y buscar una coincidencia ignorando espacios
+        // Obtener todas las tiendas para la búsqueda
         const allStores = await storage.getStores();
         
-        // Primero, intentar búsqueda ignorando espacios
+        // Primero, comprobar si coincide con el nombre de alguna tienda
         let storeMatch = allStores.find(store => {
-          const storeCodeNoSpaces = store.code.replace(/\s+/g, '');
-          const detectedCodeNoSpaces = normalizedPdfStoreCode.replace(/\s+/g, '');
-          return storeCodeNoSpaces === detectedCodeNoSpaces;
+          const storeName = store.name?.toLowerCase() || '';
+          const detectedCode = normalizedPdfStoreCode.toLowerCase();
+          
+          // Comparar si el nombre de la tienda contiene el código detectado o viceversa
+          return storeName.includes(detectedCode) || detectedCode.includes(storeName);
         });
+        
+        // Si no encontramos por nombre, intentar búsqueda ignorando espacios en el código
+        if (!storeMatch) {
+          storeMatch = allStores.find(store => {
+            const storeCodeNoSpaces = store.code.replace(/\s+/g, '').toLowerCase();
+            const detectedCodeNoSpaces = normalizedPdfStoreCode.replace(/\s+/g, '').toLowerCase();
+            return storeCodeNoSpaces === detectedCodeNoSpaces;
+          });
+        }
         
         // Si no encontramos coincidencia exacta sin espacios, buscar la más similar
         if (!storeMatch) {
           console.log(`No se encontró coincidencia sin espacios, intentando similitud para "${normalizedPdfStoreCode}"`);
           
           // Función para calcular similitud de Levenshtein (distancia de edición)
-          function levenshteinDistance(a: string, b: string): number {
-            if (a.length === 0) return b.length;
-            if (b.length === 0) return a.length;
-            
-            const matrix = [];
-            
-            // Inicializar matriz
-            for (let i = 0; i <= b.length; i++) {
-              matrix[i] = [i];
-            }
-            
-            for (let j = 0; j <= a.length; j++) {
-              matrix[0][j] = j;
-            }
-            
-            // Llenar matriz
-            for (let i = 1; i <= b.length; i++) {
-              for (let j = 1; j <= a.length; j++) {
-                if (b.charAt(i-1) === a.charAt(j-1)) {
-                  matrix[i][j] = matrix[i-1][j-1];
-                } else {
-                  matrix[i][j] = Math.min(
-                    matrix[i-1][j-1] + 1, // sustitución
-                    matrix[i][j-1] + 1,   // inserción
-                    matrix[i-1][j] + 1    // eliminación
-                  );
-                }
-              }
-            }
-            
-            return matrix[b.length][a.length];
-          }
-          
-          // Función para calcular similitud normalizada (0-100%)
-          function calculateSimilarityPercentage(a: string, b: string): number {
-            const distance = levenshteinDistance(a, b);
-            const maxLength = Math.max(a.length, b.length);
-            if (maxLength === 0) return 100; // Evitar división por cero
-            return ((maxLength - distance) / maxLength) * 100;
-          }
+          // Usar funciones de utilidad definidas a nivel de módulo
           
           // Calcular similitud para todas las tiendas
           let bestMatch = null;

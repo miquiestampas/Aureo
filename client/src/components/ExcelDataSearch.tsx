@@ -701,7 +701,6 @@ export default function ExcelDataSearch({ isOpen, onClose, onViewDetails, stores
                 <DataTable
                   columns={columns}
                   data={searchResults}
-                  pageSize={10}
                 />
               </div>
               
