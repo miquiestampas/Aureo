@@ -380,3 +380,62 @@ export const insertCoincidenciaSchema = createInsertSchema(coincidencias).pick({
 
 export type InsertCoincidencia = z.infer<typeof insertCoincidenciaSchema>;
 export type Coincidencia = typeof coincidencias.$inferSelect;
+
+// Modelo para Inspecciones
+export const inspecciones = sqliteTable("inspecciones", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  storeCode: text("store_code").notNull(), // Código de la tienda inspeccionada
+  fechaInspeccion: text("fecha_inspeccion").notNull().default(String(new Date().toISOString())),
+  inspectores: text("inspectores").notNull(), // Lista de funcionarios que realizan la inspección (separados por comas)
+  resultado: text("resultado").notNull(), // "Favorable", "Desfavorable", "Con Sanción", "Sin Sanción"
+  sancionImporte: integer("sancion_importe"), // Importe de la sanción si aplica
+  observaciones: text("observaciones"), // Anotaciones sobre la inspección
+  estado: text("estado").notNull().default("Activa"), // "Activa", "Cerrada", "En Seguimiento"
+  creadoPor: integer("creado_por").notNull(), // ID del usuario que registra la inspección
+  creadoEn: text("creado_en").notNull().default(String(new Date().toISOString())),
+  modificadoPor: integer("modificado_por"), // ID del usuario que modifica
+  modificadoEn: text("modificado_en"),
+});
+
+export const insertInspeccionSchema = createInsertSchema(inspecciones).pick({
+  storeCode: true,
+  fechaInspeccion: true,
+  inspectores: true,
+  resultado: true,
+  sancionImporte: true,
+  observaciones: true,
+  estado: true,
+  creadoPor: true,
+  modificadoPor: true,
+});
+
+export type InsertInspeccion = z.infer<typeof insertInspeccionSchema>;
+export type Inspeccion = typeof inspecciones.$inferSelect;
+
+// Modelo para Documentos de Inspección (informes, actas, etc.)
+export const documentosInspeccion = sqliteTable("documentos_inspeccion", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  inspeccionId: integer("inspeccion_id").notNull(), // ID de la inspección relacionada
+  tipoDocumento: text("tipo_documento").notNull(), // "Acta", "Informe", "Fotografía", "Anexo", etc.
+  titulo: text("titulo").notNull(),
+  descripcion: text("descripcion"),
+  ruta: text("ruta").notNull(), // Ruta al archivo en el sistema
+  fechaSubida: text("fecha_subida").notNull().default(String(new Date().toISOString())),
+  tamanoArchivo: integer("tamano_archivo"), // Tamaño en bytes
+  formatoArchivo: text("formato_archivo").notNull(), // "PDF", "JPG", "DOCX", etc.
+  creadoPor: integer("creado_por").notNull(), // ID del usuario que sube el documento
+});
+
+export const insertDocumentoInspeccionSchema = createInsertSchema(documentosInspeccion).pick({
+  inspeccionId: true,
+  tipoDocumento: true,
+  titulo: true,
+  descripcion: true,
+  ruta: true,
+  tamanoArchivo: true,
+  formatoArchivo: true,
+  creadoPor: true,
+});
+
+export type InsertDocumentoInspeccion = z.infer<typeof insertDocumentoInspeccionSchema>;
+export type DocumentoInspeccion = typeof documentosInspeccion.$inferSelect;

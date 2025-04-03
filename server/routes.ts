@@ -13,7 +13,9 @@ import {
   InsertSearchHistory, User, 
   InsertSenalPersona, SenalPersona, 
   InsertSenalObjeto, SenalObjeto,
-  InsertCoincidencia, Coincidencia
+  InsertCoincidencia, Coincidencia,
+  InsertInspeccion, Inspeccion,
+  InsertDocumentoInspeccion, DocumentoInspeccion
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -31,6 +33,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Set up file upload middleware
   const upload = setupFileUpload();
   const uploadMultiple = setupFileUpload().array('files', 20); // Permitir hasta 20 archivos a la vez
+
+  // Configurar rutas del módulo de inspecciones
+  setupInspeccionesRoutes(app);
   
   // User routes
   app.get("/api/users", (req, res, next) => {
@@ -3749,6 +3754,371 @@ function setupFileUpload() {
         console.log("Tipo de archivo no permitido:", file.mimetype);
         cb(new Error(`Solo se permiten archivos Excel, CSV y PDF. Tipo recibido: ${file.mimetype}`), false);
       }
+    }
+  });
+}
+
+// Rutas para el módulo de inspecciones
+export function setupInspeccionesRoutes(app: Express) {
+  // Proteger todas las rutas con autenticación
+  app.use("/api/inspecciones", (req, res, next) => {
+    // Si el usuario no está autenticado, redirigir a la página de login
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    next();
+  });
+
+  // Middleware para roles específicos
+  const requireRole = (roles: string[]) => {
+    return (req: any, res: any, next: any) => {
+      if (!req.user) {
+        return res.status(401).json({ error: "No autorizado" });
+      }
+      
+      if (!roles.includes(req.user.role)) {
+        return res.status(403).json({ error: "No tiene permisos suficientes" });
+      }
+      
+      next();
+    };
+  };
+
+  // Crear una nueva inspección
+  app.post("/api/inspecciones", requireRole(["SuperAdmin", "Admin"]), async (req, res) => {
+    try {
+      const data = req.body;
+      
+      // Verificar campos obligatorios
+      if (!data.storeCode || !data.fechaInspeccion || !data.inspectores || !data.resultado) {
+        return res.status(400).json({ error: "Faltan campos obligatorios" });
+      }
+      
+      // Crear la inspección con los datos recibidos
+      const inspeccion = await storage.createInspeccion({
+        ...data,
+        estado: "Activa",
+        creadoPor: req.user!.id
+      });
+      
+      res.status(201).json(inspeccion);
+    } catch (error) {
+      console.error("Error al crear inspección:", error);
+      res.status(500).json({ error: "Error al crear la inspección" });
+    }
+  });
+
+  // Obtener todas las inspecciones con filtros opcionales
+  app.get("/api/inspecciones", async (req, res) => {
+    try {
+      const { storeCode, inspectorId, fechaDesde, fechaHasta, estado } = req.query;
+      
+      // Convertir parámetros a tipos correctos
+      const filtros: any = {};
+      
+      if (storeCode) filtros.storeCode = storeCode as string;
+      if (inspectorId) filtros.inspectorId = parseInt(inspectorId as string);
+      if (fechaDesde) filtros.fechaDesde = fechaDesde as string;
+      if (fechaHasta) filtros.fechaHasta = fechaHasta as string;
+      if (estado) filtros.estado = estado as string;
+      
+      const inspecciones = await storage.getInspecciones(Object.keys(filtros).length > 0 ? filtros : undefined);
+      
+      // Para cada inspección, obtener el nombre de la tienda
+      const inspeccionesConTienda = await Promise.all(inspecciones.map(async (inspeccion) => {
+        const tienda = await storage.getStore(inspeccion.storeCode);
+        return {
+          ...inspeccion,
+          tienda: tienda ? { id: tienda.id, nombre: tienda.name, codigo: tienda.code } : null
+        };
+      }));
+      
+      res.json(inspeccionesConTienda);
+    } catch (error) {
+      console.error("Error al obtener inspecciones:", error);
+      res.status(500).json({ error: "Error al obtener las inspecciones" });
+    }
+  });
+
+  // Obtener una inspección específica por ID
+  app.get("/api/inspecciones/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "ID inválido" });
+      }
+      
+      const inspeccion = await storage.getInspeccion(id);
+      if (!inspeccion) {
+        return res.status(404).json({ error: "Inspección no encontrada" });
+      }
+      
+      // Obtener datos adicionales: tienda y documentos
+      const tienda = await storage.getStore(inspeccion.storeCode);
+      const documentos = await storage.getDocumentosByInspeccion(id);
+      
+      res.json({
+        ...inspeccion,
+        tienda: tienda ? { id: tienda.id, nombre: tienda.name, codigo: tienda.code } : null,
+        documentos
+      });
+    } catch (error) {
+      console.error(`Error al obtener inspección con ID ${req.params.id}:`, error);
+      res.status(500).json({ error: "Error al obtener la inspección" });
+    }
+  });
+
+  // Actualizar una inspección existente
+  app.put("/api/inspecciones/:id", requireRole(["SuperAdmin", "Admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "ID inválido" });
+      }
+      
+      const inspeccion = await storage.getInspeccion(id);
+      if (!inspeccion) {
+        return res.status(404).json({ error: "Inspección no encontrada" });
+      }
+      
+      // Los administradores solo pueden editar sus propias inspecciones
+      if (req.user!.role === "Admin" && inspeccion.creadoPor !== req.user!.id) {
+        return res.status(403).json({ error: "Solo puedes editar inspecciones creadas por ti" });
+      }
+      
+      const data = req.body;
+      
+      // Actualizar la inspección
+      const inspectionUpdated = await storage.updateInspeccion(id, {
+        ...data,
+        modificadoPor: req.user!.id
+      });
+      
+      res.json(inspectionUpdated);
+    } catch (error) {
+      console.error(`Error al actualizar inspección con ID ${req.params.id}:`, error);
+      res.status(500).json({ error: "Error al actualizar la inspección" });
+    }
+  });
+
+  // Eliminar una inspección
+  app.delete("/api/inspecciones/:id", requireRole(["SuperAdmin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "ID inválido" });
+      }
+      
+      const inspeccion = await storage.getInspeccion(id);
+      if (!inspeccion) {
+        return res.status(404).json({ error: "Inspección no encontrada" });
+      }
+      
+      // Eliminar la inspección y sus documentos asociados
+      await storage.deleteInspeccion(id);
+      
+      res.json({ success: true, message: "Inspección eliminada correctamente" });
+    } catch (error) {
+      console.error(`Error al eliminar inspección con ID ${req.params.id}:`, error);
+      res.status(500).json({ error: "Error al eliminar la inspección" });
+    }
+  });
+
+  // Obtener estadísticas de inspecciones
+  app.get("/api/inspecciones/estadisticas/count", async (req, res) => {
+    try {
+      const estadisticas = await storage.getEstadisticasInspecciones();
+      res.json(estadisticas);
+    } catch (error) {
+      console.error("Error al obtener estadísticas de inspecciones:", error);
+      res.status(500).json({ error: "Error al obtener las estadísticas" });
+    }
+  });
+
+  // Obtener estadísticas de inspecciones (mantener compatibilidad)
+  app.get("/api/inspecciones/estadisticas", async (req, res) => {
+    try {
+      const estadisticas = await storage.getEstadisticasInspecciones();
+      res.json(estadisticas);
+    } catch (error) {
+      console.error("Error al obtener estadísticas de inspecciones:", error);
+      res.status(500).json({ error: "Error al obtener las estadísticas" });
+    }
+  });
+
+  // Configurar multer para la carga de documentos de inspección
+  const uploadInspeccionDocs = multer({
+    storage: multer.diskStorage({
+      destination: function (req, file, cb) {
+        const uploadsDir = path.join(__dirname, '../uploads/inspecciones');
+        fs.mkdirSync(uploadsDir, { recursive: true });
+        cb(null, uploadsDir);
+      },
+      filename: function (req, file, cb) {
+        // Generar un nombre único para el archivo
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        
+        // Sanitizar el nombre original del archivo
+        let originalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+        
+        // Mantener la extensión original del archivo
+        const ext = path.extname(originalName);
+        
+        // Crear el nombre final del archivo
+        const finalName = 'inspeccion-' + uniqueSuffix + ext;
+        
+        cb(null, finalName);
+      }
+    }),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB máximo
+    },
+    fileFilter: function (req, file, cb) {
+      // Aceptar solo documentos PDF, imágenes y archivos Office
+      if (file.mimetype === 'application/pdf' || 
+          file.mimetype.startsWith('image/') ||
+          file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+          file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+          file.mimetype === 'application/msword' ||
+          file.mimetype === 'application/vnd.ms-excel') {
+        cb(null, true);
+      } else {
+        // Si no es un formato válido, rechazar el archivo
+        cb(new Error('Formato de archivo no válido. Solo se permiten PDF, imágenes y documentos de Office.'), false);
+      }
+    }
+  });
+
+  // Subir un documento para una inspección
+  app.post("/api/inspecciones/:id/documentos", requireRole(["SuperAdmin", "Admin"]), (req, res, next) => {
+    uploadInspeccionDocs.single('documento')(req, res, function(err) {
+      if (err) {
+        console.error("Error en multer al procesar el archivo:", err);
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+  }, async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No se ha subido ningún archivo" });
+      }
+      
+      const inspeccionId = parseInt(req.params.id);
+      if (isNaN(inspeccionId)) {
+        return res.status(400).json({ error: "ID de inspección inválido" });
+      }
+      
+      // Verificar que la inspección existe
+      const inspeccion = await storage.getInspeccion(inspeccionId);
+      if (!inspeccion) {
+        return res.status(404).json({ error: "Inspección no encontrada" });
+      }
+      
+      // Crear el documento asociado a la inspección
+      const documento = await storage.createDocumentoInspeccion({
+        inspeccionId,
+        tipoDocumento: req.body.tipoDocumento || 'Otro',
+        titulo: req.body.titulo || req.file.originalname,
+        descripcion: req.body.descripcion || null,
+        ruta: req.file.path,
+        tamanoArchivo: req.file.size,
+        formatoArchivo: req.file.mimetype,
+        creadoPor: req.user!.id
+      });
+      
+      res.status(201).json(documento);
+    } catch (error) {
+      console.error("Error al subir documento:", error);
+      res.status(500).json({ error: "Error al subir el documento" });
+    }
+  });
+
+  // Obtener documentos de una inspección
+  app.get("/api/inspecciones/:id/documentos", async (req, res) => {
+    try {
+      const inspeccionId = parseInt(req.params.id);
+      if (isNaN(inspeccionId)) {
+        return res.status(400).json({ error: "ID de inspección inválido" });
+      }
+      
+      const documentos = await storage.getDocumentosByInspeccion(inspeccionId);
+      res.json(documentos);
+    } catch (error) {
+      console.error(`Error al obtener documentos para la inspección ${req.params.id}:`, error);
+      res.status(500).json({ error: "Error al obtener los documentos" });
+    }
+  });
+
+  // Descargar un documento
+  app.get("/api/documentos-inspeccion/:id/descargar", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "ID de documento inválido" });
+      }
+      
+      const documento = await storage.getDocumentoInspeccion(id);
+      if (!documento) {
+        return res.status(404).json({ error: "Documento no encontrado" });
+      }
+      
+      // Verificar que el archivo existe
+      if (!fs.existsSync(documento.ruta)) {
+        return res.status(404).json({ error: "El archivo no existe en el servidor" });
+      }
+      
+      // Sanitizar el título para la descarga (eliminar caracteres que puedan causar problemas)
+      const sanitizedTitulo = documento.titulo.replace(/[^\w\s.-]/g, '_');
+      
+      // Registrar la descarga en los logs (opcional)
+      console.log(`Documento descargado: ID=${id}, Título=${documento.titulo}, Usuario=${req.user?.id || 'anónimo'}`);
+      
+      // Enviar el archivo para su descarga
+      res.download(documento.ruta, sanitizedTitulo);
+    } catch (error) {
+      console.error(`Error al descargar documento con ID ${req.params.id}:`, error);
+      res.status(500).json({ error: "Error al descargar el documento" });
+    }
+  });
+
+  // Eliminar un documento
+  app.delete("/api/documentos-inspeccion/:id", requireRole(["SuperAdmin", "Admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "ID de documento inválido" });
+      }
+      
+      const documento = await storage.getDocumentoInspeccion(id);
+      if (!documento) {
+        return res.status(404).json({ error: "Documento no encontrado" });
+      }
+      
+      // Obtener la inspección a la que pertenece el documento
+      const inspeccion = await storage.getInspeccion(documento.inspeccionId);
+      if (inspeccion && req.user!.role === "Admin" && inspeccion.creadoPor !== req.user!.id) {
+        return res.status(403).json({ error: "Solo puedes eliminar documentos de tus inspecciones" });
+      }
+      
+      // Intentar eliminar el archivo físico si existe
+      try {
+        if (fs.existsSync(documento.ruta)) {
+          fs.unlinkSync(documento.ruta);
+          console.log(`Archivo físico eliminado: ${documento.ruta}`);
+        }
+      } catch (fileError) {
+        console.error(`Error al eliminar el archivo físico (${documento.ruta}):`, fileError);
+        // Continuamos con la eliminación del registro aunque no se haya podido eliminar el archivo
+      }
+      
+      // Eliminar el registro del documento
+      await storage.deleteDocumentoInspeccion(id);
+      
+      res.json({ success: true, message: "Documento eliminado correctamente" });
+    } catch (error) {
+      console.error(`Error al eliminar documento con ID ${req.params.id}:`, error);
+      res.status(500).json({ error: "Error al eliminar el documento" });
     }
   });
 }
