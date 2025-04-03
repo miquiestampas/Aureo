@@ -53,7 +53,8 @@ import {
   X,
   ArrowUp,
   ArrowDown,
-  ArrowUpDown
+  ArrowUpDown,
+  RefreshCw
 } from "lucide-react";
 import FileUploadModal from "@/components/FileUploadModal";
 import { ColumnDef } from "@tanstack/react-table";
@@ -821,7 +822,7 @@ export default function DashboardPage() {
               onClick={() => handleOpenReassignDialog(row.original)}
               title="Reasignar tienda"
             >
-              <Building2 className="h-4 w-4" />
+              <RefreshCw className="h-4 w-4" />
             </Button>
             
             <AlertDialog>
