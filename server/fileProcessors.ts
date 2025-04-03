@@ -490,58 +490,155 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       
     } else if (ext === '.csv') {
       // Process CSV file
-      const rows: any[] = [];
+      console.log(`Processing CSV file: ${path.basename(filePath)}`);
       
-      // Read CSV file
-      const csvStream = fs.createReadStream(filePath)
-        .pipe(csvParser({
-          skipLines: 0,
-          headers: false
-        }));
+      // Primero intentar extraer el código de tienda del nombre del archivo
+      let extractedStoreCodeFromFilename = '';
+      const originalFilename = path.basename(filePath);
       
-      // Collect all rows
-      for await (const row of csvStream) {
-        rows.push(Object.values(row));
+      // Buscar patrones comunes en nombres de archivo CSV
+      // 1. Buscar patrón "J" seguido de números y letras (formato común)
+      const jPattern = /\b(J\d{5}[A-Z0-9]{4,5})\b/i;
+      const jMatch = originalFilename.match(jPattern);
+      
+      if (jMatch && jMatch[1]) {
+        extractedStoreCodeFromFilename = jMatch[1].toUpperCase();
+        console.log(`Extracted store code from CSV filename (format J+5digits+4-5chars): ${extractedStoreCodeFromFilename}`);
+      } 
+      // 2. Buscar formato de tipo JNNNNAANNN o JNNNNLAAAA
+      else {
+        const jExtendedPattern = /\b(J\d{4,5}[A-Z]{2}\d{1,5})\b/i;
+        const jExtendedMatch = originalFilename.match(jExtendedPattern);
+        
+        if (jExtendedMatch && jExtendedMatch[1]) {
+          extractedStoreCodeFromFilename = jExtendedMatch[1].toUpperCase();
+          console.log(`Extracted store code from CSV filename (format JNNNNAA): ${extractedStoreCodeFromFilename}`);
+        }
       }
       
-      // Find header row (maximum first 10 rows)
+      // 3. Si no se encontró con los patrones anteriores, verificar códigos existentes en el nombre del archivo
+      if (!extractedStoreCodeFromFilename) {
+        // Obtener todos los códigos de tienda existentes
+        const allStores = await storage.getStores();
+        
+        // Verificar si algún código de tienda existente está en el nombre del archivo
+        for (const store of allStores) {
+          if (originalFilename.toUpperCase().includes(store.code.toUpperCase())) {
+            extractedStoreCodeFromFilename = store.code;
+            console.log(`Found existing store code in CSV filename: ${extractedStoreCodeFromFilename}`);
+            break;
+          }
+        }
+      }
+      
+      // Leer el archivo CSV
+      const rows: any[] = [];
+      
+      try {
+        const csvStream = fs.createReadStream(filePath)
+          .pipe(csvParser({
+            skipLines: 0,
+            headers: false
+          }));
+        
+        // Recolectar todas las filas
+        for await (const row of csvStream) {
+          rows.push(Object.values(row));
+        }
+        
+        console.log(`CSV file has ${rows.length} rows total`);
+      } catch (csvError) {
+        console.error(`Error reading CSV file: ${csvError}`);
+        throw new Error(`Error al leer archivo CSV: ${csvError.message}`);
+      }
+      
+      // Encontrar fila de cabecera (máximo primeras 15 filas)
       let headerRowIndex = 0;
       let foundHeader = false;
       
-      for (let i = 0; i < Math.min(10, rows.length); i++) {
-        const headerText = rows[i].join(' ').toLowerCase();
+      // Palabras clave más comunes en cabeceras de archivos
+      const headerKeywords = [
+        'fecha', 'date', 'nombre', 'name', 'cliente', 'document', 'documentacion',
+        'identificacion', 'id', 'importe', 'import', 'valor', 'value', 'precio', 'price',
+        'número', 'nro', 'no.', 'código', 'code', 'concepto', 'articulo', 'item'
+      ];
+      
+      // Buscar fila con máximas coincidencias de palabras clave
+      let maxKeywordMatches = 0;
+      
+      for (let i = 0; i < Math.min(15, rows.length); i++) {
+        if (!rows[i] || rows[i].length === 0) continue;
         
-        if (
-          headerText.includes('fecha') || 
-          headerText.includes('nombre') || 
-          headerText.includes('document') ||
-          headerText.includes('id') ||
-          headerText.includes('import')
-        ) {
+        const headerText = rows[i].join(' ').toLowerCase();
+        let keywordMatches = 0;
+        
+        for (const keyword of headerKeywords) {
+          if (headerText.includes(keyword)) {
+            keywordMatches++;
+          }
+        }
+        
+        if (keywordMatches > maxKeywordMatches) {
+          maxKeywordMatches = keywordMatches;
           headerRowIndex = i;
           foundHeader = true;
-          console.log(`Found header row at index ${headerRowIndex}`);
-          break;
         }
       }
       
-      // If no header row found, assume first row is header
-      if (!foundHeader && rows.length > 0) {
+      if (foundHeader) {
+        console.log(`Found header row at index ${headerRowIndex} with ${maxKeywordMatches} keyword matches`);
+        console.log(`Header content: ${rows[headerRowIndex].join(' | ')}`);
+      } else if (rows.length > 0) {
+        // Si no se encontró cabecera, asumir la primera fila
         headerRowIndex = 0;
         console.log(`No header row found, assuming first row (${headerRowIndex}) is header`);
+        console.log(`Assumed header content: ${rows[0].join(' | ')}`);
       }
       
-      // Skip header row and process data rows
+      // Si encontramos código de tienda en el nombre del archivo, usar ese en lugar del proporcionado
+      const storeCodeToUse = extractedStoreCodeFromFilename || storeCode;
+      console.log(`Using store code for CSV processing: ${storeCodeToUse}`);
+      
+      // Saltear fila de cabecera y procesar filas de datos
+      let validRowsProcessed = 0;
+      
       for (let i = headerRowIndex + 1; i < rows.length; i++) {
-        // Skip empty rows
-        if (rows[i].every((val: any) => val === undefined || val === null || val === '')) {
+        // Saltear filas vacías
+        if (!rows[i] || rows[i].length === 0 || rows[i].every((val: any) => val === undefined || val === null || val === '')) {
           continue;
         }
         
-        // Create data object
-        const excelData = createExcelDataFromValues(rows[i], storeCode, activityId);
+        // Crear objeto de datos
+        const excelData = createExcelDataFromValues(rows[i], storeCodeToUse, activityId);
         if (excelData) {
           processedRows.push(excelData);
+          validRowsProcessed++;
+        }
+      }
+      
+      console.log(`Processed ${validRowsProcessed} valid data rows from CSV file`);
+      
+      // Si encontramos código de tienda en el nombre del archivo pero es diferente del proporcionado,
+      // actualizar la actividad con el código detectado
+      if (extractedStoreCodeFromFilename && extractedStoreCodeFromFilename !== storeCode) {
+        console.log(`Updating activity ${activityId} with detected store code: ${extractedStoreCodeFromFilename}`);
+        try {
+          // Comprobar si el código existe en la base de datos
+          const storeExists = await storage.getStoreByCode(extractedStoreCodeFromFilename);
+          
+          if (storeExists) {
+            await storage.updateFileActivity(activityId, {
+              storeCode: extractedStoreCodeFromFilename
+            });
+            console.log(`Updated file activity with detected store code: ${extractedStoreCodeFromFilename}`);
+          } else {
+            console.log(`Detected store code ${extractedStoreCodeFromFilename} not found in database. Will be used as suggestion.`);
+            await storage.updateFileActivity(activityId, {
+              detectedStoreCode: extractedStoreCodeFromFilename
+            });
+          }
+        } catch (updateError) {
+          console.error(`Error updating file activity with detected store code:`, updateError);
         }
       }
       
