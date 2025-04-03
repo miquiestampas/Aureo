@@ -543,7 +543,12 @@ export default function StoreManagementPage() {
       });
       setIsEditDialogOpen(false);
       setSelectedStore(null);
+      
+      // Actualizar los datos en esta página
       refetchStores();
+      
+      // Invalidar todas las consultas relacionadas con tiendas en cualquier componente
+      queryClient.invalidateQueries({ queryKey: ['/api/stores'] });
     },
     onError: (error: Error) => {
       toast({
@@ -566,7 +571,12 @@ export default function StoreManagementPage() {
       });
       setIsDeleteDialogOpen(false);
       setSelectedStore(null);
+      
+      // Actualizar los datos en esta página
       refetchStores();
+      
+      // Invalidar todas las consultas relacionadas con tiendas en cualquier componente
+      queryClient.invalidateQueries({ queryKey: ['/api/stores'] });
     },
     onError: (error: Error) => {
       toast({
@@ -798,7 +808,12 @@ export default function StoreManagementPage() {
       // Cerrar el diálogo y limpiar el estado
       setIsImportDialogOpen(false);
       setUploadedFile(null);
+      
+      // Actualizar los datos en esta página
       refetchStores();
+      
+      // Invalidar todas las consultas relacionadas con tiendas en cualquier componente
+      queryClient.invalidateQueries({ queryKey: ['/api/stores'] });
       
     } catch (error) {
       toast({
