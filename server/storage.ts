@@ -1,7 +1,7 @@
 import { 
   users, stores, systemConfigs, fileActivities, excelData, pdfDocuments,
   watchlistPersons, watchlistItems, alerts, searchHistory,
-  senalPersonas, senalObjetos, coincidencias, inspecciones, documentosInspeccion,
+  senalPersonas, senalObjetos, coincidencias,
   type User, type InsertUser, type Store, type InsertStore, 
   type SystemConfig, type InsertSystemConfig, type FileActivity, 
   type InsertFileActivity, type ExcelData, type InsertExcelData,
@@ -12,9 +12,7 @@ import {
   type SearchHistory, type InsertSearchHistory,
   type SenalPersona, type InsertSenalPersona,
   type SenalObjeto, type InsertSenalObjeto,
-  type Coincidencia, type InsertCoincidencia,
-  type Inspeccion, type InsertInspeccion,
-  type DocumentoInspeccion, type InsertDocumentoInspeccion
+  type Coincidencia, type InsertCoincidencia
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -157,33 +155,6 @@ export interface IStorage {
   detectarCoincidencias(excelDataId: number): Promise<{ nuevasCoincidencias: number }>;
   deleteCoincidencia(id: number): Promise<boolean>;
   deleteCoincidenciasPorLote(ids: number[]): Promise<{borradas: number, total: number}>;
-  
-  // Inspecciones
-  createInspeccion(inspeccion: InsertInspeccion): Promise<Inspeccion>;
-  getInspecciones(filtros?: {
-    storeCode?: string,
-    resultado?: string,
-    fechaDesde?: string,
-    fechaHasta?: string,
-    estado?: string
-  }): Promise<Inspeccion[]>;
-  getInspeccion(id: number): Promise<Inspeccion | undefined>;
-  updateInspeccion(id: number, inspeccion: Partial<Inspeccion>): Promise<Inspeccion | undefined>;
-  deleteInspeccion(id: number): Promise<boolean>;
-  getInspeccionesByStore(storeCode: string): Promise<Inspeccion[]>;
-  getEstadisticasInspecciones(): Promise<{
-    total: number,
-    favorables: number,
-    desfavorables: number,
-    conSancion: number,
-    sinSancion: number
-  }>;
-  
-  // Documentos de Inspección
-  createDocumentoInspeccion(documento: InsertDocumentoInspeccion): Promise<DocumentoInspeccion>;
-  getDocumentosInspeccion(inspeccionId: number): Promise<DocumentoInspeccion[]>;
-  getDocumentoInspeccion(id: number): Promise<DocumentoInspeccion | undefined>;
-  deleteDocumentoInspeccion(id: number): Promise<boolean>;
 
   // Database cleaning methods
   purgeExcelStores(): Promise<{ count: number }>;
@@ -194,26 +165,6 @@ export interface IStorage {
   purgeFileActivities(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }>;
   purgeAllData(dateRange?: { from: string | null, to: string | null }): Promise<{ count: number }>;
   purgeEntireDatabase(): Promise<{ tablesAffected: number }>;
-  
-  // Métodos para inspecciones
-  createInspeccion(inspeccion: InsertInspeccion): Promise<Inspeccion>;
-  getInspecciones(params?: {
-    storeId?: number;
-    inspectorId?: number;
-    fechaDesde?: string;
-    fechaHasta?: string;
-    estado?: string;
-  }): Promise<Inspeccion[]>;
-  getInspeccion(id: number): Promise<Inspeccion | undefined>;
-  updateInspeccion(id: number, updates: Partial<Inspeccion>): Promise<Inspeccion | undefined>;
-  deleteInspeccion(id: number): Promise<boolean>;
-  
-  // Métodos para documentos de inspección
-  createDocumentoInspeccion(documento: InsertDocumentoInspeccion): Promise<DocumentoInspeccion>;
-  getDocumentosByInspeccion(inspeccionId: number): Promise<DocumentoInspeccion[]>;
-  getDocumentoInspeccion(id: number): Promise<DocumentoInspeccion | undefined>;
-  updateDocumentoInspeccion(id: number, updates: Partial<DocumentoInspeccion>): Promise<DocumentoInspeccion | undefined>;
-  deleteDocumentoInspeccion(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -230,8 +181,6 @@ export class MemStorage implements IStorage {
   private senalPersonas: Map<number, SenalPersona>;
   private senalObjetos: Map<number, SenalObjeto>;
   private coincidencias: Map<number, Coincidencia>;
-  private inspecciones: Map<number, Inspeccion>;
-  private documentosInspeccion: Map<number, DocumentoInspeccion>;
   
   sessionStore: any; // Using any to bypass type issues with express-session
   
@@ -248,8 +197,6 @@ export class MemStorage implements IStorage {
   private senalPersonaId: number;
   private senalObjetoId: number;
   private coincidenciaId: number;
-  private inspeccionId: number;
-  private documentoInspeccionId: number;
 
   constructor() {
     this.users = new Map();
@@ -265,8 +212,6 @@ export class MemStorage implements IStorage {
     this.senalPersonas = new Map();
     this.senalObjetos = new Map();
     this.coincidencias = new Map();
-    this.inspecciones = new Map();
-    this.documentosInspeccion = new Map();
     
     this.userId = 1;
     this.storeId = 1;
@@ -281,8 +226,6 @@ export class MemStorage implements IStorage {
     this.senalPersonaId = 1;
     this.senalObjetoId = 1;
     this.coincidenciaId = 1;
-    this.inspeccionId = 1;
-    this.documentoInspeccionId = 1;
     
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // prune expired entries every 24h
@@ -1391,152 +1334,6 @@ export class MemStorage implements IStorage {
       .filter(history => history.userId === userId)
       .sort((a, b) => b.searchDate.getTime() - a.searchDate.getTime())
       .slice(0, limit);
-  }
-
-  // Implementación de métodos para inspecciones
-  async createInspeccion(inspeccion: InsertInspeccion): Promise<Inspeccion> {
-    const id = this.inspeccionId++;
-    const now = new Date().toISOString();
-    
-    const nuevaInspeccion: Inspeccion = {
-      ...inspeccion,
-      id,
-      fechaCreacion: now,
-      ultimaActualizacion: now
-    };
-    
-    this.inspecciones.set(id, nuevaInspeccion);
-    return nuevaInspeccion;
-  }
-  
-  async getInspecciones(params?: {
-    storeId?: number;
-    inspectorId?: number;
-    fechaDesde?: string;
-    fechaHasta?: string;
-    estado?: string;
-  }): Promise<Inspeccion[]> {
-    let inspecciones = Array.from(this.inspecciones.values());
-    
-    if (params) {
-      // Filtrar por tienda
-      if (params.storeId !== undefined) {
-        inspecciones = inspecciones.filter(i => i.tiendaId === params.storeId);
-      }
-      
-      // Filtrar por inspector
-      if (params.inspectorId !== undefined) {
-        inspecciones = inspecciones.filter(i => 
-          i.inspectores.some(inspector => inspector === params.inspectorId)
-        );
-      }
-      
-      // Filtrar por fecha de inspección
-      if (params.fechaDesde || params.fechaHasta) {
-        inspecciones = inspecciones.filter(i => {
-          const fechaInspeccion = new Date(i.fechaInspeccion);
-          
-          if (params.fechaDesde && params.fechaHasta) {
-            return fechaInspeccion >= new Date(params.fechaDesde) && 
-                   fechaInspeccion <= new Date(params.fechaHasta);
-          } else if (params.fechaDesde) {
-            return fechaInspeccion >= new Date(params.fechaDesde);
-          } else if (params.fechaHasta) {
-            return fechaInspeccion <= new Date(params.fechaHasta);
-          }
-          
-          return true;
-        });
-      }
-      
-      // Filtrar por estado
-      if (params.estado) {
-        inspecciones = inspecciones.filter(i => i.estado === params.estado);
-      }
-    }
-    
-    // Ordenar por fecha de inspección (más reciente primero)
-    return inspecciones.sort((a, b) => {
-      const dateA = new Date(a.fechaInspeccion).getTime();
-      const dateB = new Date(b.fechaInspeccion).getTime();
-      return dateB - dateA;
-    });
-  }
-  
-  async getInspeccion(id: number): Promise<Inspeccion | undefined> {
-    return this.inspecciones.get(id);
-  }
-  
-  async updateInspeccion(id: number, updates: Partial<Inspeccion>): Promise<Inspeccion | undefined> {
-    const inspeccion = this.inspecciones.get(id);
-    if (!inspeccion) return undefined;
-    
-    const updatedInspeccion = {
-      ...inspeccion,
-      ...updates,
-      ultimaActualizacion: new Date().toISOString()
-    };
-    
-    this.inspecciones.set(id, updatedInspeccion);
-    return updatedInspeccion;
-  }
-  
-  async deleteInspeccion(id: number): Promise<boolean> {
-    const eliminada = this.inspecciones.delete(id);
-    
-    // Eliminar todos los documentos asociados a esta inspección
-    if (eliminada) {
-      const docsAEliminar = Array.from(this.documentosInspeccion.values())
-        .filter(doc => doc.inspeccionId === id);
-      
-      for (const doc of docsAEliminar) {
-        this.documentosInspeccion.delete(doc.id);
-      }
-    }
-    
-    return eliminada;
-  }
-  
-  // Implementación de métodos para documentos de inspección
-  async createDocumentoInspeccion(documento: InsertDocumentoInspeccion): Promise<DocumentoInspeccion> {
-    const id = this.documentoInspeccionId++;
-    const now = new Date().toISOString();
-    
-    const nuevoDocumento: DocumentoInspeccion = {
-      ...documento,
-      id,
-      fechaSubida: now
-    };
-    
-    this.documentosInspeccion.set(id, nuevoDocumento);
-    return nuevoDocumento;
-  }
-  
-  async getDocumentosByInspeccion(inspeccionId: number): Promise<DocumentoInspeccion[]> {
-    return Array.from(this.documentosInspeccion.values())
-      .filter(doc => doc.inspeccionId === inspeccionId)
-      .sort((a, b) => new Date(b.fechaSubida).getTime() - new Date(a.fechaSubida).getTime());
-  }
-  
-  async getDocumentoInspeccion(id: number): Promise<DocumentoInspeccion | undefined> {
-    return this.documentosInspeccion.get(id);
-  }
-  
-  async updateDocumentoInspeccion(id: number, updates: Partial<DocumentoInspeccion>): Promise<DocumentoInspeccion | undefined> {
-    const documento = this.documentosInspeccion.get(id);
-    if (!documento) return undefined;
-    
-    const updatedDocumento = {
-      ...documento,
-      ...updates
-    };
-    
-    this.documentosInspeccion.set(id, updatedDocumento);
-    return updatedDocumento;
-  }
-  
-  async deleteDocumentoInspeccion(id: number): Promise<boolean> {
-    return this.documentosInspeccion.delete(id);
   }
 }
 
@@ -4490,233 +4287,6 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`Error al detectar coincidencias para el archivo ${fileActivityId}:`, error);
       return { totalCoincidencias: 0 };
-    }
-  }
-  
-  // Implementación de métodos de inspecciones para DatabaseStorage
-  async createInspeccion(inspeccion: InsertInspeccion): Promise<Inspeccion> {
-    try {
-      const [result] = await db.insert(inspecciones).values({
-        ...inspeccion,
-        fechaCreacion: new Date().toISOString(),
-        ultimaActualizacion: new Date().toISOString()
-      }).returning();
-      
-      return result;
-    } catch (error) {
-      console.error("Error al crear inspección:", error);
-      throw new Error("Error al crear la inspección en la base de datos");
-    }
-  }
-  
-  async getInspecciones(filtros?: {
-    storeCode?: string,
-    resultado?: string,
-    fechaDesde?: string,
-    fechaHasta?: string,
-    estado?: string
-  }): Promise<Inspeccion[]> {
-    try {
-      let query = db.select().from(inspecciones);
-      
-      if (filtros) {
-        // Filtrar por tienda (código de tienda)
-        if (filtros.storeCode) {
-          // Primero necesitamos obtener el ID de la tienda
-          const store = await this.getStoreByCode(filtros.storeCode);
-          if (store) {
-            query = query.where(eq(inspecciones.tiendaId, store.id));
-          }
-        }
-        
-        // Filtrar por resultado
-        if (filtros.resultado) {
-          query = query.where(eq(inspecciones.resultado, filtros.resultado));
-        }
-        
-        // Filtrar por rango de fechas
-        if (filtros.fechaDesde) {
-          query = query.where(gte(inspecciones.fechaInspeccion, filtros.fechaDesde));
-        }
-        
-        if (filtros.fechaHasta) {
-          query = query.where(lte(inspecciones.fechaInspeccion, filtros.fechaHasta));
-        }
-        
-        // Filtrar por estado
-        if (filtros.estado) {
-          query = query.where(eq(inspecciones.estado, filtros.estado));
-        }
-      }
-      
-      // Ordenar por fecha (más reciente primero)
-      query = query.orderBy(desc(inspecciones.fechaInspeccion));
-      
-      return await query;
-    } catch (error) {
-      console.error("Error al obtener inspecciones:", error);
-      throw new Error("Error al consultar las inspecciones en la base de datos");
-    }
-  }
-  
-  async getInspeccion(id: number): Promise<Inspeccion | undefined> {
-    try {
-      const [inspeccion] = await db.select().from(inspecciones).where(eq(inspecciones.id, id));
-      return inspeccion;
-    } catch (error) {
-      console.error(`Error al obtener inspección con ID ${id}:`, error);
-      throw new Error("Error al consultar la inspección en la base de datos");
-    }
-  }
-  
-  async updateInspeccion(id: number, updates: Partial<Inspeccion>): Promise<Inspeccion | undefined> {
-    try {
-      const [inspeccion] = await db.update(inspecciones)
-        .set({
-          ...updates,
-          ultimaActualizacion: new Date().toISOString()
-        })
-        .where(eq(inspecciones.id, id))
-        .returning();
-      
-      return inspeccion;
-    } catch (error) {
-      console.error(`Error al actualizar inspección con ID ${id}:`, error);
-      throw new Error("Error al actualizar la inspección en la base de datos");
-    }
-  }
-  
-  async deleteInspeccion(id: number): Promise<boolean> {
-    try {
-      // Primero, eliminar todos los documentos asociados
-      await db.delete(documentosInspeccion).where(eq(documentosInspeccion.inspeccionId, id));
-      
-      // Luego, eliminar la inspección
-      const result = await db.delete(inspecciones).where(eq(inspecciones.id, id));
-      
-      return true;
-    } catch (error) {
-      console.error(`Error al eliminar inspección con ID ${id}:`, error);
-      throw new Error("Error al eliminar la inspección de la base de datos");
-    }
-  }
-  
-  async getInspeccionesByStore(storeCode: string): Promise<Inspeccion[]> {
-    try {
-      // Primero obtener el ID de la tienda
-      const store = await this.getStoreByCode(storeCode);
-      
-      if (!store) {
-        return [];
-      }
-      
-      const result = await db.select()
-        .from(inspecciones)
-        .where(eq(inspecciones.tiendaId, store.id))
-        .orderBy(desc(inspecciones.fechaInspeccion));
-      
-      return result;
-    } catch (error) {
-      console.error(`Error al obtener inspecciones para la tienda ${storeCode}:`, error);
-      throw new Error("Error al consultar las inspecciones de la tienda en la base de datos");
-    }
-  }
-  
-  async getEstadisticasInspecciones(): Promise<{
-    total: number,
-    favorables: number,
-    desfavorables: number,
-    conSancion: number,
-    sinSancion: number
-  }> {
-    try {
-      // Obtener todas las inspecciones
-      const todasLasInspecciones = await db.select().from(inspecciones);
-      
-      // Calcular las estadísticas
-      const stats = {
-        total: todasLasInspecciones.length,
-        favorables: todasLasInspecciones.filter(i => i.resultado === 'Favorable').length,
-        desfavorables: todasLasInspecciones.filter(i => i.resultado === 'Desfavorable').length,
-        conSancion: todasLasInspecciones.filter(i => i.sancion).length,
-        sinSancion: todasLasInspecciones.filter(i => !i.sancion).length
-      };
-      
-      return stats;
-    } catch (error) {
-      console.error("Error al obtener estadísticas de inspecciones:", error);
-      throw new Error("Error al calcular las estadísticas de inspecciones");
-    }
-  }
-  
-  // Implementación de métodos para documentos de inspección
-  async createDocumentoInspeccion(documento: InsertDocumentoInspeccion): Promise<DocumentoInspeccion> {
-    try {
-      const [result] = await db.insert(documentosInspeccion).values({
-        ...documento,
-        fechaSubida: new Date().toISOString()
-      }).returning();
-      
-      return result;
-    } catch (error) {
-      console.error("Error al crear documento de inspección:", error);
-      throw new Error("Error al crear el documento de inspección en la base de datos");
-    }
-  }
-  
-  async getDocumentosInspeccion(inspeccionId: number): Promise<DocumentoInspeccion[]> {
-    try {
-      const documentos = await db.select()
-        .from(documentosInspeccion)
-        .where(eq(documentosInspeccion.inspeccionId, inspeccionId))
-        .orderBy(desc(documentosInspeccion.fechaSubida));
-      
-      return documentos;
-    } catch (error) {
-      console.error(`Error al obtener documentos para la inspección ${inspeccionId}:`, error);
-      throw new Error("Error al consultar los documentos de la inspección");
-    }
-  }
-  
-  // Alias para getDocumentosInspeccion para mantener consistencia con los nombres de las rutas
-  async getDocumentosByInspeccion(inspeccionId: number): Promise<DocumentoInspeccion[]> {
-    return this.getDocumentosInspeccion(inspeccionId);
-  }
-  
-  async getDocumentoInspeccion(id: number): Promise<DocumentoInspeccion | undefined> {
-    try {
-      const [documento] = await db.select()
-        .from(documentosInspeccion)
-        .where(eq(documentosInspeccion.id, id));
-      
-      return documento;
-    } catch (error) {
-      console.error(`Error al obtener documento con ID ${id}:`, error);
-      throw new Error("Error al consultar el documento de inspección");
-    }
-  }
-  
-  async deleteDocumentoInspeccion(id: number): Promise<boolean> {
-    try {
-      await db.delete(documentosInspeccion).where(eq(documentosInspeccion.id, id));
-      return true;
-    } catch (error) {
-      console.error(`Error al eliminar documento con ID ${id}:`, error);
-      throw new Error("Error al eliminar el documento de inspección");
-    }
-  }
-  
-  async updateDocumentoInspeccion(id: number, updates: Partial<DocumentoInspeccion>): Promise<DocumentoInspeccion | undefined> {
-    try {
-      const [documento] = await db.update(documentosInspeccion)
-        .set(updates)
-        .where(eq(documentosInspeccion.id, id))
-        .returning();
-      
-      return documento;
-    } catch (error) {
-      console.error(`Error al actualizar documento con ID ${id}:`, error);
-      throw new Error("Error al actualizar el documento de inspección");
     }
   }
   
