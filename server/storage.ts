@@ -3736,8 +3736,7 @@ export class DatabaseStorage implements IStorage {
           valorCoincidente: result.valor_coincidente,
           revisadoPor: result.revisado_por,
           revisadoEn: result.revisado_en,
-          notasRevision: result.notas_revision,
-          interesado: result.interesado
+          notasRevision: result.notas_revision
         } as Coincidencia;
       }
       
@@ -3791,8 +3790,7 @@ export class DatabaseStorage implements IStorage {
             valorCoincidente: row.valor_coincidente,
             revisadoPor: row.revisado_por,
             revisadoEn: row.revisado_en,
-            notasRevision: row.notas_revision,
-            interesado: row.interesado
+            notasRevision: row.notas_revision
           } as Coincidencia;
         });
       }
@@ -3831,8 +3829,7 @@ export class DatabaseStorage implements IStorage {
           valorCoincidente: row.valor_coincidente,
           revisadoPor: row.revisado_por,
           revisadoEn: row.revisado_en,
-          notasRevision: row.notas_revision,
-          interesado: row.interesado
+          notasRevision: row.notas_revision
         } as Coincidencia;
       }
       
@@ -3882,8 +3879,7 @@ export class DatabaseStorage implements IStorage {
           valorCoincidente: result.valor_coincidente,
           revisadoPor: result.revisado_por,
           revisadoEn: result.revisado_en,
-          notasRevision: result.notas_revision,
-          interesado: result.interesado
+          notasRevision: result.notas_revision
         } as Coincidencia;
       }
       
