@@ -137,7 +137,7 @@ export default function Inspecciones() {
   // Mutaciones
   const createInspeccionMutation = useMutation({
     mutationFn: (data: z.infer<typeof inspeccionSchema>) => 
-      apiRequest('/api/inspecciones', 'POST', data),
+      apiRequest('POST', '/api/inspecciones', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/inspecciones'] });
       toast({
@@ -157,7 +157,7 @@ export default function Inspecciones() {
 
   const updateInspeccionMutation = useMutation({
     mutationFn: (data: z.infer<typeof inspeccionSchema> & { id: number }) => 
-      apiRequest(`/api/inspecciones/${data.id}`, 'PUT', data),
+      apiRequest('PUT', `/api/inspecciones/${data.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/inspecciones'] });
       toast({
@@ -179,7 +179,7 @@ export default function Inspecciones() {
   const uploadDocumentoMutation = useMutation({
     mutationFn: async (data: { formData: FormData, inspeccionId: number }) => {
       const { formData, inspeccionId } = data;
-      return apiRequest(`/api/documentos-inspeccion/${inspeccionId}`, 'POST', formData, false);
+      return apiRequest('POST', `/api/documentos-inspeccion/${inspeccionId}`, formData, false);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/documentos-inspeccion', selectedInspeccion?.id] });
@@ -200,7 +200,7 @@ export default function Inspecciones() {
   });
 
   const deleteDocumentoMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/documentos-inspeccion/${id}`, 'DELETE'),
+    mutationFn: (id: number) => apiRequest('DELETE', `/api/documentos-inspeccion/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/documentos-inspeccion', selectedInspeccion?.id] });
       toast({
