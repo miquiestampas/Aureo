@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Shield,
   Bell,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -165,7 +166,14 @@ export default function Sidebar() {
             userRole={user?.role}
           />
           
-
+          <NavItem
+            href="/inspecciones"
+            icon={<ClipboardCheck size={20} />}
+            label="Inspecciones"
+            active={location === '/inspecciones'}
+            requiredRoles={["SuperAdmin", "Admin"]}
+            userRole={user?.role}
+          />
           
           {/* Sistema Section */}
           <div className="mt-6 mb-2">

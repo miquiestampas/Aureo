@@ -23,6 +23,7 @@ import PurchaseControlPage from "@/pages/purchase-control";
 import SenalamientosPage from "@/pages/senalamientos";
 import CoincidenciasPage from "@/pages/coincidencias";
 import PdfListingsPage from "@/pages/pdf-listings";
+import InspeccionesPage from "@/pages/inspecciones";
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -154,6 +155,16 @@ function Router() {
         component={() => (
           <AppLayout>
             <PdfListingsPage />
+          </AppLayout>
+        )} 
+      />
+      
+      <ProtectedRoute 
+        path="/inspecciones" 
+        roles={["SuperAdmin", "Admin"]}
+        component={() => (
+          <AppLayout>
+            <InspeccionesPage />
           </AppLayout>
         )} 
       />
