@@ -1000,22 +1000,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Volver a procesar el archivo ahora que tiene una tienda asignada
-      const filePath = path.join(
-        activity.fileType === 'Excel' ? './uploads/excel' : './uploads/pdf',
-        activity.filename
-      );
+      // Buscar el archivo en diferentes ubicaciones posibles
+      let filePath = null;
+      let fileName = activity.filename;
+      
+      // Directorios base a comprobar
+      let baseDirs = [];
       
       if (activity.fileType === 'Excel') {
-        // Para Excel, procesar el archivo
-        processExcelFile(filePath, activityId, targetStoreCode)
-          .catch(err => console.error(`Error al procesar Excel después de asignar tienda:`, err));
-      } else {
-        // Para PDF, procesar el archivo
-        processPdfFile(filePath, activityId, targetStoreCode)
-          .catch(err => console.error(`Error al procesar PDF después de asignar tienda:`, err));
+        baseDirs = ["./uploads/excel", "./data/excel"];
+      } else if (activity.fileType === 'PDF') {
+        baseDirs = ["./uploads/pdf", "./data/pdf"];
       }
       
-      res.json(updatedActivity);
+      // Buscar en todas las rutas posibles
+      for (const baseDir of baseDirs) {
+        // Rutas a comprobar (incluye directorio de "procesados")
+        const pathsToCheck = [
+          path.join(baseDir, fileName),                     // Ruta original
+          path.join(baseDir, "procesados", fileName)        // Carpeta "procesados"
+        ];
+        
+        // Comprobar todas las rutas
+        for (const checkPath of pathsToCheck) {
+          if (fs.existsSync(checkPath)) {
+            filePath = checkPath;
+            console.log(`Encontrado archivo para reasignar tienda en: ${filePath}`);
+            break;
+          }
+        }
+        
+        if (filePath) break; // Si encontramos el archivo, salir del bucle exterior
+        
+        // Si no se encontró el archivo exacto, buscar por nombre parcial
+        if (!filePath) {
+          const baseFileName = fileName.replace(/\.[^/.]+$/, ''); // Nombre sin extensión
+          const extension = path.extname(fileName);
+          
+          // Buscar en directorio principal
+          if (fs.existsSync(baseDir)) {
+            try {
+              const mainDir = fs.readdirSync(baseDir);
+              for (const file of mainDir) {
+                if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+                  filePath = path.join(baseDir, file);
+                  fileName = file;
+                  console.log(`Encontrado archivo por coincidencia parcial: ${filePath}`);
+                  break;
+                }
+              }
+            } catch (err) {
+              console.error(`Error al leer directorio ${baseDir}:`, err);
+            }
+          }
+          
+          // Si no se encontró, buscar en directorio "procesados"
+          if (!filePath) {
+            const processedDir = path.join(baseDir, "procesados");
+            if (fs.existsSync(processedDir)) {
+              try {
+                const processedFiles = fs.readdirSync(processedDir);
+                for (const file of processedFiles) {
+                  if (file.startsWith(baseFileName) && file.endsWith(extension)) {
+                    filePath = path.join(processedDir, file);
+                    fileName = file;
+                    console.log(`Encontrado archivo por coincidencia parcial en procesados: ${filePath}`);
+                    break;
+                  }
+                }
+              } catch (err) {
+                console.error(`Error al leer directorio ${processedDir}:`, err);
+              }
+            }
+          }
+          
+          if (filePath) break; // Si encontramos el archivo, salir del bucle exterior
+        }
+      }
+      
+      // Verificar si encontramos el archivo
+      if (!filePath) {
+        console.error(`No se encontró el archivo ${activity.filename} en ninguna de las rutas buscadas`);
+        // Actualizar la actividad para indicar que no se pudo encontrar el archivo
+        await storage.updateFileActivity(activityId, {
+          status: 'Failed',
+          errorMessage: 'No se encontró el archivo físico para procesar. Verifique si fue eliminado o movido.'
+        });
+        
+        // Devolver respuesta al cliente
+        return res.status(200).json({
+          ...updatedActivity,
+          status: 'Failed',
+          errorMessage: 'No se encontró el archivo físico para procesar. Verifique si fue eliminado o movido.'
+        });
+      }
+      
+      console.log(`Procesando archivo ${filePath} con activityId ${activityId} y storeCode ${targetStoreCode}`);
+      
+      try {
+        if (activity.fileType === 'Excel') {
+          // Para Excel, procesar el archivo de forma sincrónica
+          const result = await processExcelFile(filePath, activityId, targetStoreCode);
+          console.log(`Resultado de procesar Excel después de asignar tienda:`, result);
+        } else {
+          // Para PDF, procesar el archivo de forma sincrónica
+          const result = await processPdfFile(filePath, activityId, targetStoreCode);
+          console.log(`Resultado de procesar PDF después de asignar tienda:`, result);
+        }
+        
+        // Obtener estado actualizado de la actividad
+        const finalActivity = await storage.getFileActivity(activityId);
+        
+        // Devolver respuesta al cliente con el estado final
+        return res.json(finalActivity);
+      } catch (err) {
+        console.error(`Error al procesar archivo después de asignar tienda:`, err);
+        
+        // Actualizar la actividad con el error
+        await storage.updateFileActivity(activityId, {
+          status: 'Failed',
+          errorMessage: `Error al procesar archivo: ${err.message || 'Error desconocido'}`
+        });
+        
+        // Devolver respuesta al cliente con el error
+        const failedActivity = await storage.getFileActivity(activityId);
+        return res.json(failedActivity);
+      }
     } catch (error) {
       next(error);
     }

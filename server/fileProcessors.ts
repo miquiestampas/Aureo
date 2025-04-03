@@ -1174,6 +1174,56 @@ export async function processPdfFile(filePath: string, activityId: number, store
       console.log(`No store code pattern matched in filename: ${filename}`);
     }
     
+    // Verificar si tenemos un storeCode pasado como parámetro (asignación manual)
+    // o si hemos encontrado una tienda válida en la base de datos
+    if (storeCode && storeCode !== 'J28aa6') {
+      // Tenemos un código de tienda pasado como parámetro que no es el valor por defecto
+      console.log(`Using explicitly provided store code for PDF: ${storeCode}`);
+      
+      // Verificar que la tienda existe en la base de datos
+      const store = await storage.getStoreByCode(storeCode);
+      if (store) {
+        foundInDatabase = true;
+        console.log(`Found store in database with code ${storeCode}: ${store.name}`);
+        
+        // Crear registro de documento PDF
+        try {
+          // Continuar procesando con el código de tienda proporcionado
+          console.log(`Processing PDF with explicitly assigned store: ${storeCode}`);
+          
+          // Asignar documento PDF
+          const pdfDocument: InsertPdfDocument = {
+            fileActivityId: activityId,
+            storeCode: storeCode,
+            path: filePath,
+            title: path.basename(filePath, '.pdf'),
+            uploadDate: new Date().toISOString(),
+            fileSize: (await fs.promises.stat(filePath)).size,
+            documentType: 'PDF'
+          };
+          
+          // Guardar documento PDF
+          await storage.createPdfDocument(pdfDocument);
+          console.log(`Created PDF document record for file ${filename} with store ${storeCode}`);
+          
+          // Actualizar estado de la actividad a Processed
+          await storage.updateFileActivity(activityId, {
+            status: 'Processed'
+          });
+          
+          // Notificar al frontend
+          emitFileProcessingStatus(activityId, 'Processed');
+          
+          return;
+        } catch (error) {
+          console.error(`Error processing PDF with assigned store:`, error);
+          throw error;
+        }
+      } else {
+        console.error(`Explicitly provided store code ${storeCode} not found in database`);
+      }
+    }
+    
     // Si no hemos encontrado una tienda válida, poner el archivo en estado de asignación pendiente
     if (!foundInDatabase) {
       console.log(`No matching store found for PDF file ${filename}. Setting to PendingStoreAssignment status.`);
