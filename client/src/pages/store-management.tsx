@@ -513,7 +513,12 @@ export default function StoreManagementPage() {
       });
       setIsCreateDialogOpen(false);
       createForm.reset();
+      
+      // Actualizar los datos en esta página
       refetchStores();
+      
+      // Invalidar todas las consultas relacionadas con tiendas en cualquier componente
+      queryClient.invalidateQueries({ queryKey: ['/api/stores'] });
     },
     onError: (error: Error) => {
       toast({
