@@ -19,6 +19,13 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
 import { 
   Tooltip, 
   TooltipContent, 
@@ -203,21 +210,42 @@ function StoreAssignmentCard({ file, onAssigned }: { file: FileActivity, onAssig
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="store-select">Tienda</Label>
-              <Select
-                value={selectedStore}
-                onValueChange={setSelectedStore}
-              >
-                <SelectTrigger id="store-select">
-                  <SelectValue placeholder="Seleccionar tienda" />
-                </SelectTrigger>
-                <SelectContent>
-                  {stores.map((store) => (
-                    <SelectItem key={store.id} value={store.code}>
-                      {store.code} - {store.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="justify-between w-full"
+                    id="store-select"
+                  >
+                    {selectedStore
+                      ? stores.find((store) => store.code === selectedStore)
+                        ? `${selectedStore} - ${stores.find((store) => store.code === selectedStore)?.name}`
+                        : selectedStore
+                      : "Seleccionar tienda"}
+                    <ArrowDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar tienda..." className="h-9" />
+                    <CommandEmpty>No se encontraron tiendas.</CommandEmpty>
+                    <CommandGroup className="max-h-64 overflow-auto">
+                      {stores.map((store) => (
+                        <CommandItem
+                          key={store.id}
+                          value={`${store.code} ${store.name}`}
+                          onSelect={() => {
+                            setSelectedStore(store.code);
+                          }}
+                        >
+                          <span>{store.code} - {store.name}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             
             {file.detectedStoreCode && (
@@ -1292,21 +1320,42 @@ export default function DashboardPage() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="store-select">Tienda</Label>
-              <Select
-                value={selectedStore}
-                onValueChange={setSelectedStore}
-              >
-                <SelectTrigger id="store-select">
-                  <SelectValue placeholder="Seleccionar tienda" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredStores.map((store) => (
-                    <SelectItem key={store.id} value={store.code}>
-                      {store.code} - {store.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="justify-between w-full"
+                    id="store-select"
+                  >
+                    {selectedStore
+                      ? filteredStores.find((store) => store.code === selectedStore)
+                        ? `${selectedStore} - ${filteredStores.find((store) => store.code === selectedStore)?.name}`
+                        : selectedStore
+                      : "Seleccionar tienda"}
+                    <ArrowDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar tienda..." className="h-9" />
+                    <CommandEmpty>No se encontraron tiendas.</CommandEmpty>
+                    <CommandGroup className="max-h-64 overflow-auto">
+                      {filteredStores.map((store) => (
+                        <CommandItem
+                          key={store.id}
+                          value={`${store.code} ${store.name}`}
+                          onSelect={() => {
+                            setSelectedStore(store.code);
+                          }}
+                        >
+                          <span>{store.code} - {store.name}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             
             {selectedActivityToReassign && selectedActivityToReassign.storeCode && (
