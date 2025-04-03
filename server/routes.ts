@@ -709,6 +709,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Endpoint para renombrar un archivo y procesarlo de nuevo
+  app.post("/api/file-activities/:id/rename", async (req, res, next) => {
+    try {
+      const activityId = parseInt(req.params.id);
+      const { newFilename } = req.body;
+      
+      // Verificar que el ID de actividad es válido
+      const activity = await storage.getFileActivity(activityId);
+      if (!activity) {
+        return res.status(404).json({ message: "Actividad de archivo no encontrada" });
+      }
+      
+      // Verificar que el nuevo nombre no está vacío
+      if (!newFilename || typeof newFilename !== 'string' || newFilename.trim().length === 0) {
+        return res.status(400).json({ message: "Debe proporcionar un nuevo nombre de archivo válido" });
+      }
+      
+      // Ubicaciones de los archivos originales y nuevos
+      let originalFilePath = '';
+      let newFilePath = '';
+      
+      console.log(`Renombrando archivo para la actividad ${activityId}: ${activity.filename} -> ${newFilename}`);
+      
+      // Determinar las rutas según el tipo de archivo
+      if (activity.fileType === 'Excel') {
+        // Para archivos Excel
+        originalFilePath = path.join('./data/excel', activity.status === 'Processed' ? 'procesados' : '', activity.filename);
+        newFilePath = path.join('./data/excel', activity.status === 'Processed' ? 'procesados' : '', newFilename);
+      } else if (activity.fileType === 'PDF') {
+        // Para archivos PDF
+        originalFilePath = path.join('./data/pdf', activity.status === 'Processed' ? 'procesados' : '', activity.filename);
+        newFilePath = path.join('./data/pdf', activity.status === 'Processed' ? 'procesados' : '', newFilename);
+      } else {
+        return res.status(400).json({ message: "Tipo de archivo no soportado" });
+      }
+      
+      // Verificar si el archivo original existe
+      if (!fs.existsSync(originalFilePath)) {
+        console.warn(`El archivo original no existe en la ruta: ${originalFilePath}`);
+        
+        // Buscar el archivo con timestamp en el nombre (formato común para archivos procesados)
+        const dirPath = path.dirname(originalFilePath);
+        const dirFiles = fs.readdirSync(dirPath);
+        
+        // Extraer el nombre base del archivo sin extensión
+        const originalBaseName = path.basename(activity.filename, path.extname(activity.filename));
+        
+        // Buscar archivos que contengan el nombre base original
+        const matchingFiles = dirFiles.filter(file => 
+          file.includes(originalBaseName) && 
+          file.endsWith(path.extname(activity.filename))
+        );
+        
+        if (matchingFiles.length > 0) {
+          // Usar el primer archivo que coincida
+          originalFilePath = path.join(dirPath, matchingFiles[0]);
+          console.log(`Se encontró un archivo alternativo: ${originalFilePath}`);
+        } else {
+          return res.status(404).json({ message: "No se pudo encontrar el archivo físico para renombrar" });
+        }
+      }
+      
+      // Actualizar el registro en la base de datos
+      await storage.updateFileActivity(activityId, {
+        filename: newFilename,
+        status: 'Pending', // Marcar como pendiente para reprocesarlo
+      });
+      
+      // Renombrar el archivo físico
+      fs.renameSync(originalFilePath, newFilePath);
+      console.log(`Archivo renombrado físicamente: ${originalFilePath} -> ${newFilePath}`);
+      
+      // Procesar el archivo de nuevo según su tipo
+      if (activity.fileType === 'Excel') {
+        // La detección del código de tienda se hace en el procesador
+        const result = await processExcelFile(newFilePath, 0, "");
+        res.json({ 
+          success: true, 
+          message: "Archivo Excel renombrado y procesado correctamente", 
+          newFilename, 
+          detectedStoreCode: result?.detectedStoreCode 
+        });
+      } else if (activity.fileType === 'PDF') {
+        // La detección del código de tienda se hace en el procesador
+        const result = await processPdfFile(newFilePath, 0, "");
+        res.json({ 
+          success: true, 
+          message: "Archivo PDF renombrado y procesado correctamente", 
+          newFilename, 
+          detectedStoreCode: result?.detectedStoreCode 
+        });
+      }
+    } catch (error) {
+      console.error("Error al renombrar archivo:", error);
+      next(error);
+    }
+  });
+  
   // Endpoint para asignar una tienda a un archivo pendiente
   app.post("/api/file-activities/:id/assign-store", async (req, res, next) => {
     try {
