@@ -1,0 +1,74 @@
+ Installing build dependencies ... error
+  error: subprocess-exited-with-error
+
+  × pip subprocess to install build dependencies did not run successfully.
+  │ exit code: 1
+  ╰─> [58 lines of output]
+      Ignoring oldest-supported-numpy: markers 'python_version < "3.12"' don't match your environment
+      Collecting meson-python==0.13.1
+        Downloading meson_python-0.13.1-py3-none-any.whl.metadata (4.1 kB)
+      Collecting meson==1.2.1
+        Downloading meson-1.2.1-py3-none-any.whl.metadata (1.7 kB)
+      Collecting wheel
+        Downloading wheel-0.45.1-py3-none-any.whl.metadata (2.3 kB)
+      Collecting Cython<3,>=0.29.33
+        Downloading Cython-0.29.37-py2.py3-none-any.whl.metadata (3.1 kB)
+      Collecting numpy<2,>=1.26.0
+        Downloading numpy-1.26.4.tar.gz (15.8 MB)
+           --------------------------------------- 15.8/15.8 MB 63.4 MB/s eta 0:00:00
+        Installing build dependencies: started
+        Installing build dependencies: finished with status 'done'
+        Getting requirements to build wheel: started
+        Getting requirements to build wheel: finished with status 'done'
+        Installing backend dependencies: started
+        Installing backend dependencies: finished with status 'done'
+        Preparing metadata (pyproject.toml): started
+        Preparing metadata (pyproject.toml): finished with status 'error'
+        error: subprocess-exited-with-error
+
+        Preparing metadata (pyproject.toml) did not run successfully.
+        exit code: 1
+
+        [21 lines of output]
+        + C:\Users\madri\AppData\Local\Programs\Python\Python313\python.exe C:\Users\madri\AppData\Local\Temp\pip-install-t920szhy\numpy_f1af0733c4a749908679670ff6d05b8d\vendored-meson\meson\meson.py setup C:\Users\madri\AppData\Local\Temp\pip-install-t920szhy\numpy_f1af0733c4a749908679670ff6d05b8d C:\Users\madri\AppData\Local\Temp\pip-install-t920szhy\numpy_f1af0733c4a749908679670ff6d05b8d\.mesonpy-xxywqa49 -Dbuildtype=release -Db_ndebug=if-release -Db_vscrt=md --native-file=C:\Users\madri\AppData\Local\Temp\pip-install-t920szhy\numpy_f1af0733c4a749908679670ff6d05b8d\.mesonpy-xxywqa49\meson-python-native-file.ini
+        The Meson build system
+        Version: 1.2.99
+        Source dir: C:\Users\madri\AppData\Local\Temp\pip-install-t920szhy\numpy_f1af0733c4a749908679670ff6d05b8d
+        Build dir: C:\Users\madri\AppData\Local\Temp\pip-install-t920szhy\numpy_f1af0733c4a749908679670ff6d05b8d\.mesonpy-xxywqa49
+        Build type: native build
+        Project name: NumPy
+        Project version: 1.26.4
+        WARNING: Failed to activate VS environment: Could not find C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe
+
+        ..\meson.build:1:0: ERROR: Unknown compiler(s): [['icl'], ['cl'], ['cc'], ['gcc'], ['clang'], ['clang-cl'], ['pgcc']]
+        The following exception(s) were encountered:
+        Running `icl ""` gave "[WinError 2] El sistema no puede encontrar el archivo especificado"
+        Running `cl /?` gave "[WinError 2] El sistema no puede encontrar el archivo especificado"
+        Running `cc --version` gave "[WinError 2] El sistema no puede encontrar el archivo especificado"
+        Running `gcc --version` gave "[WinError 2] El sistema no puede encontrar el archivo especificado"
+        Running `clang --version` gave "[WinError 2] El sistema no puede encontrar el archivo especificado"
+        Running `clang-cl /?` gave "[WinError 2] El sistema no puede encontrar el archivo especificado"
+        Running `pgcc --version` gave "[WinError 2] El sistema no puede encontrar el archivo especificado"
+
+        A full log can be found at C:\Users\madri\AppData\Local\Temp\pip-install-t920szhy\numpy_f1af0733c4a749908679670ff6d05b8d\.mesonpy-xxywqa49\meson-logs\meson-log.txt
+        [end of output]
+
+        note: This error originates from a subprocess, and is likely not a problem with pip.
+      error: metadata-generation-failed
+
+      Encountered error while generating package metadata.
+
+      See above for output.
+
+      note: This is an issue with the package mentioned above, not pip.
+      hint: See above for details.
+      [end of output]
+
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+error: subprocess-exited-with-error
+
+× pip subprocess to install build dependencies did not run successfully.
+│ exit code: 1
+╰─> See above for output.
+
+note: This error originates from a subprocess, and is likely not a problem with pip.
