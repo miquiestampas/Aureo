@@ -5,12 +5,19 @@ import argparse
 
 app = create_app()
 
-# Ejecutar antes del primer request
-@app.before_first_request
-def before_first_request():
+# En Flask 2.0+, before_first_request ha sido eliminado
+# Inicializamos los componentes antes de iniciar el servidor
+
+# Función para inicializar componentes
+def initialize_components():
     # Inicializar vigilantes de archivos
     # La base de datos ya se inicializa en create_app()
     init_watchers()
+
+# Configuramos un evento before_first_request alternativo usando un punto de extensión
+with app.app_context():
+    # Inicializamos los componentes inmediatamente
+    initialize_components()
 
 def parse_arguments():
     """Procesa los argumentos de línea de comandos"""
