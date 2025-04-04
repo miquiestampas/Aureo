@@ -135,7 +135,7 @@ export default function Navbar({ onMenuToggle }: NavbarProps) {
                     {user?.name}
                   </span>
                   <div className="ml-2 flex-shrink-0">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium role-badge">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary text-primary">
                       {user?.role}
                     </span>
                   </div>
