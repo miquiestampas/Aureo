@@ -55,6 +55,9 @@ def init_watchers():
             watcher_thread = threading.Thread(target=start_file_watchers)
             watcher_thread.daemon = True
             watcher_thread.start()
+            print("Vigilantes de archivos iniciados correctamente")
+        else:
+            print("Vigilancia de archivos deshabilitada por configuración")
         return True
     except Exception as e:
         print(f"Error al inicializar vigilantes de archivos: {str(e)}")

@@ -505,10 +505,17 @@ def update_system_config(key):
     
     # Si es la configuración de vigilancia de archivos, actualizar el estado
     if key == 'FILE_WATCHING_ACTIVE':
-        if config.value.lower() == 'true':
-            init_watchers()
-        else:
-            stop_file_watchers()
+        try:
+            if config.value.lower() == 'true':
+                success = init_watchers()
+                if not success:
+                    print("No se pudo iniciar la vigilancia de archivos desde la configuración")
+            else:
+                success = stop_file_watchers()
+                if not success:
+                    print("No se pudo detener la vigilancia de archivos desde la configuración")
+        except Exception as e:
+            print(f"Error al actualizar vigilancia de archivos: {str(e)}")
     
     return jsonify(config.to_dict()), 200
 
@@ -821,24 +828,47 @@ def toggle_file_watching():
     """Activa o desactiva la vigilancia de archivos"""
     from .file_watcher import is_watching
     
-    config = SystemConfig.query.filter_by(key='FILE_WATCHING_ACTIVE').first()
-    if not config:
-        return jsonify({'error': 'Configuración no encontrada'}), 404
+    try:
+        config = SystemConfig.query.filter_by(key='FILE_WATCHING_ACTIVE').first()
+        if not config:
+            # Si la configuración no existe, crearla
+            config = SystemConfig(
+                key='FILE_WATCHING_ACTIVE',
+                value='false',
+                description='Indica si la vigilancia automática de archivos está activa'
+            )
+            db.session.add(config)
+        
+        # Cambiar el estado
+        new_status = not is_watching
+        
+        if new_status:
+            # Activar vigilancia
+            success = init_watchers()
+            if success:
+                config.value = 'true'
+            else:
+                return jsonify({'error': 'No se pudo iniciar la vigilancia de archivos'}), 500
+        else:
+            # Desactivar vigilancia
+            success = stop_file_watchers()
+            if success:
+                config.value = 'false'
+            else:
+                return jsonify({'error': 'No se pudo detener la vigilancia de archivos'}), 500
+        
+        # Guardar cambios
+        db.session.commit()
+        
+        return jsonify({
+            'active': new_status,
+            'configEnabled': config.value.lower() == 'true'
+        }), 200
     
-    # Cambiar el estado
-    if is_watching:
-        stop_file_watchers()
-        config.value = 'false'
-    else:
-        init_watchers()
-        config.value = 'true'
-    
-    db.session.commit()
-    
-    return jsonify({
-        'active': not is_watching,  # Devolver el nuevo estado esperado
-        'configEnabled': config.value.lower() == 'true'
-    }), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error al cambiar estado de vigilancia: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 # Función de utilidad para verificar contraseña de administrador
 async def verifyAdminPassword(userId, password):
