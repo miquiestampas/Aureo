@@ -3,7 +3,6 @@ import path from 'path';
 import { storage } from './storage';
 import { emitFileProcessingStatus } from './fileWatcher';
 import { InsertExcelData, InsertPdfDocument, InsertAlert, ExcelData, FileActivity } from '@shared/schema';
-import { moveToProcessed, deleteFileIfExists, fileExists, getFileSize } from './fileUtils';
 import { promisify } from 'util';
 import ExcelJS from 'exceljs';
 import { read as readXLSX, utils as xlsxUtils } from 'xlsx';
@@ -369,22 +368,16 @@ function createExcelDataFromValues(values: any[], storeCode: string, activityId:
     return {
       fileActivityId: activityId,
       storeCode: storeCode,
-      orderNumber: documentNumber.toString(), // Usar documentNumber como orderNumber (campo requerido)
-      orderDate: isoDate,
-      customerName: name.toString(),
-      customerContact: documentNumber.toString(),
-      customerAddress: city, 
-      customerLocation: country,
-      itemDetails: products.toString(),
-      price: amount,
-      // Campos obligatorios según el esquema
-      itemWeight: "",
-      metals: "",
-      engravings: "",
-      stones: "",
-      carats: "",
-      pawnTicket: "",
-      saleDate: null
+      purchaseDate: isoDate,
+      name: name.toString(),
+      documentNumber: documentNumber.toString(),
+      amount: amount,
+      city: city,
+      country: country,
+      products: products.toString(),
+      status: 'Active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
   } catch (error) {
     console.error(`Error al crear objeto de datos de Excel:`, error);
@@ -496,155 +489,58 @@ export async function processExcelFile(filePath: string, activityId: number, sto
       
     } else if (ext === '.csv') {
       // Process CSV file
-      console.log(`Processing CSV file: ${path.basename(filePath)}`);
-      
-      // Primero intentar extraer el código de tienda del nombre del archivo
-      let extractedStoreCodeFromFilename = '';
-      const originalFilename = path.basename(filePath);
-      
-      // Buscar patrones comunes en nombres de archivo CSV
-      // 1. Buscar patrón "J" seguido de números y letras (formato común)
-      const jPattern = /\b(J\d{5}[A-Z0-9]{4,5})\b/i;
-      const jMatch = originalFilename.match(jPattern);
-      
-      if (jMatch && jMatch[1]) {
-        extractedStoreCodeFromFilename = jMatch[1].toUpperCase();
-        console.log(`Extracted store code from CSV filename (format J+5digits+4-5chars): ${extractedStoreCodeFromFilename}`);
-      } 
-      // 2. Buscar formato de tipo JNNNNAANNN o JNNNNLAAAA
-      else {
-        const jExtendedPattern = /\b(J\d{4,5}[A-Z]{2}\d{1,5})\b/i;
-        const jExtendedMatch = originalFilename.match(jExtendedPattern);
-        
-        if (jExtendedMatch && jExtendedMatch[1]) {
-          extractedStoreCodeFromFilename = jExtendedMatch[1].toUpperCase();
-          console.log(`Extracted store code from CSV filename (format JNNNNAA): ${extractedStoreCodeFromFilename}`);
-        }
-      }
-      
-      // 3. Si no se encontró con los patrones anteriores, verificar códigos existentes en el nombre del archivo
-      if (!extractedStoreCodeFromFilename) {
-        // Obtener todos los códigos de tienda existentes
-        const allStores = await storage.getStores();
-        
-        // Verificar si algún código de tienda existente está en el nombre del archivo
-        for (const store of allStores) {
-          if (originalFilename.toUpperCase().includes(store.code.toUpperCase())) {
-            extractedStoreCodeFromFilename = store.code;
-            console.log(`Found existing store code in CSV filename: ${extractedStoreCodeFromFilename}`);
-            break;
-          }
-        }
-      }
-      
-      // Leer el archivo CSV
       const rows: any[] = [];
       
-      try {
-        const csvStream = fs.createReadStream(filePath)
-          .pipe(csvParser({
-            skipLines: 0,
-            headers: false
-          }));
-        
-        // Recolectar todas las filas
-        for await (const row of csvStream) {
-          rows.push(Object.values(row));
-        }
-        
-        console.log(`CSV file has ${rows.length} rows total`);
-      } catch (csvError) {
-        console.error(`Error reading CSV file: ${csvError}`);
-        throw new Error(`Error al leer archivo CSV: ${csvError.message}`);
+      // Read CSV file
+      const csvStream = fs.createReadStream(filePath)
+        .pipe(csvParser({
+          skipLines: 0,
+          headers: false
+        }));
+      
+      // Collect all rows
+      for await (const row of csvStream) {
+        rows.push(Object.values(row));
       }
       
-      // Encontrar fila de cabecera (máximo primeras 15 filas)
+      // Find header row (maximum first 10 rows)
       let headerRowIndex = 0;
       let foundHeader = false;
       
-      // Palabras clave más comunes en cabeceras de archivos
-      const headerKeywords = [
-        'fecha', 'date', 'nombre', 'name', 'cliente', 'document', 'documentacion',
-        'identificacion', 'id', 'importe', 'import', 'valor', 'value', 'precio', 'price',
-        'número', 'nro', 'no.', 'código', 'code', 'concepto', 'articulo', 'item'
-      ];
-      
-      // Buscar fila con máximas coincidencias de palabras clave
-      let maxKeywordMatches = 0;
-      
-      for (let i = 0; i < Math.min(15, rows.length); i++) {
-        if (!rows[i] || rows[i].length === 0) continue;
-        
+      for (let i = 0; i < Math.min(10, rows.length); i++) {
         const headerText = rows[i].join(' ').toLowerCase();
-        let keywordMatches = 0;
         
-        for (const keyword of headerKeywords) {
-          if (headerText.includes(keyword)) {
-            keywordMatches++;
-          }
-        }
-        
-        if (keywordMatches > maxKeywordMatches) {
-          maxKeywordMatches = keywordMatches;
+        if (
+          headerText.includes('fecha') || 
+          headerText.includes('nombre') || 
+          headerText.includes('document') ||
+          headerText.includes('id') ||
+          headerText.includes('import')
+        ) {
           headerRowIndex = i;
           foundHeader = true;
+          console.log(`Found header row at index ${headerRowIndex}`);
+          break;
         }
       }
       
-      if (foundHeader) {
-        console.log(`Found header row at index ${headerRowIndex} with ${maxKeywordMatches} keyword matches`);
-        console.log(`Header content: ${rows[headerRowIndex].join(' | ')}`);
-      } else if (rows.length > 0) {
-        // Si no se encontró cabecera, asumir la primera fila
+      // If no header row found, assume first row is header
+      if (!foundHeader && rows.length > 0) {
         headerRowIndex = 0;
         console.log(`No header row found, assuming first row (${headerRowIndex}) is header`);
-        console.log(`Assumed header content: ${rows[0].join(' | ')}`);
       }
       
-      // Si encontramos código de tienda en el nombre del archivo, usar ese en lugar del proporcionado
-      const storeCodeToUse = extractedStoreCodeFromFilename || storeCode;
-      console.log(`Using store code for CSV processing: ${storeCodeToUse}`);
-      
-      // Saltear fila de cabecera y procesar filas de datos
-      let validRowsProcessed = 0;
-      
+      // Skip header row and process data rows
       for (let i = headerRowIndex + 1; i < rows.length; i++) {
-        // Saltear filas vacías
-        if (!rows[i] || rows[i].length === 0 || rows[i].every((val: any) => val === undefined || val === null || val === '')) {
+        // Skip empty rows
+        if (rows[i].every((val: any) => val === undefined || val === null || val === '')) {
           continue;
         }
         
-        // Crear objeto de datos
-        const excelData = createExcelDataFromValues(rows[i], storeCodeToUse, activityId);
+        // Create data object
+        const excelData = createExcelDataFromValues(rows[i], storeCode, activityId);
         if (excelData) {
           processedRows.push(excelData);
-          validRowsProcessed++;
-        }
-      }
-      
-      console.log(`Processed ${validRowsProcessed} valid data rows from CSV file`);
-      
-      // Si encontramos código de tienda en el nombre del archivo pero es diferente del proporcionado,
-      // actualizar la actividad con el código detectado
-      if (extractedStoreCodeFromFilename && extractedStoreCodeFromFilename !== storeCode) {
-        console.log(`Updating activity ${activityId} with detected store code: ${extractedStoreCodeFromFilename}`);
-        try {
-          // Comprobar si el código existe en la base de datos
-          const storeExists = await storage.getStoreByCode(extractedStoreCodeFromFilename);
-          
-          if (storeExists) {
-            await storage.updateFileActivity(activityId, {
-              storeCode: extractedStoreCodeFromFilename
-            });
-            console.log(`Updated file activity with detected store code: ${extractedStoreCodeFromFilename}`);
-          } else {
-            console.log(`Detected store code ${extractedStoreCodeFromFilename} not found in database. Will be used as suggestion.`);
-            await storage.updateFileActivity(activityId, {
-              detectedStoreCode: extractedStoreCodeFromFilename
-            });
-          }
-        } catch (updateError) {
-          console.error(`Error updating file activity with detected store code:`, updateError);
         }
       }
       
@@ -806,29 +702,30 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     const { totalCoincidencias } = await storage.detectarCoincidenciasExcelFile(activityId);
     console.log(`Se encontraron ${totalCoincidencias} coincidencias en total`);
     
-    // Mover el archivo a la carpeta "procesados" utilizando la función de utilidades
+    // Mover el archivo a la carpeta "procesados"
     try {
-      // Usar la función centralizada para mover el archivo a procesados
-      const newPath = await moveToProcessed(filePath, 'Excel');
-      
-      if (newPath) {
-        console.log(`Archivo Excel movido a ${newPath}`);
-      } else {
-        console.warn(`Advertencia: No se pudo mover el archivo Excel a la carpeta procesados`);
+      // Obtener la configuración del directorio de Excel
+      const excelDirConfig = await storage.getConfig('EXCEL_WATCH_DIR');
+      if (excelDirConfig) {
+        const excelDir = excelDirConfig.value;
+        const procesadosDir = path.join(excelDir, 'procesados');
         
-        // Como no se pudo mover, intentar eliminar para evitar reprocesamiento
-        if (await deleteFileIfExists(filePath)) {
-          console.log(`Archivo original eliminado: ${filePath}`);
+        // Asegurarse de que la carpeta existe
+        if (!fs.existsSync(procesadosDir)) {
+          await fs.promises.mkdir(procesadosDir, { recursive: true });
         }
+        
+        // Crear la ruta del nuevo archivo
+        const fileName = path.basename(filePath);
+        const destPath = path.join(procesadosDir, fileName);
+        
+        // Mover el archivo
+        await fs.promises.rename(filePath, destPath);
+        console.log(`Archivo movido a ${destPath}`);
       }
     } catch (moveError) {
       console.error(`Error al mover el archivo a la carpeta 'procesados':`, moveError);
       // No fallar el proceso completo si no se puede mover el archivo
-      
-      // Intentar eliminar el archivo original para evitar reprocesamiento
-      if (await deleteFileIfExists(filePath)) {
-        console.log(`Archivo original eliminado: ${filePath}`);
-      }
     }
 
     // Actualizar la actividad del archivo a Processed
@@ -1120,37 +1017,34 @@ export async function processPdfFile(filePath: string, activityId: number, store
     
     await storage.createPdfDocument(pdfDocument);
     
-    // Mover el archivo a la carpeta "procesados" utilizando la función de utilidades
+    // Mover el archivo a la carpeta "procesados", manteniendo su nombre original
     try {
-      // Usar la función centralizada para mover el archivo a procesados
-      const newPath = await moveToProcessed(filePath, 'PDF');
-      
-      if (newPath) {
+      // Obtener la configuración del directorio de PDF
+      const pdfDirConfig = await storage.getConfig('PDF_WATCH_DIR');
+      if (pdfDirConfig) {
+        const pdfDir = pdfDirConfig.value;
+        const procesadosDir = path.join(pdfDir, 'procesados');
+        
+        // Asegurarse de que la carpeta existe
+        if (!fs.existsSync(procesadosDir)) {
+          await fs.promises.mkdir(procesadosDir, { recursive: true });
+        }
+        
+        // Crear la ruta del nuevo archivo (conservando el nombre original)
+        const fileName = path.basename(filePath);
+        const destPath = path.join(procesadosDir, fileName);
+        
+        // Mover el archivo
+        await fs.promises.rename(filePath, destPath);
+        
         // Actualizar la ruta del documento en la base de datos
-        const pathUpdated = await storage.updatePdfDocumentPath(pdfDocument.fileActivityId, newPath);
-        if (pathUpdated) {
-          console.log(`Actualizada ruta de documento PDF en base de datos: ${newPath}`);
-        } else {
-          console.warn(`Advertencia: No se pudo actualizar la ruta del documento PDF en la base de datos`);
-        }
+        await storage.updatePdfDocumentPath(pdfDocument.fileActivityId, destPath);
         
-        console.log(`Archivo PDF movido a ${newPath}`);
-      } else {
-        console.warn(`Advertencia: No se pudo mover el archivo PDF a la carpeta procesados`);
-        
-        // Como no se pudo mover, intentar eliminar para evitar reprocesamiento
-        if (await deleteFileIfExists(filePath)) {
-          console.log(`Archivo original eliminado: ${filePath}`);
-        }
+        console.log(`Archivo PDF movido a ${destPath}`);
       }
     } catch (moveError) {
       console.error(`Error al mover el archivo PDF a la carpeta 'procesados':`, moveError);
       // No fallar el proceso completo si no se puede mover el archivo
-      
-      // Intentar eliminar el archivo original para evitar reprocesamiento
-      if (await deleteFileIfExists(filePath)) {
-        console.log(`Archivo original eliminado: ${filePath}`);
-      }
     }
     
     // Update file activity to Processed

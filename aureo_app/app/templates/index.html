@@ -57,17 +57,10 @@
     </div>
 
     <script>
-        // Comprobar si estamos en un bucle de recarga
-        if (!sessionStorage.getItem('loaded')) {
-            sessionStorage.setItem('loaded', 'true');
-            // Intentar cargar la aplicación principal solo una vez
-            setTimeout(() => {
-                window.location.href = '/auth';
-            }, 1500);
-        } else {
-            // Si ya se intentó cargar, mostrar mensaje
-            document.querySelector('.container').innerHTML += '<p style="color:red">Error al cargar la aplicación. Por favor, intente acceder directamente a <a href="/auth">/auth</a>.</p>';
-        }
+        // Redirigir a la aplicación React después de un breve retraso
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 2000);
     </script>
 </body>
 </html>

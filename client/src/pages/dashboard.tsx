@@ -71,7 +71,6 @@ interface SystemStatus {
   fileWatchingActive: boolean;
   lastSystemCheck: string;
   databaseSize: number; // Tamaño relativo de la BD en porcentaje (0-100)
-  databaseSizeMB: number; // Tamaño de la base de datos en MB
 }
 
 interface FileActivity {
@@ -1155,7 +1154,7 @@ export default function DashboardPage() {
                       ></div>
                     </div>
                     <span className="text-xs text-gray-600 mt-1">
-                      {systemStatus?.databaseSize ?? 0}% de 1TB ({systemStatus?.databaseSizeMB ?? 0} MB)
+                      {systemStatus?.databaseSize ?? 0}% de 1TB
                     </span>
                   </dd>
                 </div>

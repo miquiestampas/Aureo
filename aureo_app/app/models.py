@@ -279,90 +279,57 @@ class SearchHistory(db.Model):
 
 # Función para inicializar la base de datos con datos iniciales
 def init_db():
-    import logging
+    # Habilitar el soporte para claves foráneas en SQLite
     from sqlalchemy import event
     from sqlalchemy.engine import Engine
     from sqlite3 import Connection as SQLite3Connection
-    import traceback
     
-    logger = logging.getLogger('aureo.db')
+    @event.listens_for(Engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):
+        if isinstance(dbapi_connection, SQLite3Connection):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
     
-    try:
-        # Habilitar el soporte para claves foráneas en SQLite
-        @event.listens_for(Engine, "connect")
-        def _set_sqlite_pragma(dbapi_connection, connection_record):
-            if isinstance(dbapi_connection, SQLite3Connection):
-                cursor = dbapi_connection.cursor()
-                cursor.execute("PRAGMA foreign_keys=ON")
-                cursor.close()
-        
-        logger.info("Creando estructura de la base de datos...")
-        # Crear todas las tablas
-        db.create_all()
-        
-        # Crear usuario SuperAdmin por defecto
-        if User.query.filter_by(username='117020').first() is None:
-            logger.info("Creando usuario administrador principal...")
-            user = User(
-                username='117020',
-                name='Administrador',
-                role='SuperAdmin'
-            )
-            user.set_password('password123')
-            db.session.add(user)
-        
-        # Crear usuario admin para facilitar acceso
-        if User.query.filter_by(username='admin').first() is None:
-            logger.info("Creando usuario admin...")
-            user = User(
-                username='admin',
-                name='Administrador Local',
-                role='SuperAdmin'
-            )
-            user.set_password('admin123')
-            db.session.add(user)
-        
-        # Crear configuraciones del sistema
-        logger.info("Configurando parámetros del sistema...")
-        configs = [
-            {
-                'key': 'FILE_WATCHING_ACTIVE',
-                'value': 'false',  # Por defecto desactivado para evitar errores
-                'description': 'Indica si la vigilancia automática de archivos está activa'
-            },
-            {
-                'key': 'AUTO_STORE_DETECTION',
-                'value': 'false',
-                'description': 'Asigna automáticamente una tienda cuando no se detecta en el nombre del archivo'
-            },
-            {
-                'key': 'APP_NAME',
-                'value': 'Áureo',
-                'description': 'Nombre de la aplicación'
-            },
-            {
-                'key': 'EXCEL_COLUMN_MAPPING',
-                'value': 'A=Código,B=Número,C=Fecha,D=Cliente,E=DNI,F=Dirección,G=Localidad,H=Artículo,I=Peso,J=Metal,K=Grabado,L=Piedras,M=Precio,N=Papeletas,O=Venta',
-                'description': 'Mapeo de columnas Excel (no modificar)'
-            }
-        ]
-        
-        for config in configs:
-            existing = SystemConfig.query.filter_by(key=config['key']).first()
-            if existing is None:
-                logger.info(f"Creando configuración: {config['key']}")
-                db.session.add(SystemConfig(**config))
-            elif config['key'] == 'FILE_WATCHING_ACTIVE':
-                # Asegurarse que la vigilancia de archivos esté desactivada inicialmente
-                existing.value = 'false'
-                logger.info("Desactivando vigilancia de archivos por defecto")
-        
-        # Guardar todos los cambios
-        db.session.commit()
-        logger.info("Base de datos inicializada correctamente")
-        return True
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error al inicializar la base de datos: {str(e)}")
-        logger.error(traceback.format_exc())
-        return False
+    # Crear todas las tablas
+    db.create_all()
+    
+    # Crear usuario SuperAdmin por defecto
+    if User.query.filter_by(username='117020').first() is None:
+        user = User(
+            username='117020',
+            name='Administrador',
+            role='SuperAdmin'
+        )
+        user.set_password('password123')
+        db.session.add(user)
+    
+    # Crear configuraciones del sistema
+    configs = [
+        {
+            'key': 'FILE_WATCHING_ACTIVE',
+            'value': 'true',
+            'description': 'Indica si la vigilancia automática de archivos está activa'
+        },
+        {
+            'key': 'AUTO_STORE_DETECTION',
+            'value': 'false',
+            'description': 'Asigna automáticamente una tienda cuando no se detecta en el nombre del archivo'
+        },
+        {
+            'key': 'APP_NAME',
+            'value': 'Áureo',
+            'description': 'Nombre de la aplicación'
+        },
+        {
+            'key': 'EXCEL_COLUMN_MAPPING',
+            'value': 'A=Código,B=Número,C=Fecha,D=Cliente,E=DNI,F=Dirección,G=Localidad,H=Artículo,I=Peso,J=Metal,K=Grabado,L=Piedras,M=Precio,N=Papeletas,O=Venta',
+            'description': 'Mapeo de columnas Excel (no modificar)'
+        }
+    ]
+    
+    for config in configs:
+        if SystemConfig.query.filter_by(key=config['key']).first() is None:
+            db.session.add(SystemConfig(**config))
+    
+    db.session.commit()

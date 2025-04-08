@@ -3,33 +3,12 @@ import shutil
 import time
 import threading
 from datetime import datetime
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 import re
-import logging
 from . import db
 from .models import FileActivity, SystemConfig, Store
 from .file_processors import process_excel_file, process_pdf_file
-
-# Configurar logging
-logger = logging.getLogger('aureo.file_watcher')
-
-# Intentar importar watchdog, pero no fallar si no está disponible
-try:
-    from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler
-    watchdog_available = True
-except ImportError:
-    logger.warning("La librería watchdog no está instalada. La vigilancia de archivos no funcionará.")
-    watchdog_available = False
-    # Definir clases dummy
-    class Observer:
-        def __init__(self): pass
-        def schedule(self, *args, **kwargs): pass
-        def start(self): pass
-        def stop(self): pass
-        def join(self): pass
-    
-    class FileSystemEventHandler:
-        def on_created(self, event): pass
 
 # Variables globales
 excel_observer = None
@@ -68,17 +47,6 @@ class PdfFileHandler(FileSystemEventHandler):
 def init_watchers():
     """Inicializa los vigilantes de archivos según la configuración del sistema"""
     try:
-        # Verificar si watchdog está disponible
-        if not watchdog_available:
-            logger.warning("No se puede iniciar la vigilancia de archivos: la librería watchdog no está instalada.")
-            # Actualizar configuración a falso para evitar intentos futuros
-            config = SystemConfig.query.filter_by(key='FILE_WATCHING_ACTIVE').first()
-            if config:
-                config.value = 'false'
-                db.session.commit()
-                logger.info("Se ha desactivado la vigilancia automática de archivos en la configuración.")
-            return False
-        
         # Verificar si la vigilancia está habilitada
         config = SystemConfig.query.filter_by(key='FILE_WATCHING_ACTIVE').first()
         if config and config.value.lower() == 'true':
@@ -87,14 +55,9 @@ def init_watchers():
             watcher_thread = threading.Thread(target=start_file_watchers)
             watcher_thread.daemon = True
             watcher_thread.start()
-            logger.info("Vigilantes de archivos iniciados correctamente")
-        else:
-            logger.info("Vigilancia de archivos deshabilitada por configuración")
         return True
     except Exception as e:
-        logger.error(f"Error al inicializar vigilantes de archivos: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
+        print(f"Error al inicializar vigilantes de archivos: {str(e)}")
         return False
 
 def start_file_watchers():
@@ -106,11 +69,6 @@ def start_file_watchers():
     """
     try:
         from config import Config
-        
-        # Verificar si watchdog está disponible
-        if not watchdog_available:
-            logger.error("No se puede iniciar vigilancia: la librería watchdog no está instalada.")
-            return False
         
         # Obtener rutas de directorios a vigilar
         excel_watch_dir = Config.EXCEL_WATCH_DIR
@@ -136,7 +94,7 @@ def start_file_watchers():
         pdf_observer.start()
         is_watching = True
         
-        logger.info(f"Vigilancia de archivos iniciada: Excel en {excel_watch_dir}, PDF en {pdf_watch_dir}")
+        print(f"Vigilancia de archivos iniciada: Excel en {excel_watch_dir}, PDF en {pdf_watch_dir}")
         
         # Mantener el hilo ejecutándose
         try:
@@ -147,9 +105,7 @@ def start_file_watchers():
         
         return True
     except Exception as e:
-        logger.error(f"Error al iniciar vigilancia de archivos: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
+        print(f"Error al iniciar vigilancia de archivos: {str(e)}")
         return False
 
 def stop_file_watchers():
@@ -162,38 +118,21 @@ def stop_file_watchers():
     try:
         global excel_observer, pdf_observer, is_watching
         
-        # Si no hay observadores, no hay nada que detener
-        if not excel_observer and not pdf_observer:
-            logger.info("No hay vigilantes de archivos activos para detener")
-            is_watching = False
-            return True
-        
-        # Detener los observadores si existen
         if excel_observer:
-            try:
-                excel_observer.stop()
-                excel_observer.join()
-                excel_observer = None
-                logger.info("Observador de Excel detenido")
-            except Exception as e:
-                logger.error(f"Error al detener observador de Excel: {str(e)}")
+            excel_observer.stop()
+            excel_observer.join()
+            excel_observer = None
         
         if pdf_observer:
-            try:
-                pdf_observer.stop()
-                pdf_observer.join()
-                pdf_observer = None
-                logger.info("Observador de PDF detenido")
-            except Exception as e:
-                logger.error(f"Error al detener observador de PDF: {str(e)}")
+            pdf_observer.stop()
+            pdf_observer.join()
+            pdf_observer = None
         
         is_watching = False
-        logger.info("Vigilancia de archivos detenida completamente")
+        print("Vigilancia de archivos detenida")
         return True
     except Exception as e:
-        logger.error(f"Error al detener vigilancia de archivos: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
+        print(f"Error al detener vigilancia de archivos: {str(e)}")
         return False
 
 def handle_new_excel_file(file_path):
@@ -208,33 +147,22 @@ def handle_new_excel_file(file_path):
         filename = os.path.basename(file_path)
         file_size = os.path.getsize(file_path)
         
-        logger.info(f"Procesando nuevo archivo Excel: {filename} ({file_size} bytes)")
-        
         # Esperar a que el archivo termine de escribirse
         time.sleep(1)  # Pequeño retraso para asegurar que el archivo esté completo
         
         # Extraer código de tienda del nombre del archivo (típicamente un código alfanumérico al inicio)
         store_code = extract_store_code_from_filename(filename)
-        logger.info(f"Código de tienda detectado: {store_code if store_code else 'No detectado'}")
         
         # Verificar si el código de tienda existe
         store = None
         if store_code:
             store = Store.query.filter_by(code=store_code, type='Excel').first()
-            if store:
-                logger.info(f"Tienda encontrada: {store.code} - {store.name}")
-            else:
-                logger.warning(f"No se encontró tienda con código {store_code} para Excel")
         
         # Si no se encontró una tienda y está habilitada la asignación automática
         auto_detection = SystemConfig.query.filter_by(key='AUTO_STORE_DETECTION').first()
         if not store and auto_detection and auto_detection.value.lower() == 'true':
             # Asignar a la primera tienda Excel activa
             store = Store.query.filter_by(type='Excel', active=True).first()
-            if store:
-                logger.info(f"Asignación automática a tienda: {store.code} - {store.name}")
-            else:
-                logger.warning("No hay tiendas Excel activas para asignación automática")
         
         # Crear destino para el archivo
         from config import Config
@@ -248,7 +176,6 @@ def handle_new_excel_file(file_path):
         
         # Copiar archivo a directorio de uploads
         shutil.copy2(file_path, dest_path)
-        logger.info(f"Archivo copiado a: {dest_path}")
         
         # Crear registro de actividad
         activity = FileActivity(
@@ -265,20 +192,16 @@ def handle_new_excel_file(file_path):
         
         db.session.add(activity)
         db.session.commit()
-        logger.info(f"Registro de actividad creado con ID: {activity.id}")
         
         # Si tenemos tienda, procesar inmediatamente
         if store:
             # Iniciar procesamiento en un hilo separado
-            logger.info(f"Iniciando procesamiento en segundo plano para archivo {filename}")
             threading.Thread(target=process_excel_file, args=(activity.id,)).start()
-        else:
-            logger.info(f"Archivo {filename} queda pendiente de asignación de tienda")
+        
+        print(f"Archivo Excel detectado: {filename}, tienda: {store.code if store else 'Pendiente de asignación'}")
         
     except Exception as e:
-        logger.error(f"Error al procesar archivo Excel {file_path}: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
+        print(f"Error al procesar archivo Excel {file_path}: {str(e)}")
 
 def handle_new_pdf_file(file_path):
     """
@@ -292,33 +215,22 @@ def handle_new_pdf_file(file_path):
         filename = os.path.basename(file_path)
         file_size = os.path.getsize(file_path)
         
-        logger.info(f"Procesando nuevo archivo PDF: {filename} ({file_size} bytes)")
-        
         # Esperar a que el archivo termine de escribirse
         time.sleep(1)  # Pequeño retraso para asegurar que el archivo esté completo
         
         # Extraer código de tienda del nombre del archivo
         store_code = extract_store_code_from_filename(filename)
-        logger.info(f"Código de tienda detectado: {store_code if store_code else 'No detectado'}")
         
         # Verificar si el código de tienda existe
         store = None
         if store_code:
             store = Store.query.filter_by(code=store_code, type='PDF').first()
-            if store:
-                logger.info(f"Tienda encontrada: {store.code} - {store.name}")
-            else:
-                logger.warning(f"No se encontró tienda con código {store_code} para PDF")
         
         # Si no se encontró una tienda y está habilitada la asignación automática
         auto_detection = SystemConfig.query.filter_by(key='AUTO_STORE_DETECTION').first()
         if not store and auto_detection and auto_detection.value.lower() == 'true':
             # Asignar a la primera tienda PDF activa
             store = Store.query.filter_by(type='PDF', active=True).first()
-            if store:
-                logger.info(f"Asignación automática a tienda: {store.code} - {store.name}")
-            else:
-                logger.warning("No hay tiendas PDF activas para asignación automática")
         
         # Crear destino para el archivo
         from config import Config
@@ -332,7 +244,6 @@ def handle_new_pdf_file(file_path):
         
         # Copiar archivo a directorio de uploads
         shutil.copy2(file_path, dest_path)
-        logger.info(f"Archivo copiado a: {dest_path}")
         
         # Crear registro de actividad
         activity = FileActivity(
@@ -349,20 +260,16 @@ def handle_new_pdf_file(file_path):
         
         db.session.add(activity)
         db.session.commit()
-        logger.info(f"Registro de actividad creado con ID: {activity.id}")
         
         # Si tenemos tienda, procesar inmediatamente
         if store:
             # Iniciar procesamiento en un hilo separado
-            logger.info(f"Iniciando procesamiento en segundo plano para archivo {filename}")
             threading.Thread(target=process_pdf_file, args=(activity.id,)).start()
-        else:
-            logger.info(f"Archivo {filename} queda pendiente de asignación de tienda")
+        
+        print(f"Archivo PDF detectado: {filename}, tienda: {store.code if store else 'Pendiente de asignación'}")
         
     except Exception as e:
-        logger.error(f"Error al procesar archivo PDF {file_path}: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
+        print(f"Error al procesar archivo PDF {file_path}: {str(e)}")
 
 def extract_store_code_from_filename(filename):
     """
@@ -407,10 +314,8 @@ def update_activity_status(activity_id, status, error_message=None):
     try:
         activity = FileActivity.query.get(activity_id)
         if not activity:
-            logger.warning(f"No se encontró actividad con ID {activity_id} para actualizar estado")
             return False
-        
-        old_status = activity.status
+            
         activity.status = status
         if error_message:
             activity.error_message = error_message
@@ -419,11 +324,7 @@ def update_activity_status(activity_id, status, error_message=None):
             activity.processing_date = datetime.utcnow()
         
         db.session.commit()
-        logger.info(f"Actividad ID {activity_id} actualizada: estado {old_status} → {status}")
         return True
     except Exception as e:
-        logger.error(f"Error al actualizar estado de actividad {activity_id}: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        db.session.rollback()
+        print(f"Error al actualizar estado de actividad {activity_id}: {str(e)}")
         return False

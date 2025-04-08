@@ -776,16 +776,9 @@ export class MemStorage implements IStorage {
   async getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit: number = 50): Promise<Coincidencia[]> {
     let coincidencias = Array.from(this.coincidencias.values());
     
-    // Filtrar por estado si se especifica
     if (estado) {
       coincidencias = coincidencias.filter(coincidencia => coincidencia.estado === estado);
     }
-    
-    // Filtrar para excluir coincidencias de baja precisión
-    coincidencias = coincidencias.filter(coincidencia => {
-      // Excluir las coincidencias con puntuación baja (tipo_match === 'Baja')
-      return coincidencia.tipoMatch !== 'Baja';
-    });
     
     return coincidencias
       .sort((a, b) => {
@@ -844,19 +837,7 @@ export class MemStorage implements IStorage {
   
   async getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]> {
     return Array.from(this.coincidencias.values())
-      .filter(coincidencia => {
-        // Filtrar por ID del Excel
-        if (coincidencia.idExcelData !== excelDataId) {
-          return false;
-        }
-        
-        // Filtrar para excluir coincidencias de baja precisión
-        if (coincidencia.tipoMatch === 'Baja') {
-          return false;
-        }
-        
-        return true;
-      })
+      .filter(coincidencia => coincidencia.idExcelData === excelDataId)
       .sort((a, b) => {
         // Ordenar primero por no leídos y luego por fecha
         if (a.estado === "NoLeido" && b.estado !== "NoLeido") return -1;
@@ -871,19 +852,7 @@ export class MemStorage implements IStorage {
   
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     return Array.from(this.coincidencias.values())
-      .filter(coincidencia => {
-        // Solo contar las coincidencias no leídas
-        if (coincidencia.estado !== "NoLeido") {
-          return false;
-        }
-        
-        // Excluir coincidencias de baja precisión
-        if (coincidencia.tipoMatch === 'Baja') {
-          return false;
-        }
-        
-        return true;
-      })
+      .filter(coincidencia => coincidencia.estado === "NoLeido")
       .length;
   }
   
@@ -3002,21 +2971,15 @@ export class DatabaseStorage implements IStorage {
     try {
       let query = db.select().from(coincidencias);
       
-      // Filtrar por estado si se especifica
       if (estado) {
         query = query.where(eq(coincidencias.estado, estado));
       }
       
-      // Obtener resultados de la base de datos
-      const resultados = await query
+      const resultado = await query
         .orderBy(desc(coincidencias.creadoEn))
         .limit(limit);
-      
-      // Filtrar para excluir coincidencias de baja precisión
-      return resultados.filter(coincidencia => {
-        // Excluir las coincidencias con puntuación baja (tipo_match === 'Baja')
-        return coincidencia.tipoMatch !== 'Baja';
-      });
+        
+      return resultado;
     } catch (error) {
       console.error("Error al obtener coincidencias:", error);
       return [];
@@ -3125,11 +3088,7 @@ export class DatabaseStorage implements IStorage {
           desc(coincidencias.creadoEn)
         );
         
-      // Filtrar para excluir coincidencias de baja precisión
-      return coincidenciasResult.filter(coincidencia => {
-        // Excluir las coincidencias con puntuación baja (tipo_match === 'Baja')
-        return coincidencia.tipoMatch !== 'Baja';
-      });
+      return coincidenciasResult;
     } catch (error) {
       console.error(`Error al obtener coincidencias para excelDataId ${excelDataId}:`, error);
       return [];
@@ -3138,19 +3097,12 @@ export class DatabaseStorage implements IStorage {
   
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     try {
-      // Primero obtenemos todas las coincidencias no leídas
-      const coincidenciasNoLeidas = await db
-        .select()
+      const resultado = await db
+        .select({ count: sql`COUNT(*)` })
         .from(coincidencias)
         .where(eq(coincidencias.estado, "NoLeido"));
-      
-      // Filtramos para excluir coincidencias de baja precisión
-      const coincidenciasFiltradas = coincidenciasNoLeidas.filter(coincidencia => {
-        return coincidencia.tipoMatch !== 'Baja';
-      });
-      
-      // Devolvemos el número de coincidencias filtradas
-      return coincidenciasFiltradas.length;
+        
+      return Number(resultado[0]?.count || 0);
     } catch (error) {
       console.error("Error al obtener número de coincidencias no leídas:", error);
       return 0;
@@ -3798,7 +3750,6 @@ export class DatabaseStorage implements IStorage {
   async getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit: number = 50): Promise<Coincidencia[]> {
     try {
       // Construir la consulta SQL directamente para solo mostrar coincidencias con señalamientos activos
-      // y excluir las coincidencias de baja precisión
       let sql = `
         SELECT * FROM coincidencias
         WHERE (
@@ -3806,7 +3757,6 @@ export class DatabaseStorage implements IStorage {
           OR 
           (id_senal_objeto IS NOT NULL AND id_senal_objeto IN (SELECT id FROM senal_objetos WHERE estado = 'Activo'))
         )
-        AND tipo_match <> 'Baja'
         ${estado ? `AND estado = ?` : ''}
         ORDER BY creado_en DESC
         LIMIT ?
@@ -3943,11 +3893,10 @@ export class DatabaseStorage implements IStorage {
   async getCoincidenciasByExcelDataId(excelDataId: number): Promise<Coincidencia[]> {
     try {
       // Usar SQLite directamente para evitar problemas con columnas y tipos
-      // Solo mostrar coincidencias con señalamientos activos y excluir las de baja precisión
+      // Solo mostrar coincidencias con señalamientos activos
       const sql = `
         SELECT * FROM coincidencias
         WHERE id_excel_data = ?
-        AND tipo_match <> 'Baja'
         AND (
           (id_senal_persona IS NOT NULL AND id_senal_persona IN (SELECT id FROM senal_personas WHERE estado = 'Activo'))
           OR 
@@ -3991,11 +3940,10 @@ export class DatabaseStorage implements IStorage {
   async getNumeroCoincidenciasNoLeidas(): Promise<number> {
     try {
       // Usar SQLite directamente para evitar problemas con columnas
-      // Solo contar coincidencias para señalamientos ACTIVOS y excluir las de baja precisión
+      // Solo contar coincidencias para señalamientos ACTIVOS
       const sql = `
         SELECT COUNT(*) as total FROM coincidencias
         WHERE estado = 'NoLeido'
-        AND tipo_match <> 'Baja'
         AND (
           (id_senal_persona IS NOT NULL AND id_senal_persona IN (SELECT id FROM senal_personas WHERE estado = 'Activo'))
           OR 
