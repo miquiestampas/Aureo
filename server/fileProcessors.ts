@@ -554,38 +554,89 @@ export async function processExcelFile(filePath: string, activityId: number, sto
     let excelStoreCode = '';
     const maxRowsToCheck = 10;
     
-    // Buscar celda con código de tienda (patrón común: "Tienda: XXX" o similar)
-    for (let i = 0; i < Math.min(maxRowsToCheck, processedRows.length); i++) {
-      const row = processedRows[i];
+    // 1. Primero intentamos extraer el código de tienda del nombre del archivo
+    const filename = path.basename(filePath);
+    const fileNameWithoutExt = path.basename(filename, path.extname(filename));
+    
+    console.log(`Intentando extraer código de tienda del nombre del archivo Excel: ${filename}`);
+    
+    // Patrones para nombres de archivo
+    // 1. Buscar por patrón J12345ABCDE (formato común que comienza con J seguido de números y letras)
+    const j_pattern = /\b(J\d{5}[A-Z0-9]{4,5})\b/i;
+    const j_match = fileNameWithoutExt.match(j_pattern);
+    
+    if (j_match && j_match[1]) {
+      excelStoreCode = j_match[1];
+      console.log(`Patrón J+Números+Letras encontrado en nombre de archivo: ${excelStoreCode}`);
+    } 
+    // 2. Intentar formato general de códigos: LETRA+NÚMEROS o NÚMEROS+LETRA
+    else {
+      const general_pattern = /\b([A-Z]\d{1,6}|J\d{2,6}[a-z]{1,3})\b/i;
+      const general_match = fileNameWithoutExt.match(general_pattern);
       
-      // Buscar en diversos campos (nombre, documento, productos, etc.)
-      const fieldsToCheck = [row.name, row.documentNumber, row.products, row.city, row.country];
-      
-      for (const field of fieldsToCheck) {
-        if (!field) continue;
+      if (general_match && general_match[1]) {
+        excelStoreCode = general_match[1];
+        console.log(`Patrón general encontrado en nombre de archivo: ${excelStoreCode}`);
+      }
+      // 3. Intentar patrones específicos comparando con las tiendas en el sistema
+      else {
+        // Obtener todos los códigos de tienda existentes
+        const allStores = await storage.getStores();
+        const storesCodes = allStores.filter(store => store.type === 'Excel').map(store => store.code);
         
-        // Patrones comunes para códigos de tienda en texto
-        const storeCodePatterns = [
-          /tienda\s*:\s*([A-Z0-9]+)/i,      // "Tienda: ABC123"
-          /store\s*:\s*([A-Z0-9]+)/i,        // "Store: ABC123"
-          /local\s*:\s*([A-Z0-9]+)/i,        // "Local: ABC123"
-          /código\s*:\s*([A-Z0-9]+)/i,       // "Código: ABC123"
-          /code\s*:\s*([A-Z0-9]+)/i          // "Code: ABC123"
-        ];
-        
-        for (const pattern of storeCodePatterns) {
-          const match = field.match(pattern);
-          if (match && match[1]) {
-            excelStoreCode = match[1];
-            console.log(`Found store code in data row ${i}: ${excelStoreCode}`);
+        // Buscar si algún código de tienda aparece en el nombre del archivo
+        for (const code of storesCodes) {
+          // Normalizar los códigos para la comparación (eliminar espacios, a minúsculas)
+          const normalizedCode = code.replace(/\s+/g, '').toLowerCase();
+          const normalizedFilename = fileNameWithoutExt.replace(/\s+/g, '').toLowerCase();
+          
+          if (normalizedFilename.includes(normalizedCode)) {
+            excelStoreCode = code; // Usar el código original de la base de datos
+            console.log(`Encontrado código de tienda exacto en nombre del archivo: ${excelStoreCode}`);
             break;
           }
+        }
+      }
+    }
+    
+    // Si no encontramos en el nombre del archivo, buscar en las filas de datos
+    if (!excelStoreCode) {
+      console.log(`No se encontró código de tienda en el nombre del archivo. Buscando en contenido...`);
+      
+      // Buscar celda con código de tienda (patrón común: "Tienda: XXX" o similar)
+      for (let i = 0; i < Math.min(maxRowsToCheck, processedRows.length); i++) {
+        const row = processedRows[i];
+        
+        // Buscar en diversos campos (nombre, documento, productos, etc.)
+        const fieldsToCheck = [row.name, row.documentNumber, row.products, row.city, row.country];
+        
+        for (const field of fieldsToCheck) {
+          if (!field) continue;
+          
+          // Patrones comunes para códigos de tienda en texto
+          const storeCodePatterns = [
+            /tienda\s*:\s*([A-Z0-9]+)/i,      // "Tienda: ABC123"
+            /store\s*:\s*([A-Z0-9]+)/i,        // "Store: ABC123"
+            /local\s*:\s*([A-Z0-9]+)/i,        // "Local: ABC123"
+            /código\s*:\s*([A-Z0-9]+)/i,       // "Código: ABC123"
+            /code\s*:\s*([A-Z0-9]+)/i,         // "Code: ABC123"
+            /\b(J\d{5}[A-Z0-9]{4,5})\b/i       // Código del tipo J12345ABCDE
+          ];
+          
+          for (const pattern of storeCodePatterns) {
+            const match = field.match(pattern);
+            if (match && match[1]) {
+              excelStoreCode = match[1];
+              console.log(`Encontrado código de tienda en fila de datos ${i}: ${excelStoreCode}`);
+              break;
+            }
+          }
+          
+          if (excelStoreCode) break;
         }
         
         if (excelStoreCode) break;
       }
-      
-      if (excelStoreCode) break;
     }
     
     // Verificar si el código de tienda extraído existe
@@ -772,7 +823,7 @@ export async function processPdfFile(filePath: string, activityId: number, store
       
     if (j_match && j_match[1]) {
       pdfStoreCode = j_match[1];
-      console.log(`Pattern 1 matched: ${pdfStoreCode}`);
+      console.log(`Patrón J+Números+Letras encontrado en PDF: ${pdfStoreCode}`);
     }
     // 2. Intentar formato general de códigos: LETRA+NÚMEROS o NÚMEROS+LETRA
     else {
@@ -781,27 +832,71 @@ export async function processPdfFile(filePath: string, activityId: number, store
         
       if (general_match && general_match[1]) {
         pdfStoreCode = general_match[1];
-        console.log(`Pattern 2 matched: ${pdfStoreCode}`);
+        console.log(`Patrón general encontrado en PDF: ${pdfStoreCode}`);
       }
       // 3. Intentar patrones específicos para las tiendas en el sistema
       else {
         // Obtener todos los códigos de tienda existentes
         const allStores = await storage.getStores();
-        const storesCodes = allStores.map(store => store.code);
+        const storesCodes = allStores.filter(store => store.type === 'PDF').map(store => store.code);
         
-        // Buscar si algún código de tienda aparece en el nombre del archivo
+        // Buscar si algún código de tienda aparece en el nombre del archivo (comparando de forma más precisa)
         for (const code of storesCodes) {
-          if (originalFilename.includes(code)) {
-            pdfStoreCode = code;
-            console.log(`Found exact store code in filename: ${pdfStoreCode}`);
+          // Normalizar los códigos para la comparación (eliminar espacios, a minúsculas)
+          const normalizedCode = code.replace(/\s+/g, '').toLowerCase();
+          const normalizedFilename = originalFilename.replace(/\s+/g, '').toLowerCase();
+          
+          if (normalizedFilename.includes(normalizedCode)) {
+            pdfStoreCode = code; // Usar el código original de la base de datos
+            console.log(`Encontrado código de tienda exacto en PDF: ${pdfStoreCode}`);
             break;
           }
         }
         
-        // Eliminamos la búsqueda por patrones de tiendas comunes
-        // para evitar asignaciones incorrectas (por ejemplo, que Montera 7 se asigne a Montera)
+        // Intentar patrones específicos para PDF como MP o CM que aparecen en los nombres
         if (!pdfStoreCode) {
-          console.log(`No se encontraron patrones de código de tienda en el nombre del archivo: ${originalFilename}`);
+          // Buscar patrones como MP + LOCALIZACIÓN o CM + LOCALIZACIÓN
+          const mpCmPatterns = [
+            /\bMP\s+([^,\.0-9]+)/i,      // "MP MONTERA", "MP CARRETAS", etc.
+            /\bCM\s+([^,\.0-9]+)/i       // "CM GRANVÍA", "CM SOL", etc.
+          ];
+          
+          for (const pattern of mpCmPatterns) {
+            const match = originalFilename.match(pattern);
+            if (match && match[1]) {
+              const location = match[1].trim();
+              
+              if (location.length > 3) { // Evitar coincidencias con cadenas muy cortas
+                console.log(`Encontrada posible ubicación en PDF: "${location}"`);
+                
+                // Buscar tiendas con nombres similares
+                const matchingStores = allStores.filter(store => {
+                  // Normalizar para comparación
+                  const storeNameNorm = (store.name || "").toLowerCase().replace(/\s+/g, '');
+                  const locationNorm = location.toLowerCase().replace(/\s+/g, '');
+                  
+                  return storeNameNorm.includes(locationNorm) || 
+                         (store.district && store.district.toLowerCase().includes(locationNorm));
+                });
+                
+                if (matchingStores.length === 1) {
+                  pdfStoreCode = matchingStores[0].code;
+                  console.log(`Encontrada tienda por ubicación: ${pdfStoreCode} (${matchingStores[0].name})`);
+                } else if (matchingStores.length > 1) {
+                  console.log(`Múltiples posibles tiendas para la ubicación "${location}". Se requiere asignación manual.`);
+                  for (const store of matchingStores) {
+                    console.log(`- ${store.code}: ${store.name}`);
+                  }
+                }
+                
+                break;
+              }
+            }
+          }
+        }
+        
+        if (!pdfStoreCode) {
+          console.log(`No se encontraron patrones de código de tienda en el archivo PDF: ${originalFilename}`);
         }
       }
     }
