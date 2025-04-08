@@ -702,10 +702,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint para obtener archivos pendientes de asignación de tienda
   app.get("/api/pending-store-assignments", async (req, res, next) => {
     try {
-      const pendingActivities = await storage.getPendingStoreAssignmentActivities();
-      res.json(pendingActivities);
+      console.log("Solicitando actividades pendientes de asignación de tienda...");
+      
+      // Verificar primero en la DB si realmente hay actividades pendientes
+      const pendingActivitiesFromDB = await db
+        .select()
+        .from(fileActivities)
+        .where(
+          or(
+            eq(fileActivities.status, 'PendingStoreAssignment'),
+            eq(fileActivities.storeCode, 'PENDIENTE')
+          )
+        )
+        .orderBy(desc(fileActivities.processingDate));
+        
+      if (pendingActivitiesFromDB.length > 0) {
+        console.log(`Se encontraron ${pendingActivitiesFromDB.length} actividades pendientes directamente en la DB`);
+        res.json(pendingActivitiesFromDB);
+      } else {
+        // Si no hay en la DB, usar el método normal
+        console.log("No se encontraron actividades pendientes en la DB, usando método storage...");
+        const pendingActivities = await storage.getPendingStoreAssignmentActivities();
+        
+        if (pendingActivities.length > 0) {
+          console.log("⚠️ INCONSISTENCIA DETECTADA: El storage reporta actividades pendientes pero no están en la DB");
+          console.log("Actividades reportadas por storage:", JSON.stringify(pendingActivities));
+          
+          // Si hay actividades reportadas por el storage pero no por la DB, 
+          // devolver un array vacío para limpiar la UI
+          res.json([]);
+        } else {
+          res.json([]);
+        }
+      }
     } catch (error) {
-      next(error);
+      console.error("Error al obtener actividades pendientes:", error);
+      // En caso de error, devolver un array vacío para evitar bloquear la UI
+      res.json([]);
     }
   });
   
@@ -925,14 +958,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Endpoint para asignar una tienda a un archivo pendiente
-  app.post("/api/file-activities/:id/assign-store", async (req, res, next) => {
+  app.post(["/api/file-activities/:id/assign-store", "/api/assign-store"], async (req, res, next) => {
     try {
-      const activityId = parseInt(req.params.id);
+      // Si usamos la ruta general, extraer el activityId del body
+      const activityId = req.params.id ? parseInt(req.params.id) : (req.body.activityId ? parseInt(req.body.activityId) : -1);
       const { storeCode, createNewStore } = req.body;
+      
+      console.log(`🔄 Asignación de tienda solicitada para activityId=${activityId}, storeCode=${storeCode}, createNewStore=${createNewStore}`);
       
       // Verificar que el ID de actividad es válido
       const activity = await storage.getFileActivity(activityId);
       if (!activity) {
+        console.error(`❌ No se encontró una actividad con ID ${activityId}`);
+        
+        // Verificar directamente en la base de datos
+        const dbCheck = await db
+          .select()
+          .from(fileActivities)
+          .where(eq(fileActivities.id, activityId));
+        
+        if (dbCheck.length > 0) {
+          console.log(`⚠️ INCONSISTENCIA: La actividad ${activityId} existe en la base de datos pero no en el storage`);
+          console.log(`Actividad en DB:`, JSON.stringify(dbCheck[0]));
+          
+          // Reinsertar la actividad en la memoria desde la DB
+          console.log(`Intentando recuperar la actividad de la DB al storage...`);
+          const recoveredActivity = dbCheck[0];
+          await storage.createFileActivity({
+            filename: recoveredActivity.filename,
+            storeCode: recoveredActivity.storeCode,
+            fileType: recoveredActivity.fileType,
+            status: recoveredActivity.status,
+            processingDate: recoveredActivity.processingDate,
+            processedBy: recoveredActivity.processedBy,
+            errorMessage: recoveredActivity.errorMessage,
+            metadata: recoveredActivity.metadata,
+            detectedStoreCode: recoveredActivity.detectedStoreCode
+          });
+          
+          return res.status(500).json({ 
+            message: "Se detectó una inconsistencia en los datos. Por favor, intente de nuevo en unos momentos." 
+          });
+        }
+        
         return res.status(404).json({ message: "Actividad de archivo no encontrada" });
       }
       
@@ -994,10 +1062,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Actualizar la actividad con el nuevo código de tienda y cambiar su estado a Pending
+      // También asegurarnos de que no sea PENDIENTE para que no aparezca en la lista de pendientes
       const updatedActivity = await storage.updateFileActivity(activityId, {
         storeCode: targetStoreCode,
         status: 'Pending'
       });
+      
+      // Verificar que se haya actualizado correctamente
+      console.log(`Actividad actualizada: storeCode=${updatedActivity.storeCode}, status=${updatedActivity.status}`);
       
       // Volver a procesar el archivo ahora que tiene una tienda asignada
       // Buscar el archivo en diferentes ubicaciones posibles

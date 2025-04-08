@@ -644,18 +644,28 @@ export async function processPdfFile(filePath: string, activityId: number, store
     
     // Detectar específicamente J28366AAKA5, J28366AAYHJ y J28366AA96M por ser los códigos que sabemos que existen
     const specificPatterns = [
-      /J28366AAKA5/i, 
-      /J28366AAYHJ/i, 
-      /J28366AA96M/i
+      { pattern: /J28366AAKA5/i, code: 'J28366AAKA5' },
+      { pattern: /J28366AAYHJ/i, code: 'J28366AAYHJ' },
+      { pattern: /J28366AA96M/i, code: 'J28366AA96M' }
     ];
     
     let foundSpecificMatch = false;
-    for (const pattern of specificPatterns) {
-      const match = originalFilename.match(pattern);
+    for (const item of specificPatterns) {
+      const match = originalFilename.match(item.pattern);
       if (match) {
-        pdfStoreCode = match[0].toUpperCase();
+        // Usar el código exacto para asegurar la coincidencia en base de datos
+        pdfStoreCode = item.code;
         console.log(`[DEBUG PDF] ¡¡ENCONTRADO!! Código específico encontrado: ${pdfStoreCode}`);
         foundSpecificMatch = true;
+        
+        // Verificar inmediatamente si existe en base de datos
+        const store = await storage.getStoreByCode(pdfStoreCode);
+        if (store) {
+          console.log(`[DEBUG] ¡Código ${pdfStoreCode} confirmado en base de datos!`);
+        } else {
+          console.log(`[DEBUG] ADVERTENCIA: Código ${pdfStoreCode} NO encontrado en base de datos a pesar de estar en nuestra lista.`);
+        }
+        
         break;
       }
     }

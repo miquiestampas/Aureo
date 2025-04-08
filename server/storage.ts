@@ -1882,6 +1882,28 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
+      // Lógica para manejar la relación entre storeCode y status
+      // Si estamos cambiando el código de tienda de "PENDIENTE" a otro valor,
+      // asegurarnos de que el status no sea PendingStoreAssignment
+      if (processedUpdates.storeCode && 
+          processedUpdates.storeCode !== 'PENDIENTE' && 
+          activity.storeCode === 'PENDIENTE') {
+        // Si no se especificó un status, actualizarlo automáticamente a "Pending"
+        if (!processedUpdates.status) {
+          processedUpdates.status = 'Pending';
+          console.log(`Actualizando automáticamente status a 'Pending' porque storeCode cambió de PENDIENTE a ${processedUpdates.storeCode}`);
+        }
+      }
+      
+      // A la inversa, si estamos cambiando a status PendingStoreAssignment,
+      // asegurarnos de que el storeCode sea PENDIENTE
+      if (processedUpdates.status === 'PendingStoreAssignment' && 
+          activity.storeCode !== 'PENDIENTE' && 
+          !processedUpdates.storeCode) {
+        processedUpdates.storeCode = 'PENDIENTE';
+        console.log(`Actualizando automáticamente storeCode a 'PENDIENTE' porque status cambió a PendingStoreAssignment`);
+      }
+      
       console.log(`Actualizando actividad de archivo ${id}:`, JSON.stringify(processedUpdates));
       
       // Actualizar la actividad con los nuevos valores
