@@ -77,10 +77,10 @@ app.use((req, res, next) => {
   const port = 5000;
   server.listen({
     port,
-    host: "127.0.0.1",
+    host: "localhost",
     reusePort: true,
   }, () => {
-    log(`Server running at http://127.0.0.1:${port}`);
+    log(`Server running at http://localhost:${port}`);
     // Mostrar todas las IPs disponibles para facilitar el acceso
     const networkInterfaces = os.networkInterfaces();
     Object.keys(networkInterfaces).forEach((interfaceName) => {
