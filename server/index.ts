@@ -77,10 +77,12 @@ app.use((req, res, next) => {
   const port = 5000;
   server.listen({
     port,
-    host: "localhost",
+    host: "127.0.0.1",  // Usamos explícitamente IPv4
     reusePort: true,
+    ipv6Only: false,  // Deshabilitamos IPv6
+    family: 4  // Forzamos el uso de IPv4 únicamente
   }, () => {
-    log(`Server running at http://localhost:${port}`);
+    log(`Server running at http://127.0.0.1:${port}`);
     // Mostrar todas las IPs disponibles para facilitar el acceso
     const networkInterfaces = os.networkInterfaces();
     Object.keys(networkInterfaces).forEach((interfaceName) => {
