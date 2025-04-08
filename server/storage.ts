@@ -300,9 +300,39 @@ export class MemStorage implements IStorage {
   }
   
   async getStoreByCode(code: string): Promise<Store | undefined> {
-    return Array.from(this.stores.values()).find(
+    // Primero intentamos una búsqueda exacta (incluye case-sensitive)
+    const exactMatch = Array.from(this.stores.values()).find(
       (store) => store.code === code
     );
+    
+    if (exactMatch) {
+      console.log(`[Storage] Encontrada tienda con código exacto: ${exactMatch.code}`);
+      return exactMatch;
+    }
+    
+    // Si no encontramos coincidencia exacta, intentamos case-insensitive
+    const caseInsensitiveMatch = Array.from(this.stores.values()).find(
+      (store) => store.code.toLowerCase() === code.toLowerCase()
+    );
+    
+    if (caseInsensitiveMatch) {
+      console.log(`[Storage] Encontrada tienda con código case-insensitive: ${caseInsensitiveMatch.code} (buscado: ${code})`);
+      return caseInsensitiveMatch;
+    }
+    
+    // Por último, intentamos normalizar (sin espacios y case-insensitive)
+    const normalizedQueryCode = code.replace(/\s+/g, '').toLowerCase();
+    const normalizedMatch = Array.from(this.stores.values()).find(
+      (store) => store.code.replace(/\s+/g, '').toLowerCase() === normalizedQueryCode
+    );
+    
+    if (normalizedMatch) {
+      console.log(`[Storage] Encontrada tienda con código normalizado: ${normalizedMatch.code} (buscado: ${code})`);
+      return normalizedMatch;
+    }
+    
+    console.log(`[Storage] No se encontró tienda con código: ${code} (usando ningún método de búsqueda)`);
+    return undefined;
   }
   
   async getStores(): Promise<Store[]> {
@@ -1654,8 +1684,40 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getStoreByCode(code: string): Promise<Store | undefined> {
-    const [store] = await db.select().from(stores).where(eq(stores.code, code));
-    return store;
+    // Primero intentamos búsqueda exacta case-sensitive
+    let [store] = await db.select().from(stores).where(eq(stores.code, code));
+    if (store) {
+      console.log(`[SQLStorage] Encontrada tienda con código exacto: ${store.code}`);
+      return store;
+    }
+    
+    // Intentar búsqueda con SQL LIKE (case-insensitive en SQLite)
+    // Usamos una única % para indicar que estamos buscando una coincidencia exacta
+    // pero case-insensitive
+    const likeQuery = await db.select().from(stores).where(sql`LOWER(${stores.code}) = LOWER(${code})`);
+    if (likeQuery.length > 0) {
+      console.log(`[SQLStorage] Encontrada tienda con código case-insensitive: ${likeQuery[0].code} (buscado: ${code})`);
+      return likeQuery[0];
+    }
+    
+    // Intentar búsqueda más flexible eliminando espacios
+    const normalizedCode = code.replace(/\s+/g, '');
+    if (normalizedCode.length > 3) { // Evitar búsquedas con códigos muy cortos
+      const storesData = await db.select().from(stores);
+      
+      // Usamos filter para aplicar lógica de normalización que es complicada de expresar en SQL
+      const matchingStore = storesData.find(store => 
+        store.code.replace(/\s+/g, '').toLowerCase() === normalizedCode.toLowerCase()
+      );
+      
+      if (matchingStore) {
+        console.log(`[SQLStorage] Encontrada tienda con código normalizado: ${matchingStore.code} (buscado: ${code})`);
+        return matchingStore;
+      }
+    }
+    
+    console.log(`[SQLStorage] No se encontró tienda con código: ${code} (usando ningún método de búsqueda)`);
+    return undefined;
   }
   
   async getStores(): Promise<Store[]> {
