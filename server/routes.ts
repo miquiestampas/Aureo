@@ -702,305 +702,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint para obtener archivos pendientes de asignación de tienda
   app.get("/api/pending-store-assignments", async (req, res, next) => {
     try {
-      console.log("Solicitando actividades pendientes de asignación de tienda...");
-      
-      // Verificar primero en la DB si realmente hay actividades pendientes
-      const pendingActivitiesFromDB = await db
-        .select()
-        .from(fileActivities)
-        .where(
-          or(
-            eq(fileActivities.status, 'PendingStoreAssignment'),
-            eq(fileActivities.storeCode, 'PENDIENTE')
-          )
-        )
-        .orderBy(desc(fileActivities.processingDate));
-        
-      if (pendingActivitiesFromDB.length > 0) {
-        console.log(`Se encontraron ${pendingActivitiesFromDB.length} actividades pendientes directamente en la DB`);
-        res.json(pendingActivitiesFromDB);
-      } else {
-        // Si no hay en la DB, usar el método normal
-        console.log("No se encontraron actividades pendientes en la DB, usando método storage...");
-        const pendingActivities = await storage.getPendingStoreAssignmentActivities();
-        
-        if (pendingActivities.length > 0) {
-          console.log("⚠️ INCONSISTENCIA DETECTADA: El storage reporta actividades pendientes pero no están en la DB");
-          console.log("Actividades reportadas por storage:", JSON.stringify(pendingActivities));
-          
-          // Si hay actividades reportadas por el storage pero no por la DB, 
-          // devolver un array vacío para limpiar la UI
-          res.json([]);
-        } else {
-          res.json([]);
-        }
-      }
+      const pendingActivities = await storage.getPendingStoreAssignmentActivities();
+      res.json(pendingActivities);
     } catch (error) {
-      console.error("Error al obtener actividades pendientes:", error);
-      // En caso de error, devolver un array vacío para evitar bloquear la UI
-      res.json([]);
-    }
-  });
-  
-  // Endpoint para renombrar un archivo y procesarlo de nuevo
-  app.post("/api/file-activities/:id/rename", async (req, res, next) => {
-    try {
-      const activityId = parseInt(req.params.id);
-      const { newFilename } = req.body;
-      
-      // Verificar que el ID de actividad es válido
-      const activity = await storage.getFileActivity(activityId);
-      if (!activity) {
-        return res.status(404).json({ message: "Actividad de archivo no encontrada" });
-      }
-      
-      // Verificar que el nuevo nombre no está vacío
-      if (!newFilename || typeof newFilename !== 'string' || newFilename.trim().length === 0) {
-        return res.status(400).json({ message: "Debe proporcionar un nuevo nombre de archivo válido" });
-      }
-      
-      // Ubicaciones de los archivos originales y nuevos
-      let originalFilePath = '';
-      
-      console.log(`Renombrando archivo para la actividad ${activityId}: ${activity.filename} -> ${newFilename}`);
-      
-      // Posibles ubicaciones de archivos
-      const possibleLocations = [];
-      
-      if (activity.fileType === 'Excel') {
-        // Para archivos Excel
-        possibleLocations.push(
-          // Ubicaciones principales para Excel
-          path.join('./data/excel', activity.filename),
-          path.join('./data/excel/procesados', activity.filename),
-          path.join('./uploads/excel', activity.filename),
-          // Ubicación para archivos recién subidos
-          path.join(os.tmpdir(), activity.filename),
-          path.join('./temp', activity.filename)
-        );
-      } else if (activity.fileType === 'PDF') {
-        // Para archivos PDF
-        possibleLocations.push(
-          // Ubicaciones principales para PDF
-          path.join('./data/pdf', activity.filename),
-          path.join('./data/pdf/procesados', activity.filename),
-          path.join('./uploads/pdf', activity.filename),
-          // Ubicación para archivos recién subidos
-          path.join(os.tmpdir(), activity.filename),
-          path.join('./temp', activity.filename)
-        );
-      } else {
-        return res.status(400).json({ message: "Tipo de archivo no soportado" });
-      }
-      
-      // Verificar si el archivo existe en alguna de las ubicaciones
-      for (const location of possibleLocations) {
-        if (fs.existsSync(location)) {
-          originalFilePath = location;
-          console.log(`Se encontró el archivo en: ${originalFilePath}`);
-          break;
-        }
-      }
-      
-      // Si no se encontró con el nombre exacto, buscar por coincidencia parcial
-      if (!originalFilePath) {
-        console.warn(`No se encontró el archivo con el nombre exacto en ninguna ubicación conocida`);
-        
-        // Determinar los directorios a buscar
-        const dirsToSearch = [];
-        if (activity.fileType === 'Excel') {
-          dirsToSearch.push('./data/excel', './data/excel/procesados', './uploads/excel');
-        } else {
-          dirsToSearch.push('./data/pdf', './data/pdf/procesados', './uploads/pdf');
-        }
-        
-        // Extraer extensión y nombre base
-        const fileExt = path.extname(activity.filename);
-        const baseFileName = path.basename(activity.filename, fileExt);
-        
-        // Buscar en cada directorio por coincidencia parcial
-        for (const dir of dirsToSearch) {
-          if (fs.existsSync(dir)) {
-            try {
-              const files = fs.readdirSync(dir);
-              for (const file of files) {
-                // Comprobar si el archivo contiene parte del nombre original o si solo hay uno con la misma extensión
-                if ((file.includes(baseFileName) || 
-                    (files.length === 1 && file.endsWith(fileExt))) && 
-                    file.endsWith(fileExt)) {
-                  originalFilePath = path.join(dir, file);
-                  console.log(`Se encontró un archivo similar: ${originalFilePath}`);
-                  break;
-                }
-              }
-              if (originalFilePath) break;
-            } catch (err) {
-              console.error(`Error al leer el directorio ${dir}:`, err);
-            }
-          }
-        }
-        
-        if (!originalFilePath) {
-          // Si la actividad fue recién creada, el archivo puede estar en el directorio temporal
-          if (new Date().getTime() - new Date(activity.processingDate).getTime() < 60000) { // menos de 1 minuto
-            // Buscar el PDF o Excel en el directorio temporal del sistema
-            const tempDir = os.tmpdir();
-            if (fs.existsSync(tempDir)) {
-              try {
-                const files = fs.readdirSync(tempDir);
-                for (const file of files) {
-                  if (file.endsWith(fileExt)) {
-                    originalFilePath = path.join(tempDir, file);
-                    console.log(`Se encontró un archivo temporal reciente: ${originalFilePath}`);
-                    break;
-                  }
-                }
-              } catch (err) {
-                console.error(`Error al leer el directorio temporal:`, err);
-              }
-            }
-          }
-        }
-        
-        // Si aún no se ha encontrado, buscar en el directorio actual
-        if (!originalFilePath) {
-          const currentDir = './';
-          try {
-            const files = fs.readdirSync(currentDir);
-            for (const file of files) {
-              if (file.endsWith(fileExt) && (file.includes(baseFileName) || file === activity.filename)) {
-                originalFilePath = path.join(currentDir, file);
-                console.log(`Se encontró un archivo en el directorio actual: ${originalFilePath}`);
-                break;
-              }
-            }
-          } catch (err) {
-            console.error(`Error al leer el directorio actual:`, err);
-          }
-        }
-      }
-      
-      // Si después de todo no se encontró el archivo
-      if (!originalFilePath) {
-        return res.status(404).json({ message: "No se pudo encontrar el archivo físico para renombrar" });
-      }
-      // Generar la ruta para el nuevo archivo en el mismo directorio del original
-      const originalDirPath = path.dirname(originalFilePath);
-      const newFilePath = path.join(originalDirPath, newFilename);
-      
-      console.log(`Ruta del archivo original: ${originalFilePath}`);
-      console.log(`Ruta para el nuevo archivo: ${newFilePath}`);
-      
-      // Actualizar el registro en la base de datos
-      await storage.updateFileActivity(activityId, {
-        filename: newFilename,
-        status: 'Pending', // Marcar como pendiente para reprocesarlo
-      });
-      
-      // Renombrar el archivo físico
-      fs.renameSync(originalFilePath, newFilePath);
-      console.log(`Archivo renombrado físicamente: ${originalFilePath} -> ${newFilePath}`);
-      
-      // Procesar el archivo de nuevo según su tipo
-      if (activity.fileType === 'Excel') {
-        // La detección del código de tienda se hace en el procesador
-        // Usamos el ID de la actividad actual para mantener la relación con los datos
-        const result = await processExcelFile(newFilePath, activityId, activity.storeCode || "");
-        
-        // Si se detectó un código de tienda diferente, actualizarlo en la actividad
-        if (result?.detectedStoreCode && result.detectedStoreCode !== activity.storeCode) {
-          await storage.updateFileActivity(activityId, {
-            storeCode: result.detectedStoreCode
-          });
-          console.log(`Código de tienda actualizado para actividad ${activityId}: ${activity.storeCode} -> ${result.detectedStoreCode}`);
-        }
-        
-        // Verificar el estado final de la actividad
-        const updatedActivity = await storage.getFileActivity(activityId);
-        const finalStatus = updatedActivity?.status || "Desconocido";
-        
-        res.json({ 
-          success: true, 
-          message: `Archivo Excel renombrado y procesado correctamente (Estado final: ${finalStatus})`, 
-          newFilename, 
-          detectedStoreCode: result?.detectedStoreCode,
-          status: finalStatus
-        });
-      } else if (activity.fileType === 'PDF') {
-        // La detección del código de tienda se hace en el procesador
-        // Usamos el ID de la actividad actual para mantener la relación con los datos
-        const result = await processPdfFile(newFilePath, activityId, activity.storeCode || "");
-        
-        // Si se detectó un código de tienda diferente, actualizarlo en la actividad
-        if (result?.detectedStoreCode && result.detectedStoreCode !== activity.storeCode) {
-          await storage.updateFileActivity(activityId, {
-            storeCode: result.detectedStoreCode
-          });
-          console.log(`Código de tienda actualizado para actividad ${activityId}: ${activity.storeCode} -> ${result.detectedStoreCode}`);
-        }
-        
-        // Verificar el estado final de la actividad
-        const updatedActivity = await storage.getFileActivity(activityId);
-        const finalStatus = updatedActivity?.status || "Desconocido";
-        
-        res.json({ 
-          success: true, 
-          message: `Archivo PDF renombrado y procesado correctamente (Estado final: ${finalStatus})`, 
-          newFilename, 
-          detectedStoreCode: result?.detectedStoreCode,
-          status: finalStatus
-        });
-      }
-    } catch (error) {
-      console.error("Error al renombrar archivo:", error);
       next(error);
     }
   });
   
   // Endpoint para asignar una tienda a un archivo pendiente
-  app.post(["/api/file-activities/:id/assign-store", "/api/assign-store"], async (req, res, next) => {
+  app.post("/api/file-activities/:id/assign-store", async (req, res, next) => {
     try {
-      // Si usamos la ruta general, extraer el activityId del body
-      const activityId = req.params.id ? parseInt(req.params.id) : (req.body.activityId ? parseInt(req.body.activityId) : -1);
+      const activityId = parseInt(req.params.id);
       const { storeCode, createNewStore } = req.body;
-      
-      console.log(`🔄 Asignación de tienda solicitada para activityId=${activityId}, storeCode=${storeCode}, createNewStore=${createNewStore}`);
       
       // Verificar que el ID de actividad es válido
       const activity = await storage.getFileActivity(activityId);
       if (!activity) {
-        console.error(`❌ No se encontró una actividad con ID ${activityId}`);
-        
-        // Verificar directamente en la base de datos
-        const dbCheck = await db
-          .select()
-          .from(fileActivities)
-          .where(eq(fileActivities.id, activityId));
-        
-        if (dbCheck.length > 0) {
-          console.log(`⚠️ INCONSISTENCIA: La actividad ${activityId} existe en la base de datos pero no en el storage`);
-          console.log(`Actividad en DB:`, JSON.stringify(dbCheck[0]));
-          
-          // Reinsertar la actividad en la memoria desde la DB
-          console.log(`Intentando recuperar la actividad de la DB al storage...`);
-          const recoveredActivity = dbCheck[0];
-          await storage.createFileActivity({
-            filename: recoveredActivity.filename,
-            storeCode: recoveredActivity.storeCode,
-            fileType: recoveredActivity.fileType,
-            status: recoveredActivity.status,
-            processingDate: recoveredActivity.processingDate,
-            processedBy: recoveredActivity.processedBy,
-            errorMessage: recoveredActivity.errorMessage,
-            metadata: recoveredActivity.metadata,
-            detectedStoreCode: recoveredActivity.detectedStoreCode
-          });
-          
-          return res.status(500).json({ 
-            message: "Se detectó una inconsistencia en los datos. Por favor, intente de nuevo en unos momentos." 
-          });
-        }
-        
         return res.status(404).json({ message: "Actividad de archivo no encontrada" });
       }
       
@@ -1062,142 +779,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Actualizar la actividad con el nuevo código de tienda y cambiar su estado a Pending
-      // También asegurarnos de que no sea PENDIENTE para que no aparezca en la lista de pendientes
       const updatedActivity = await storage.updateFileActivity(activityId, {
         storeCode: targetStoreCode,
         status: 'Pending'
       });
       
-      // Verificar que se haya actualizado correctamente
-      console.log(`Actividad actualizada: storeCode=${updatedActivity.storeCode}, status=${updatedActivity.status}`);
-      
       // Volver a procesar el archivo ahora que tiene una tienda asignada
-      // Buscar el archivo en diferentes ubicaciones posibles
-      let filePath = null;
-      let fileName = activity.filename;
-      
-      // Directorios base a comprobar
-      let baseDirs = [];
+      const filePath = path.join(
+        activity.fileType === 'Excel' ? './uploads/excel' : './uploads/pdf',
+        activity.filename
+      );
       
       if (activity.fileType === 'Excel') {
-        baseDirs = ["./uploads/excel", "./data/excel"];
-      } else if (activity.fileType === 'PDF') {
-        baseDirs = ["./uploads/pdf", "./data/pdf"];
+        // Para Excel, procesar el archivo
+        processExcelFile(filePath, activityId, targetStoreCode)
+          .catch(err => console.error(`Error al procesar Excel después de asignar tienda:`, err));
+      } else {
+        // Para PDF, procesar el archivo
+        processPdfFile(filePath, activityId, targetStoreCode)
+          .catch(err => console.error(`Error al procesar PDF después de asignar tienda:`, err));
       }
       
-      // Buscar en todas las rutas posibles
-      for (const baseDir of baseDirs) {
-        // Rutas a comprobar (incluye directorio de "procesados")
-        const pathsToCheck = [
-          path.join(baseDir, fileName),                     // Ruta original
-          path.join(baseDir, "procesados", fileName)        // Carpeta "procesados"
-        ];
-        
-        // Comprobar todas las rutas
-        for (const checkPath of pathsToCheck) {
-          if (fs.existsSync(checkPath)) {
-            filePath = checkPath;
-            console.log(`Encontrado archivo para reasignar tienda en: ${filePath}`);
-            break;
-          }
-        }
-        
-        if (filePath) break; // Si encontramos el archivo, salir del bucle exterior
-        
-        // Si no se encontró el archivo exacto, buscar por nombre parcial
-        if (!filePath) {
-          const baseFileName = fileName.replace(/\.[^/.]+$/, ''); // Nombre sin extensión
-          const extension = path.extname(fileName);
-          
-          // Buscar en directorio principal
-          if (fs.existsSync(baseDir)) {
-            try {
-              const mainDir = fs.readdirSync(baseDir);
-              for (const file of mainDir) {
-                if (file.startsWith(baseFileName) && file.endsWith(extension)) {
-                  filePath = path.join(baseDir, file);
-                  fileName = file;
-                  console.log(`Encontrado archivo por coincidencia parcial: ${filePath}`);
-                  break;
-                }
-              }
-            } catch (err) {
-              console.error(`Error al leer directorio ${baseDir}:`, err);
-            }
-          }
-          
-          // Si no se encontró, buscar en directorio "procesados"
-          if (!filePath) {
-            const processedDir = path.join(baseDir, "procesados");
-            if (fs.existsSync(processedDir)) {
-              try {
-                const processedFiles = fs.readdirSync(processedDir);
-                for (const file of processedFiles) {
-                  if (file.startsWith(baseFileName) && file.endsWith(extension)) {
-                    filePath = path.join(processedDir, file);
-                    fileName = file;
-                    console.log(`Encontrado archivo por coincidencia parcial en procesados: ${filePath}`);
-                    break;
-                  }
-                }
-              } catch (err) {
-                console.error(`Error al leer directorio ${processedDir}:`, err);
-              }
-            }
-          }
-          
-          if (filePath) break; // Si encontramos el archivo, salir del bucle exterior
-        }
-      }
-      
-      // Verificar si encontramos el archivo
-      if (!filePath) {
-        console.error(`No se encontró el archivo ${activity.filename} en ninguna de las rutas buscadas`);
-        // Actualizar la actividad para indicar que no se pudo encontrar el archivo
-        await storage.updateFileActivity(activityId, {
-          status: 'Failed',
-          errorMessage: 'No se encontró el archivo físico para procesar. Verifique si fue eliminado o movido.'
-        });
-        
-        // Devolver respuesta al cliente
-        return res.status(200).json({
-          ...updatedActivity,
-          status: 'Failed',
-          errorMessage: 'No se encontró el archivo físico para procesar. Verifique si fue eliminado o movido.'
-        });
-      }
-      
-      console.log(`Procesando archivo ${filePath} con activityId ${activityId} y storeCode ${targetStoreCode}`);
-      
-      try {
-        if (activity.fileType === 'Excel') {
-          // Para Excel, procesar el archivo de forma sincrónica
-          const result = await processExcelFile(filePath, activityId, targetStoreCode);
-          console.log(`Resultado de procesar Excel después de asignar tienda:`, result);
-        } else {
-          // Para PDF, procesar el archivo de forma sincrónica
-          const result = await processPdfFile(filePath, activityId, targetStoreCode);
-          console.log(`Resultado de procesar PDF después de asignar tienda:`, result);
-        }
-        
-        // Obtener estado actualizado de la actividad
-        const finalActivity = await storage.getFileActivity(activityId);
-        
-        // Devolver respuesta al cliente con el estado final
-        return res.json(finalActivity);
-      } catch (err) {
-        console.error(`Error al procesar archivo después de asignar tienda:`, err);
-        
-        // Actualizar la actividad con el error
-        await storage.updateFileActivity(activityId, {
-          status: 'Failed',
-          errorMessage: `Error al procesar archivo: ${err.message || 'Error desconocido'}`
-        });
-        
-        // Devolver respuesta al cliente con el error
-        const failedActivity = await storage.getFileActivity(activityId);
-        return res.json(failedActivity);
-      }
+      res.json(updatedActivity);
     } catch (error) {
       next(error);
     }

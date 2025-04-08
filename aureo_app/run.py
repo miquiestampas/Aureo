@@ -15,7 +15,7 @@ def before_first_request():
 def parse_arguments():
     """Procesa los argumentos de línea de comandos"""
     parser = argparse.ArgumentParser(description='Inicia la aplicación Áureo')
-    parser.add_argument('--host', default='127.0.0.1', help='Host para escuchar (por defecto: 127.0.0.1)')
+    parser.add_argument('--host', default='0.0.0.0', help='Host para escuchar (por defecto: 0.0.0.0)')
     parser.add_argument('--port', type=int, default=5000, help='Puerto para escuchar (por defecto: 5000)')
     parser.add_argument('--debug', action='store_true', help='Iniciar en modo depuración (por defecto: False)')
     

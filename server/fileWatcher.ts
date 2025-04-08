@@ -2,8 +2,7 @@ import chokidar from 'chokidar';
 import path from 'path';
 import fs from 'fs';
 import { storage } from './storage';
-import { processExcelFile } from './fileProcessors';
-import { processPdfFile } from './fileProcessors';
+import { processExcelFile, processPdfFile } from './fileProcessors';
 import { Server } from 'socket.io';
 
 let excelWatcher: any | null = null;
@@ -163,12 +162,11 @@ async function handleNewExcelFile(filePath: string) {
     const allStores = await storage.getStores();
     let foundStore = null;
     
-    // Solo permitir coincidencia exacta de código (NO coincidencias parciales)
+    // Primero intentar coincidencia exacta de código
     for (const store of allStores) {
-      // Usamos === para solo aceptar coincidencias exactas
-      if (filename === store.code || filename.startsWith(store.code + '_') || filename.startsWith(store.code + '.')) {
+      if (filename.includes(store.code)) {
         foundStore = store;
-        console.log(`Excel matched with store by exact code: ${store.code}`);
+        console.log(`Excel matched with store by code: ${store.code}`);
         break;
       }
     }
@@ -177,22 +175,6 @@ async function handleNewExcelFile(filePath: string) {
     if (!foundStore) {
       // Estrategias para extraer el código de tienda del nombre del archivo
       let storeCode = '';
-      
-      // Verificar primero si es nuestro archivo de prueba con J28366AAKA5
-      if (filename.includes('J28366AAKA5')) {
-        console.log('¡ATENCIÓN! Detectado archivo de prueba con código J28366AAKA5');
-        // Intentar obtener esta tienda específica (sabemos que existe)
-        foundStore = await storage.getStoreByCode('J28366AAKA5');
-        if (foundStore) {
-          console.log(`Excel file ${filename} matched with J28366AAKA5 test store!`);
-          // Usar esta tienda y continuar el procesamiento normal
-          storeCode = foundStore.code;
-          // Saltamos el resto del código en este bloque
-          return foundStore;
-        } else {
-          console.log('No se pudo encontrar la tienda J28366AAKA5 a pesar de ser un código válido');
-        }
-      }
       
       // 1. Intentar el formato STORECODE_*.xlsx
       const formatMatch = filename.match(/^([^_\.]+)_/);
@@ -303,12 +285,11 @@ async function handleNewPdfFile(filePath: string) {
     const allStores = await storage.getStores();
     let foundStore = null;
     
-    // Solo permitir coincidencia exacta de código (NO coincidencias parciales)
+    // Primero intentar coincidencia exacta de código
     for (const store of allStores) {
-      // Usamos === para solo aceptar coincidencias exactas
-      if (filename === store.code || filename.startsWith(store.code + '_') || filename.startsWith(store.code + '.')) {
+      if (filename.includes(store.code)) {
         foundStore = store;
-        console.log(`PDF matched with store by exact code: ${store.code}`);
+        console.log(`PDF matched with store by code: ${store.code}`);
         break;
       }
     }
@@ -317,22 +298,6 @@ async function handleNewPdfFile(filePath: string) {
     if (!foundStore) {
       // Estrategias para extraer el código de tienda del nombre del archivo
       let storeCode = '';
-      
-      // Verificar primero si es nuestro archivo de prueba con J28366AAKA5
-      if (filename.includes('J28366AAKA5')) {
-        console.log('¡ATENCIÓN! Detectado archivo PDF de prueba con código J28366AAKA5');
-        // Intentar obtener esta tienda específica (sabemos que existe)
-        foundStore = await storage.getStoreByCode('J28366AAKA5');
-        if (foundStore) {
-          console.log(`PDF file ${filename} matched with J28366AAKA5 test store!`);
-          // Usar esta tienda y continuar el procesamiento normal
-          storeCode = foundStore.code;
-          // Saltar el resto del procesamiento en el bloque if (!foundStore)
-          return foundStore;
-        } else {
-          console.log('No se pudo encontrar la tienda J28366AAKA5 a pesar de ser un código válido');
-        }
-      }
       
       // 1. Buscar por patrón J12345ABCDE (formato común que comienza con J seguido de números y letras)
       const j_pattern = /\b(J\d{5}[A-Z0-9]{4,5})\b/i;

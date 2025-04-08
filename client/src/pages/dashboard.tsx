@@ -98,9 +98,7 @@ interface Store {
 // Componente para manejar la asignación de tiendas
 function StoreAssignmentCard({ file, onAssigned }: { file: FileActivity, onAssigned: () => void }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState<string>("");
-  const [newFilename, setNewFilename] = useState<string>("");
   const [stores, setStores] = useState<Store[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -123,13 +121,6 @@ function StoreAssignmentCard({ file, onAssigned }: { file: FileActivity, onAssig
       loadStores();
     }
   }, [isDialogOpen, file.fileType]);
-
-  // Inicializar el valor del nuevo nombre al abrir el diálogo de renombrar
-  useEffect(() => {
-    if (isRenameDialogOpen) {
-      setNewFilename(file.filename);
-    }
-  }, [isRenameDialogOpen, file.filename]);
 
   // Asignar tienda al archivo
   const assignStore = useMutation({
@@ -168,51 +159,8 @@ function StoreAssignmentCard({ file, onAssigned }: { file: FileActivity, onAssig
     }
   });
 
-  // Renombrar archivo y procesarlo de nuevo
-  const renameFile = useMutation({
-    mutationFn: async () => {
-      if (!newFilename || newFilename.trim() === '') {
-        throw new Error("El nombre del archivo no puede estar vacío");
-      }
-      
-      const response = await apiRequest("POST", `/api/file-activities/${file.id}/rename`, {
-        newFilename
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Error al renombrar archivo");
-      }
-      
-      return response.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Archivo renombrado",
-        description: data.detectedStoreCode
-          ? `El archivo ha sido renombrado correctamente. Se detectó el código de tienda: ${data.detectedStoreCode}`
-          : "El archivo ha sido renombrado correctamente.",
-        variant: "default",
-      });
-      setIsRenameDialogOpen(false);
-      setNewFilename("");
-      onAssigned();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error al renombrar archivo",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  });
-
   const handleAssign = () => {
     assignStore.mutate();
-  };
-
-  const handleRename = () => {
-    renameFile.mutate();
   };
 
   return (
@@ -238,89 +186,17 @@ function StoreAssignmentCard({ file, onAssigned }: { file: FileActivity, onAssig
           </div>
         </div>
         
-        <div className="flex flex-col space-y-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsRenameDialogOpen(true)}
-            className="text-amber-600 border-amber-200 hover:bg-amber-50"
-          >
-            <RefreshCw className="h-3.5 w-3.5 mr-1" />
-            Renombrar Archivo
-          </Button>
-          
+        <div>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setIsDialogOpen(true)}
             className="text-blue-600 border-blue-200 hover:bg-blue-50"
           >
-            <Building2 className="h-3.5 w-3.5 mr-1" />
             Asignar Tienda
           </Button>
         </div>
       </div>
-      
-      {/* Dialog para renombrar archivo */}
-      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Renombrar Archivo</DialogTitle>
-            <DialogDescription>
-              Renombre el archivo para facilitar la asignación automática de tienda. Incluya el código de tienda en el nombre para permitir su detección automática.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="new-filename">Nuevo nombre de archivo</Label>
-              <Input 
-                id="new-filename" 
-                value={newFilename} 
-                onChange={(e) => setNewFilename(e.target.value)}
-                placeholder="Ingrese nuevo nombre con formato: CÓDIGO_TIENDA_descripción.extensión"
-              />
-              <p className="text-xs text-gray-500">
-                Ejemplo: "J28366_OroExpress_Madrid_20250401.xlsx" o "J28aa6_Montera_4_25042025.pdf"
-              </p>
-            </div>
-            
-            <div className="bg-blue-50 p-3 rounded-md text-sm">
-              <p className="font-medium text-blue-800">Sugerencia</p>
-              <p className="text-blue-700 mt-1">
-                Para una mejor detección automática, incluya el código de tienda al inicio del nombre 
-                del archivo, seguido por guion bajo o espacio.
-              </p>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsRenameDialogOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleRename}
-              disabled={!newFilename || renameFile.isPending}
-              className="bg-amber-600 hover:bg-amber-700 text-white"
-            >
-              {renameFile.isPending ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Procesando...
-                </>
-              ) : (
-                "Renombrar y Procesar"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       
       {/* Dialog para asignar tienda */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

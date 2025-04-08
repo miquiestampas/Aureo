@@ -104,7 +104,7 @@ export default function AuthPage() {
             <CardHeader>
               <CardTitle>Iniciar Sesión</CardTitle>
               <CardDescription>
-                Introduzca sus credenciales para acceder al sistema
+                Ingrese sus credenciales para acceder al sistema
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -117,7 +117,7 @@ export default function AuthPage() {
                       <FormItem>
                         <FormLabel>Código de Usuario</FormLabel>
                         <FormControl>
-                          <Input placeholder="Introduzca su carné profesional" {...field} />
+                          <Input placeholder="Ingrese su código (5-6 dígitos)" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -156,7 +156,7 @@ export default function AuthPage() {
               </Form>
             </CardContent>
             <CardFooter className="flex justify-center border-t pt-4">
-              <p className="text-sm text-gray-500">JSP MADRID - UDEV - GRUPO XI</p>
+              <p className="text-sm text-gray-500">Los usuarios son creados por el administrador del sistema</p>
             </CardFooter>
           </Card>
         </div>
@@ -165,9 +165,9 @@ export default function AuthPage() {
       {/* Right side - Hero section */}
       <div className="w-full md:w-1/2 bg-primary p-10 flex flex-col justify-center hidden md:flex">
         <div className="max-w-md mx-auto text-white">
-          <h2 className="text-3xl font-bold mb-6">Gestión de Compraventas Grupo XI</h2>
+          <h2 className="text-3xl font-bold mb-6">Sistema de Gestión Áureo</h2>
           <p className="text-lg mb-8">
-            Sistema de gestión, administración y control de tiendas y sus comunicaciones.
+            Una solución completa para rastrear y administrar compras de tiendas con procesamiento automatizado de archivos.
           </p>
           
           <div className="space-y-4">
@@ -178,7 +178,7 @@ export default function AuthPage() {
               <div>
                 <h3 className="font-medium text-lg">Procesamiento de Archivos Excel</h3>
                 <p className="text-white/80">
-                  Importación y procesamiento automático de archivos Excel con datos de compras
+                  Importación y procesamiento automático de archivos Excel con datos de compras de tiendas
                 </p>
               </div>
             </div>
@@ -190,7 +190,7 @@ export default function AuthPage() {
               <div>
                 <h3 className="font-medium text-lg">Gestión de Documentos PDF</h3>
                 <p className="text-white/80">
-                  Visualización, organización y clasificación automática de documentos PDF por código de tienda 
+                  Organice y clasifique documentos PDF por código de tienda con nuestro sistema inteligente
                 </p>
               </div>
             </div>
