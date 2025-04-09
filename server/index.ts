@@ -5,6 +5,9 @@ import os from 'os';
 import fs from 'fs';
 import path from 'path';
 
+// Función para detectar si estamos en Windows
+const isWindows = os.platform() === 'win32';
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -75,14 +78,24 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
-  server.listen({
+  
+  // Configuración específica según el sistema operativo
+  const serverConfig: any = {
     port,
-    host: "127.0.0.1",  // Usamos explícitamente IPv4
-    reusePort: true,
-    ipv6Only: false,  // Deshabilitamos IPv6
-    family: 4  // Forzamos el uso de IPv4 únicamente
-  }, () => {
-    log(`Server running at http://127.0.0.1:${port}`);
+    host: "127.0.0.1", // Usamos explícitamente IPv4
+    family: 4          // Forzamos el uso de IPv4 únicamente
+  };
+  
+  // En Windows, solo necesitamos la configuración básica
+  // En otros sistemas operativos, agregamos opciones adicionales
+  if (!isWindows) {
+    serverConfig.reusePort = true;
+    serverConfig.ipv6Only = false;
+  }
+  
+  // Crear y loggear la URL según la configuración
+  server.listen(serverConfig, () => {
+    log(`Server running at http://127.0.0.1:${port} (${isWindows ? 'Windows' : 'No Windows'})`);
     // Mostrar todas las IPs disponibles para facilitar el acceso
     const networkInterfaces = os.networkInterfaces();
     Object.keys(networkInterfaces).forEach((interfaceName) => {
