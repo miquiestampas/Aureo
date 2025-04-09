@@ -3750,6 +3750,7 @@ export class DatabaseStorage implements IStorage {
   async getCoincidencias(estado?: "NoLeido" | "Leido" | "Descartado", limit: number = 50): Promise<Coincidencia[]> {
     try {
       // Construir la consulta SQL directamente para solo mostrar coincidencias con señalamientos activos
+      // y filtrar también aquellas con tipo de match "Baja" (puntuación < 65%)
       let sql = `
         SELECT * FROM coincidencias
         WHERE (
@@ -3757,6 +3758,7 @@ export class DatabaseStorage implements IStorage {
           OR 
           (id_senal_objeto IS NOT NULL AND id_senal_objeto IN (SELECT id FROM senal_objetos WHERE estado = 'Activo'))
         )
+        AND tipo_match != 'Baja'
         ${estado ? `AND estado = ?` : ''}
         ORDER BY creado_en DESC
         LIMIT ?
@@ -3894,9 +3896,11 @@ export class DatabaseStorage implements IStorage {
     try {
       // Usar SQLite directamente para evitar problemas con columnas y tipos
       // Solo mostrar coincidencias con señalamientos activos
+      // y excluir coincidencias de baja precisión
       const sql = `
         SELECT * FROM coincidencias
         WHERE id_excel_data = ?
+        AND tipo_match != 'Baja'
         AND (
           (id_senal_persona IS NOT NULL AND id_senal_persona IN (SELECT id FROM senal_personas WHERE estado = 'Activo'))
           OR 
@@ -3941,9 +3945,11 @@ export class DatabaseStorage implements IStorage {
     try {
       // Usar SQLite directamente para evitar problemas con columnas
       // Solo contar coincidencias para señalamientos ACTIVOS
+      // y excluir coincidencias de baja precisión
       const sql = `
         SELECT COUNT(*) as total FROM coincidencias
         WHERE estado = 'NoLeido'
+        AND tipo_match != 'Baja'
         AND (
           (id_senal_persona IS NOT NULL AND id_senal_persona IN (SELECT id FROM senal_personas WHERE estado = 'Activo'))
           OR 
@@ -4054,16 +4060,14 @@ export class DatabaseStorage implements IStorage {
           
           console.log(`Puntuación para ${persona.nombre}: ${puntuacion}`);
           
-          // Umbral más bajo: 40% en lugar de 50%
-          if (puntuacion >= 40) {
+          // Umbral de 65% (media precisión) - no guardar coincidencias con baja precisión
+          if (puntuacion >= 65) {
             // Determinar tipo de coincidencia
-            let tipoMatch = "Baja";
+            let tipoMatch = "Media";
             if (puntuacion >= 95) {
               tipoMatch = "Exacta";
             } else if (puntuacion >= 80) {
               tipoMatch = "Alta";
-            } else if (puntuacion >= 65) {
-              tipoMatch = "Media";
             }
             
             // Crear registro de coincidencia
@@ -4105,16 +4109,14 @@ export class DatabaseStorage implements IStorage {
             
             console.log(`Puntuación para grabación ${objeto.grabacion}: ${puntuacion}`);
             
-            // Umbral más bajo: 40% en lugar de 50%
-            if (puntuacion >= 40) {
+            // Umbral de 65% (media precisión) - no guardar coincidencias con baja precisión
+            if (puntuacion >= 65) {
               // Determinar tipo de coincidencia
-              let tipoMatch = "Baja";
+              let tipoMatch = "Media";
               if (puntuacion >= 95) {
                 tipoMatch = "Exacta";
               } else if (puntuacion >= 80) {
                 tipoMatch = "Alta";
-              } else if (puntuacion >= 65) {
-                tipoMatch = "Media";
               }
               
               // Crear registro de coincidencia
@@ -4211,16 +4213,14 @@ export class DatabaseStorage implements IStorage {
           
           console.log(`Puntuación final para descripción ${objeto.descripcion}: ${puntuacion}`);
           
-          // Umbral más bajo: 40% en lugar de 50%
-          if (puntuacion >= 40) {
+          // Umbral de 65% (media precisión) - no guardar coincidencias con baja precisión
+          if (puntuacion >= 65) {
             // Determinar tipo de coincidencia
-            let tipoMatch = "Baja";
+            let tipoMatch = "Media";
             if (puntuacion >= 95) {
               tipoMatch = "Exacta";
             } else if (puntuacion >= 80) {
               tipoMatch = "Alta";
-            } else if (puntuacion >= 65) {
-              tipoMatch = "Media";
             }
             
             // Crear registro de coincidencia
@@ -4241,7 +4241,7 @@ export class DatabaseStorage implements IStorage {
               console.error(`Error al crear coincidencia de objeto por descripción: `, err);
             }
           } else {
-            console.log(`No alcanza el umbral mínimo de 40% para crear coincidencia`);
+            console.log(`No alcanza el umbral mínimo de 65% para crear coincidencia`);
           }
         }
       } else {
