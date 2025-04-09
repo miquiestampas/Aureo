@@ -12,6 +12,24 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Configurar cabeceras para UTF-8 y asegurar que los caracteres especiales como la Ñ se muestren correctamente
+app.use((req, res, next) => {
+  // No sobreescribir el Content-Type si ya ha sido establecido
+  if (!res.getHeader('Content-Type')) {
+    // Detectar tipo de contenido basado en la ruta o usar JSON por defecto
+    if (req.path.endsWith('.html') || req.path === '/' || req.path === '') {
+      res.header('Content-Type', 'text/html; charset=utf-8');
+    } else if (req.path.endsWith('.css')) {
+      res.header('Content-Type', 'text/css; charset=utf-8');
+    } else if (req.path.endsWith('.js')) {
+      res.header('Content-Type', 'application/javascript; charset=utf-8');
+    } else if (req.path.startsWith('/api')) {
+      res.header('Content-Type', 'application/json; charset=utf-8');
+    }
+  }
+  next();
+});
+
 // Asegúrate de que existan los directorios para los archivos temporales y cargados
 const uploadsDir = path.join(process.cwd(), 'uploads');
 const tempDir = path.join(uploadsDir, 'temp');

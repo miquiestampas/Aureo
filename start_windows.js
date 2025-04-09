@@ -3,7 +3,12 @@
  * 
  * Este script inicia la aplicación Áureo utilizando una configuración
  * específica para Windows, evitando problemas comunes con IPv6 y sockets.
+ * 
+ * Configurado para soportar caracteres internacionales (UTF-8) como la Ñ.
  */
+
+// Configurar la codificación para la consola
+process.stdout.setEncoding('utf8');
 
 const { spawn } = require('child_process');
 const path = require('path');
@@ -30,13 +35,17 @@ const server = spawn('node', [
   '--no-warnings',
   '--dns-result-order=ipv4first',
   '--require=tsx',
+  '--experimental-specifier-resolution=node',
   'server/index.ts'
 ], {
   stdio: 'inherit',
   env: {
     ...process.env,
     NODE_ENV: 'development',
-    NODE_OPTIONS: '--dns-result-order=ipv4first'
+    NODE_OPTIONS: '--dns-result-order=ipv4first',
+    LANG: 'es_ES.UTF-8',
+    LC_ALL: 'es_ES.UTF-8',
+    LC_CTYPE: 'UTF-8'
   }
 });
 
