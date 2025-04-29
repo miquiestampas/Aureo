@@ -178,11 +178,11 @@ export default function FileUploadModal({ isOpen, onClose, storesByType, fileTyp
   };
   
   const getFileTypeLabel = (): string => {
-    return fileType === "Excel" ? "Excel (.xlsx, .xls)" : "PDF (.pdf)";
+    return fileType === "Excel" ? "Excel o CSV (.xlsx, .xls, .csv)" : "PDF (.pdf)";
   };
   
   const getFileTypeAccept = (): string => {
-    return fileType === "Excel" ? ".xlsx,.xls" : ".pdf";
+    return fileType === "Excel" ? ".xlsx,.xls,.csv" : ".pdf";
   };
   
   const getFileTypeIcon = () => {

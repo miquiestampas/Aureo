@@ -98,22 +98,15 @@ app.use((req, res, next) => {
   const port = 5000;
   
   // Configuración específica según el sistema operativo
-  const serverConfig: any = {
+  const serverConfig = {
     port,
-    host: "127.0.0.1", // Usamos explícitamente IPv4
-    family: 4          // Forzamos el uso de IPv4 únicamente
+    host: "0.0.0.0"  // Escuchar en todas las interfaces
   };
-  
-  // En Windows, solo necesitamos la configuración básica
-  // En otros sistemas operativos, agregamos opciones adicionales
-  if (!isWindows) {
-    serverConfig.reusePort = true;
-    serverConfig.ipv6Only = false;
-  }
   
   // Crear y loggear la URL según la configuración
   server.listen(serverConfig, () => {
-    log(`Server running at http://127.0.0.1:${port} (${isWindows ? 'Windows' : 'No Windows'})`);
+    log(`Server running at http://localhost:${port}`);
+    log(`Server running at http://127.0.0.1:${port}`);
     // Mostrar todas las IPs disponibles para facilitar el acceso
     const networkInterfaces = os.networkInterfaces();
     Object.keys(networkInterfaces).forEach((interfaceName) => {

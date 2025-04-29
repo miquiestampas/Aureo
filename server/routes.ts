@@ -17,6 +17,7 @@ import {
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
+import { initializeDatabaseConnection } from "./db";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
@@ -714,94 +715,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const activityId = parseInt(req.params.id);
       const { storeCode, createNewStore } = req.body;
-      
+      console.log(`[ASSIGN-STORE] Intentando asignar tienda '${storeCode}' a actividad ID ${activityId}`);
       // Verificar que el ID de actividad es válido
       const activity = await storage.getFileActivity(activityId);
       if (!activity) {
+        console.log(`[ASSIGN-STORE] Actividad de archivo no encontrada para ID ${activityId}`);
         return res.status(404).json({ message: "Actividad de archivo no encontrada" });
       }
-      
       // Verificar que la actividad está en estado pendiente de asignación o procesado
-      // Permitimos reasignar tiendas a archivos en cualquier estado excepto 'Failed'
       if (activity.status === 'Failed') {
+        console.log(`[ASSIGN-STORE] No se puede asignar tienda a una actividad fallida (ID ${activityId})`);
         return res.status(400).json({ 
           message: "No se puede asignar tienda a una actividad que ha fallado. Borre la actividad y procese el archivo nuevamente." 
         });
       }
-      
-      console.log(`Asignando tienda ${storeCode} a actividad ${activityId} con estado actual: ${activity.status}`);
-      
+      console.log(`[ASSIGN-STORE] Estado actual de la actividad: ${activity.status}`);
       let targetStoreCode = storeCode;
-      
-      // Si se indicó crear una nueva tienda
-      if (createNewStore === true) {
-        // Usar el código detectado o el proporcionado
-        const newStoreCode = storeCode || activity.detectedStoreCode;
-        
-        if (!newStoreCode) {
-          return res.status(400).json({ 
-            message: "Se requiere un código de tienda para crear una nueva tienda" 
-          });
-        }
-        
-        // Verificar que no exista una tienda con ese código
-        const existingStore = await storage.getStoreByCode(newStoreCode);
-        if (existingStore) {
-          return res.status(400).json({ 
-            message: `Ya existe una tienda con el código ${newStoreCode}` 
-          });
-        }
-        
-        // Crear la nueva tienda
-        const newStore = await storage.createStore({
-          code: newStoreCode,
-          name: `Tienda ${newStoreCode}`,
-          type: activity.fileType,
-          district: "",
-          locality: "",
-          active: 1
-        });
-        
-        targetStoreCode = newStore.code;
-      } else {
-        // Verificar que la tienda existe
-        const store = await storage.getStoreByCode(storeCode);
-        if (!store) {
-          return res.status(404).json({ message: "Tienda no encontrada" });
-        }
-        
-        // Verificar que el tipo de tienda coincide con el tipo de archivo
-        if (store.type !== activity.fileType) {
-          return res.status(400).json({ 
-            message: `Esta tienda es de tipo ${store.type} pero el archivo es ${activity.fileType}` 
-          });
-        }
+      // Verificar que la tienda existe
+      const store = await storage.getStoreByCode(storeCode);
+      if (!store) {
+        console.log(`[ASSIGN-STORE] Tienda con código '${storeCode}' no encontrada en la base de datos.`);
+        return res.status(404).json({ message: "Tienda no encontrada" });
       }
-      
+      // Verificar que el tipo de tienda coincide con el tipo de archivo
+      if (store.type !== activity.fileType) {
+        console.log(`[ASSIGN-STORE] Tipo de tienda (${store.type}) no coincide con tipo de archivo (${activity.fileType})`);
+        return res.status(400).json({ 
+          message: `Esta tienda es de tipo ${store.type} pero el archivo es ${activity.fileType}` 
+        });
+      }
       // Actualizar la actividad con el nuevo código de tienda y cambiar su estado a Pending
       const updatedActivity = await storage.updateFileActivity(activityId, {
         storeCode: targetStoreCode,
         status: 'Pending'
       });
-      
-      // Volver a procesar el archivo ahora que tiene una tienda asignada
+      // Determinar la ruta del archivo
       const filePath = path.join(
         activity.fileType === 'Excel' ? './uploads/excel' : './uploads/pdf',
         activity.filename
       );
-      
-      if (activity.fileType === 'Excel') {
-        // Para Excel, procesar el archivo
-        processExcelFile(filePath, activityId, targetStoreCode)
-          .catch(err => console.error(`Error al procesar Excel después de asignar tienda:`, err));
-      } else {
-        // Para PDF, procesar el archivo
-        processPdfFile(filePath, activityId, targetStoreCode)
-          .catch(err => console.error(`Error al procesar PDF después de asignar tienda:`, err));
+      console.log(`[ASSIGN-STORE] Ruta del archivo a procesar: ${filePath}`);
+      if (!fs.existsSync(filePath)) {
+        console.error(`[ASSIGN-STORE] El archivo físico no existe en la ruta esperada: ${filePath}`);
+        return res.status(404).json({ message: `El archivo físico no existe en la ruta esperada: ${filePath}` });
       }
-      
+      // Volver a procesar el archivo ahora que tiene una tienda asignada
+      if (activity.fileType === 'Excel') {
+        processExcelFile(filePath, activityId, targetStoreCode)
+          .then(() => console.log(`[ASSIGN-STORE] Reprocesamiento de archivo Excel iniciado para actividad ${activityId}`))
+          .catch(err => console.error(`[ASSIGN-STORE] Error al reprocesar archivo Excel:`, err));
+      } else {
+        processPdfFile(filePath, activityId, targetStoreCode)
+          .then(() => console.log(`[ASSIGN-STORE] Reprocesamiento de archivo PDF iniciado para actividad ${activityId}`))
+          .catch(err => console.error(`[ASSIGN-STORE] Error al reprocesar archivo PDF:`, err));
+      }
       res.json(updatedActivity);
+      console.log(`[ASSIGN-STORE] Respuesta enviada al cliente para actividad ${activityId}`);
     } catch (error) {
+      console.error(`[ASSIGN-STORE] Error en el endpoint de asignación manual:`, error);
       next(error);
     }
   });
@@ -1730,18 +1701,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // File upload routes
   // Carga individual de archivos Excel
   app.post("/api/upload/excel", upload.single("file"), async (req, res, next) => {
+    console.log("[UPLOAD] Endpoint /api/upload/excel llamado");
     try {
       if (!req.file) {
+        console.log("[UPLOAD] No se ha cargado ningún archivo");
         return res.status(400).json({ message: "No se ha cargado ningún archivo" });
       }
-      
+      console.log(`[UPLOAD] Archivo recibido: ${req.file.originalname}, tamaño: ${req.file.size} bytes, mimetype: ${req.file.mimetype}`);
       // Usamos un código de tienda genérico que será reemplazado automáticamente
       // durante el procesamiento del archivo basado en su contenido
       const defaultStoreCode = "PENDIENTE";
-      
       // Create file activity entry - asegurarnos de que la fecha sea una cadena para SQLite
       const processingDate = new Date().toISOString();
-      
       const activity = await storage.createFileActivity({
         filename: req.file.originalname,
         storeCode: defaultStoreCode,
@@ -1752,17 +1723,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         errorMessage: null,
         metadata: null
       });
-      
+      console.log(`[UPLOAD] Actividad de archivo creada con ID: ${activity.id}`);
       // Process the file in the background
       // El código de tienda será determinado automáticamente desde el archivo
       processExcelFile(req.file.path, activity.id, defaultStoreCode)
-        .catch(err => console.error("Error al procesar archivo Excel cargado:", err));
-      
+        .then(() => console.log(`[UPLOAD] Procesamiento de archivo Excel iniciado para actividad ${activity.id}`))
+        .catch(err => console.error("[UPLOAD] Error al procesar archivo Excel cargado:", err));
       res.status(202).json({
         message: "Archivo cargado exitosamente y en cola para procesamiento",
         fileActivity: activity
       });
+      console.log(`[UPLOAD] Respuesta enviada al cliente para actividad ${activity.id}`);
     } catch (err) {
+      console.error("[UPLOAD] Error en el endpoint /api/upload/excel:", err);
       next(err);
     }
   });
@@ -3353,6 +3326,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   initializeFileWatchers().catch(err => 
     console.error("Error initializing file watchers on startup:", err)
   );
+  
+  // Endpoint para obtener la ruta de la base de datos
+  app.get("/api/config/database-path", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const config = await storage.getConfig("DATABASE_PATH");
+        res.json({ path: config?.value || "./aureo_app/datos.sqlite" });
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
+  
+  // Endpoint para actualizar la ruta de la base de datos y reinicializar la conexión
+  app.put("/api/config/database-path", (req, res, next) => {
+    req.authorize(["SuperAdmin"])(req, res, async () => {
+      try {
+        const { path: newPath } = req.body;
+        if (!newPath || typeof newPath !== "string") {
+          return res.status(400).json({ message: "Se requiere una ruta válida" });
+        }
+        // Guardar en system_configs
+        await storage.setConfig({
+          key: "DATABASE_PATH",
+          value: newPath,
+          description: "Ruta del archivo de base de datos SQLite"
+        });
+        // Reinicializar la conexión
+        initializeDatabaseConnection(newPath);
+        res.json({ success: true, path: newPath });
+      } catch (err) {
+        next(err);
+      }
+    });
+  });
   
   return httpServer;
 }

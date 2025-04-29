@@ -5,23 +5,45 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { sql } from 'drizzle-orm';
 
-// Ruta donde se creará la base de datos SQLite
-const DB_PATH = './aureo_app';
-const DB_FILE = 'datos.sqlite';
-const FULL_PATH = path.join(DB_PATH, DB_FILE);
+let sqlite: Database.Database;
+let db: ReturnType<typeof drizzle>;
 
-// Crear el directorio si no existe
-if (!fs.existsSync(DB_PATH)) {
-  fs.mkdirSync(DB_PATH, { recursive: true });
-  console.log(`Directorio creado: ${DB_PATH}`);
+// Función para obtener la ruta de la base de datos desde system_configs o usar la predeterminada
+function getDatabasePathSync() {
+  // Intentar leer la ruta de system_configs
+  try {
+    const configPath = path.join('./aureo_app', 'datos.sqlite');
+    if (!fs.existsSync('./aureo_app')) {
+      fs.mkdirSync('./aureo_app', { recursive: true });
+    }
+    // Leer la ruta de system_configs si existe
+    try {
+      const configFile = path.join('./aureo_app', 'system_configs.json');
+      if (fs.existsSync(configFile)) {
+        const configs = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+        if (configs.DATABASE_PATH && typeof configs.DATABASE_PATH === 'string') {
+          return configs.DATABASE_PATH;
+        }
+      }
+    } catch {}
+    return configPath;
+  } catch {
+    return './aureo_app/datos.sqlite';
+  }
 }
 
-// Crear la conexión a la base de datos SQLite
-const sqlite = new Database(FULL_PATH);
-console.log(`Base de datos SQLite inicializada en: ${FULL_PATH}`);
+function initializeDatabaseConnection(dbPath?: string) {
+  const pathToUse = dbPath || getDatabasePathSync();
+  sqlite = new Database(pathToUse);
+  db = drizzle(sqlite, { schema });
+  console.log(`Base de datos SQLite inicializada en: ${pathToUse}`);
+  return db;
+}
 
-// Crear la instancia de Drizzle ORM
-export const db = drizzle(sqlite, { schema });
+// Inicializar la conexión al arrancar
+initializeDatabaseConnection();
 
 // Exportar el cliente SQLite directamente para consultas SQL puras
 export { sqlite };
+
+export { db, initializeDatabaseConnection };

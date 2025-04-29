@@ -758,9 +758,9 @@ export async function processExcelFile(filePath: string, activityId: number, sto
         
         // Primero, intentar búsqueda ignorando espacios
         let storeMatch = allStores.find(store => {
-          const storeCodeNoSpaces = store.code.replace(/\s+/g, '');
-          const detectedCodeNoSpaces = normalizedExcelStoreCode.replace(/\s+/g, '');
-          return storeCodeNoSpaces === detectedCodeNoSpaces;
+          const storeCodeNoSpaces = store.code.replace(/\s+/g, '').toUpperCase();
+          const detectedCodeNormalized = normalizedExcelStoreCode.replace(/\s+/g, '').toUpperCase();
+          return storeCodeNoSpaces === detectedCodeNormalized;
         });
         
         // Si no encontramos coincidencia exacta sin espacios, buscar la más similar
@@ -1020,7 +1020,7 @@ export async function processPdfFile(filePath: string, activityId: number, store
         
         // Buscar si algún código de tienda aparece en el nombre del archivo
         for (const code of storesCodes) {
-          if (originalFilename.includes(code)) {
+          if (originalFilename.toLowerCase().includes(code.toLowerCase())) {
             pdfStoreCode = code;
             console.log(`Found exact store code in filename: ${pdfStoreCode}`);
             break;
@@ -1059,9 +1059,9 @@ export async function processPdfFile(filePath: string, activityId: number, store
         
         // Primero, intentar búsqueda ignorando espacios
         let storeMatch = allStores.find(store => {
-          const storeCodeNoSpaces = store.code.replace(/\s+/g, '');
-          const detectedCodeNoSpaces = normalizedPdfStoreCode.replace(/\s+/g, '');
-          return storeCodeNoSpaces === detectedCodeNoSpaces;
+          const storeCodeNoSpaces = store.code.replace(/\s+/g, '').toUpperCase();
+          const detectedCodeNormalized = normalizedPdfStoreCode.replace(/\s+/g, '').toUpperCase();
+          return storeCodeNoSpaces === detectedCodeNormalized;
         });
         
         // Si no encontramos coincidencia exacta sin espacios, buscar la más similar
@@ -1302,24 +1302,24 @@ export async function processPdfFile(filePath: string, activityId: number, store
         // Actualizar la ruta del documento en la base de datos
         await storage.updatePdfDocumentPath(pdfDocument.fileActivityId, destPath);
         
-        console.log(`Archivo PDF movido a ${destPath}`);
+        console.log("Archivo PDF movido correctamente");
       }
     } catch (moveError) {
-      console.error(`Error al mover el archivo PDF a la carpeta 'procesados':`, moveError);
+      console.error(`Error al mover el archivo a la carpeta 'procesados':`, moveError);
       // No fallar el proceso completo si no se puede mover el archivo
     }
-    
-    // Update file activity to Processed
+
+    // Actualizar la actividad del archivo a Processed
     await storage.updateFileActivityStatus(activityId, 'Processed');
     emitFileProcessingStatus(activityId, 'Processed');
     
-    console.log(`Successfully processed PDF file ${path.basename(filePath)}`);
+    console.log(`Archivo PDF procesado correctamente: ${path.basename(filePath)}`);
     
   } catch (error) {
-    console.error(`Error processing PDF file ${filePath}:`, error);
+    console.error(`Error al procesar el archivo ${filePath}:`, error);
     
-    // Update file activity to Failed
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error during processing';
+    // Actualizar la actividad del archivo a Failed
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido durante el procesamiento';
     await storage.updateFileActivityStatus(activityId, 'Failed', errorMessage);
     emitFileProcessingStatus(activityId, 'Failed', errorMessage);
   }

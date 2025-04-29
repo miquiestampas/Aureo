@@ -43,7 +43,8 @@ import {
   PlayCircle,
   StopCircle,
   Save,
-  AlertCircle
+  AlertCircle,
+  Database
 } from "lucide-react";
 
 interface SystemConfig {
@@ -337,6 +338,19 @@ export default function SystemConfigPage() {
                   {renderDirectoryInput('PDF_WATCH_DIR', 'PDF Files Directory Path', <FolderOpen className="h-4 w-4" />)}
                 </CardContent>
               </Card>
+              
+              {/* Database Path Configuration */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Database className="h-5 w-5 mr-2 text-blue-600" />
+                    Database File Path
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {renderDirectoryInput('DATABASE_PATH', 'Database File Path', <Database className="h-4 w-4" />)}
+                </CardContent>
+              </Card>
             </div>
             
             {/* Advanced Settings */}
@@ -353,7 +367,7 @@ export default function SystemConfigPage() {
                       
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" className="w-full border-dashed border-red-300 text-red-500 hover:text-red-700">
+                          <Button variant="outline" className="w-full border-red-300 text-red-500 hover:text-red-700">
                             <AlertCircle className="mr-2 h-4 w-4" />
                             Reset Directory Settings
                           </Button>

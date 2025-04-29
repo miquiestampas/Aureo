@@ -287,7 +287,7 @@ async function handleNewPdfFile(filePath: string) {
     
     // Primero intentar coincidencia exacta de código
     for (const store of allStores) {
-      if (filename.includes(store.code)) {
+      if (filename.toLowerCase().includes(store.code.toLowerCase())) {
         foundStore = store;
         console.log(`PDF matched with store by code: ${store.code}`);
         break;

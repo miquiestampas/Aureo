@@ -1081,6 +1081,12 @@ export default function PurchaseControlPage() {
                       <Phone className="h-4 w-4 mr-2 text-gray-400" />
                       <span>{selectedRecord.customerContact}</span>
                     </div>
+                    {selectedRecord.customerAddress && (
+                      <div className="flex items-center ml-6">
+                        <MapPin className="h-4 w-4 mr-2 text-gray-400" />
+                        <span>{selectedRecord.customerAddress}</span>
+                      </div>
+                    )}
                     {selectedRecord.customerLocation && (
                       <div className="flex items-center ml-6">
                         <MapPin className="h-4 w-4 mr-2 text-gray-400" />
